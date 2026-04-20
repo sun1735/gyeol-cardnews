@@ -8,20 +8,95 @@ datasource db {
 }
 
 model BrandProfile {
-  id             String       @id @default(cuid())
-  name           String       @unique
-  tone           String       @default("")
-  defaultPhrase  String       @default("")
-  primaryColor   String       @default("#0f766e")
-  secondaryColor String       @default("#f0fdfa")
-  textColor      String       @default("#111827")
-  fontFamily     String       @default("Pretendard, sans-serif")
+  id             String                @id @default(cuid())
+  name           String                @unique
+  tone           String                @default("")
+  defaultPhrase  String                @default("")
+  primaryColor   String                @default("#0f766e")
+  secondaryColor String                @default("#f0fdfa")
+  textColor      String                @default("#111827")
+  fontFamily     String                @default("Pretendard, sans-serif")
   assets         BrandAsset[]
   projects       Project[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  knowledgeDocs  BrandKnowledgeDoc[]
+  knowledgeChunks BrandKnowledgeChunk[]
+  imageAssets    BrandImageAsset[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
   @@map("brand_profiles")
+}
+
+// 브랜드 자료 문서. 카피라이팅용 컨텍스트 — 제품 설명·보도자료·FAQ 등을 수집.
+model BrandKnowledgeDoc {
+  id          String   @id @default(cuid())
+  brandId     String
+  title       String
+  sourceType  String   // upload | url | note
+  sourceUrl   String?
+  contentText String   @default("")
+  status      String   @default("ready") // ready | indexing | failed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brand  BrandProfile          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  chunks BrandKnowledgeChunk[]
+
+  @@index([brandId, createdAt])
+  @@map("brand_knowledge_docs")
+}
+
+// 청크 단위 검색 유닛. MVP 는 키워드(BM25-like) 매칭 — embedding 컬럼은 후속용 자리.
+model BrandKnowledgeChunk {
+  id         String   @id @default(cuid())
+  brandId    String
+  docId      String
+  chunkIndex Int
+  text       String
+  tokenCount Int      @default(0)
+  embedding  String?  // JSON stringified vector, 추후 pgvector 컬럼으로 교체 권장
+  createdAt  DateTime @default(now())
+
+  brand BrandProfile      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  doc   BrandKnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([brandId, docId])
+  @@map("brand_knowledge_chunks")
+}
+
+// 태그 달린 이미지 라이브러리. 카드별 이미지 후보 랭킹 대상.
+model BrandImageAsset {
+  id           String   @id @default(cuid())
+  brandId      String
+  url          String
+  label        String   @default("")
+  tags         String   @default("") // JSON stringified string[] — 간단 매칭용
+  usageRights  String   @default("owned") // owned | licensed | unknown
+  qualityScore Float    @default(0.5) // 0~1
+  createdAt    DateTime @default(now())
+
+  brand BrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId, createdAt])
+  @@map("brand_image_assets")
+}
+
+// 비동기 카드 생성 잡. Postgres row 가 source of truth.
+// 부팅 시 status='running' 행은 'failed' 로 복구해서 좀비 방지.
+model GenerationJob {
+  id           String   @id @default(cuid())
+  brandId      String?
+  mode         String   // note_rag (현재) | future modes
+  status       String   @default("queued") // queued | running | partial | done | failed
+  requestJson  String   // 원 요청 payload
+  resultJson   String?  // 결과 cards + meta
+  errorMessage String?
+  progress     Int      @default(0) // 0~100
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@map("generation_jobs")
 }
 
 model BrandAsset {

@@ -11,6 +11,7 @@ import { UploadModule } from './upload/upload.module'
 import { BackgroundsModule } from './backgrounds/backgrounds.module'
 import { ReelsModule } from './reels/reels.module'
 import { ImagesModule } from './images/images.module'
+import { KnowledgeModule } from './knowledge/knowledge.module'
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ImagesModule } from './images/images.module'
     BackgroundsModule,
     ReelsModule,
     ImagesModule,
+    KnowledgeModule,
   ],
 })
 export class AppModule {}
