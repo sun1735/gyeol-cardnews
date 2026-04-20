@@ -57,13 +57,32 @@ function zipFilename(brand: string | undefined) {
   return `${safeBrandName(brand)}_${todayStamp()}.zip`
 }
 
+type GenMode = 'auto' | 'manual' | 'note-rag'
+
 export default function Page() {
-  const [mode, setMode] = useState<'auto' | 'manual'>('auto')
+  const [mode, setMode] = useState<GenMode>('auto')
   const [size, setSize] = useState<SizePreset>('1:1')
   const [count, setCount] = useState(3)
   const [prompt, setPrompt] = useState('')
   const [baseImages, setBaseImages] = useState<string[]>([]) // Mode A — 공통 참조 이미지 1~3장
   const [baseUploading, setBaseUploading] = useState(false)
+  const [ragProgress, setRagProgress] = useState<number | null>(null) // 지식노트 기반 비동기 생성 진행률
+  const [ragError, setRagError] = useState<string | null>(null)
+  const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false)
+
+  // 지식노트 — 선택된 브랜드의 문서·이미지 라이브러리
+  const [knowledgeDocs, setKnowledgeDocs] = useState<
+    Array<{ id: string; title: string; sourceType: string; chunkCount: number; createdAt: string }>
+  >([])
+  const [knowledgeImages, setKnowledgeImages] = useState<
+    Array<{ id: string; url: string; label: string; tags: string[]; qualityScore: number }>
+  >([])
+  const [newDocTitle, setNewDocTitle] = useState('')
+  const [newDocText, setNewDocText] = useState('')
+  const [docSaving, setDocSaving] = useState(false)
+  const [newImageLabel, setNewImageLabel] = useState('')
+  const [newImageTags, setNewImageTags] = useState('')
+  const [imageUploading, setImageUploading] = useState(false)
   const [manual, setManual] = useState<ManualInput[]>(
     Array.from({ length: 5 }, emptyManual)
   )
@@ -114,15 +133,151 @@ export default function Page() {
     }
   }
 
+  async function loadKnowledge(brandId: string) {
+    try {
+      const [d, i] = await Promise.all([
+        fetch(`/api/knowledge/docs?brandId=${brandId}`).then((r) => r.json()),
+        fetch(`/api/knowledge/images?brandId=${brandId}`).then((r) => r.json()),
+      ])
+      setKnowledgeDocs(d?.docs ?? [])
+      setKnowledgeImages(i?.images ?? [])
+    } catch {
+      setKnowledgeDocs([])
+      setKnowledgeImages([])
+    }
+  }
+
+  async function createKnowledgeDoc() {
+    if (!selectedBrandId || !newDocTitle.trim() || !newDocText.trim()) return
+    setDocSaving(true)
+    try {
+      const r = await fetch('/api/knowledge/docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandId: selectedBrandId,
+          title: newDocTitle.trim(),
+          sourceType: 'note',
+          contentText: newDocText,
+        }),
+      })
+      if (r.ok) {
+        setNewDocTitle('')
+        setNewDocText('')
+        await loadKnowledge(selectedBrandId)
+      } else {
+        const j = await r.json().catch(() => ({}))
+        alert(`문서 저장 실패: ${j?.message ?? r.status}`)
+      }
+    } finally {
+      setDocSaving(false)
+    }
+  }
+
+  async function deleteKnowledgeDoc(id: string) {
+    if (!selectedBrandId) return
+    if (!confirm('이 문서를 삭제할까요? 관련 청크도 함께 삭제됩니다.')) return
+    await fetch(`/api/knowledge/docs/${id}`, { method: 'DELETE' })
+    await loadKnowledge(selectedBrandId)
+  }
+
+  async function addKnowledgeImage(file: File) {
+    if (!selectedBrandId) return
+    setImageUploading(true)
+    try {
+      // 1) 파일 업로드 → URL
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('consent', 'true')
+      const up = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
+      if (!up?.url) {
+        alert('업로드 실패')
+        return
+      }
+      // 2) knowledge 이미지 에셋으로 등록
+      const tags = newImageTags
+        .split(/[,，\s]+/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+      const r = await fetch('/api/knowledge/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandId: selectedBrandId,
+          url: up.url,
+          label: newImageLabel.trim(),
+          tags,
+          usageRights: 'owned',
+          qualityScore: 0.8,
+        }),
+      })
+      if (r.ok) {
+        setNewImageLabel('')
+        setNewImageTags('')
+        await loadKnowledge(selectedBrandId)
+      } else {
+        const j = await r.json().catch(() => ({}))
+        alert(`이미지 등록 실패: ${j?.message ?? r.status}`)
+      }
+    } finally {
+      setImageUploading(false)
+    }
+  }
+
+  async function deleteKnowledgeImage(id: string) {
+    if (!selectedBrandId) return
+    if (!confirm('이 이미지 에셋을 라이브러리에서 제거할까요?')) return
+    await fetch(`/api/knowledge/images/${id}`, { method: 'DELETE' })
+    await loadKnowledge(selectedBrandId)
+  }
+
   useEffect(() => {
     loadBrands()
     checkHealth()
     loadBackgrounds()
   }, [])
 
+  // 지식노트 패널이 열리거나 브랜드가 바뀌면 문서·이미지 재로드
+  useEffect(() => {
+    if (knowledgePanelOpen && selectedBrandId) {
+      loadKnowledge(selectedBrandId)
+    }
+  }, [knowledgePanelOpen, selectedBrandId])
+
   async function handleGenerate() {
+    setRagError(null)
     setIsGenerating(true)
     try {
+      if (mode === 'note-rag') {
+        if (!selectedBrandId) {
+          setRagError('지식노트 기반 생성은 브랜드 선택이 필수입니다.')
+          return
+        }
+        setRagProgress(0)
+        const enqRes = await fetch('/api/generate/cards-from-note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brandId: selectedBrandId,
+            prompt,
+            count,
+            baseImageUrls: baseImages.length ? baseImages : undefined,
+            sizePreset: size,
+          }),
+        })
+        if (!enqRes.ok) {
+          const j = await enqRes.json().catch(() => ({}))
+          setRagError(j?.message ?? `HTTP ${enqRes.status}`)
+          return
+        }
+        const { jobId } = await enqRes.json()
+        const cards = await pollRagJob(jobId)
+        setCards(cards)
+        setSelectedCardId(cards[0]?.id ?? null)
+        setRagProgress(100)
+        return
+      }
+
       const body =
         mode === 'auto'
           ? {
@@ -153,7 +308,27 @@ export default function Page() {
       setSelectedCardId(newCards[0]?.id ?? null)
     } finally {
       setIsGenerating(false)
+      // progress 는 완료 후 2초간 노출해서 사용자에게 피드백
+      if (mode === 'note-rag') {
+        setTimeout(() => setRagProgress(null), 2000)
+      }
     }
+  }
+
+  async function pollRagJob(jobId: string, timeoutMs = 180_000): Promise<CardData[]> {
+    const t0 = Date.now()
+    while (Date.now() - t0 < timeoutMs) {
+      const r = await fetch(`/api/generate/jobs/${jobId}`).then((r) => r.json())
+      setRagProgress(typeof r?.progress === 'number' ? r.progress : 0)
+      if (r?.status === 'done' || r?.status === 'partial') {
+        return (r.cards ?? []) as CardData[]
+      }
+      if (r?.status === 'failed') {
+        throw new Error(r?.errorMessage ?? '잡 실패')
+      }
+      await new Promise((res) => setTimeout(res, 1500))
+    }
+    throw new Error(`잡 ${jobId} 시간 초과 (${Math.round(timeoutMs / 1000)}s)`)
   }
 
   function updateCard(id: string, patch: Partial<CardData>) {
@@ -476,24 +651,44 @@ export default function Page() {
               </select>
             </div>
 
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 onClick={() => setMode('auto')}
-                className={`flex-1 px-3 py-2 rounded-md text-sm border ${
+                className={`px-2 py-2 rounded-md text-xs border leading-tight ${
                   mode === 'auto' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white'
                 }`}
               >
-                프롬프트 자동 생성
+                <span className="block font-semibold">자동</span>
+                <span className="block text-[10px] opacity-75">프롬프트 → 5장</span>
               </button>
               <button
                 onClick={() => setMode('manual')}
-                className={`flex-1 px-3 py-2 rounded-md text-sm border ${
+                className={`px-2 py-2 rounded-md text-xs border leading-tight ${
                   mode === 'manual' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white'
                 }`}
               >
-                카드별 수동 입력
+                <span className="block font-semibold">수동</span>
+                <span className="block text-[10px] opacity-75">카드별 직접 입력</span>
+              </button>
+              <button
+                onClick={() => setMode('note-rag')}
+                className={`px-2 py-2 rounded-md text-xs border leading-tight ${
+                  mode === 'note-rag' ? 'bg-violet-700 text-white border-violet-700' : 'bg-white'
+                }`}
+                title="브랜드 지식노트 + 이미지 라이브러리로 더 정확한 카드 생성"
+              >
+                <span className="block font-semibold">✨ 지식노트</span>
+                <span className="block text-[10px] opacity-75">RAG 기반</span>
               </button>
             </div>
+            {mode === 'note-rag' && (
+              <button
+                onClick={() => setKnowledgePanelOpen((v) => !v)}
+                className="w-full px-3 py-1.5 text-xs border rounded-md bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100"
+              >
+                {knowledgePanelOpen ? '📚 지식노트 관리 닫기' : '📚 지식노트 관리 열기'}
+              </button>
+            )}
 
             <div>
               <label className="block text-xs text-slate-500 mb-1">사이즈 프리셋</label>
@@ -519,27 +714,41 @@ export default function Page() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-500 mb-1">카드 수 (생성 시)</label>
+              <label className="block text-xs text-slate-500 mb-1">
+                카드 수 (생성 시){mode === 'note-rag' ? ' · 최대 10' : ' · 최대 5'}
+              </label>
               <input
                 type="number"
                 min={1}
-                max={5}
+                max={mode === 'note-rag' ? 10 : 5}
                 value={count}
-                onChange={(e) =>
-                  setCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))
-                }
+                onChange={(e) => {
+                  const max = mode === 'note-rag' ? 10 : 5
+                  setCount(Math.max(1, Math.min(max, Number(e.target.value) || 1)))
+                }}
                 className="w-full border rounded-md px-2 py-2 text-sm"
               />
             </div>
 
-            {mode === 'auto' ? (
+            {mode !== 'manual' ? (
               <div>
-                <label className="block text-sm font-medium mb-1">프롬프트</label>
+                <label className="block text-sm font-medium mb-1">
+                  프롬프트
+                  {mode === 'note-rag' && (
+                    <span className="ml-2 text-[11px] font-normal text-violet-700">
+                      지식노트 + 이미지 라이브러리로 자동 컨텍스트 주입
+                    </span>
+                  )}
+                </label>
                 <textarea
                   rows={5}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="예) 유순 임산부와 유아를 위한 케어 서비스 안내"
+                  placeholder={
+                    mode === 'note-rag'
+                      ? '예) 유순 제품 5월 1일 온라인 판매 시작 — 인스타 피드 6장'
+                      : '예) 유순 임산부와 유아를 위한 케어 서비스 안내'
+                  }
                   className="w-full border rounded-md px-2 py-2 text-sm"
                 />
                 <p className="mt-1 text-xs text-slate-500">
@@ -655,8 +864,25 @@ export default function Page() {
               onClick={handleGenerate}
               className="w-full bg-teal-700 hover:bg-teal-800 text-white rounded-md py-2 text-sm font-medium disabled:opacity-60"
             >
-              {isGenerating ? '생성 중…' : '카드 생성'}
+              {isGenerating
+                ? mode === 'note-rag'
+                  ? `생성 중… ${ragProgress ?? 0}%`
+                  : '생성 중…'
+                : '카드 생성'}
             </button>
+            {mode === 'note-rag' && ragProgress !== null && (
+              <div className="h-1.5 w-full bg-violet-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-violet-600 transition-[width] duration-300"
+                  style={{ width: `${Math.min(100, Math.max(0, ragProgress))}%` }}
+                />
+              </div>
+            )}
+            {ragError && (
+              <div className="text-[11px] text-red-600 leading-relaxed">
+                지식노트 생성 오류: {ragError}
+              </div>
+            )}
           </div>
 
           {cards.length > 0 && (
@@ -1027,6 +1253,161 @@ export default function Page() {
             </div>
           </div>
         </section>
+      )}
+
+      {knowledgePanelOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setKnowledgePanelOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b px-5 py-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold">
+                📚 지식노트 — {selectedBrand?.name ?? '(브랜드 미선택)'}
+              </h2>
+              <button
+                onClick={() => setKnowledgePanelOpen(false)}
+                className="text-slate-500 hover:text-slate-900 text-xl leading-none"
+                aria-label="닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            {!selectedBrandId ? (
+              <div className="p-6 text-sm text-slate-500">
+                먼저 왼쪽 상단에서 브랜드를 선택해 주세요.
+              </div>
+            ) : (
+              <div className="p-5 space-y-6">
+                {/* 문서 섹션 */}
+                <section>
+                  <h3 className="text-sm font-semibold mb-2">
+                    문서 <span className="text-slate-400 font-normal">({knowledgeDocs.length})</span>
+                  </h3>
+                  <div className="space-y-2 mb-3">
+                    {knowledgeDocs.length === 0 && (
+                      <p className="text-xs text-slate-400">등록된 문서가 없습니다.</p>
+                    )}
+                    {knowledgeDocs.map((d) => (
+                      <div
+                        key={d.id}
+                        className="flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-slate-50"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">{d.title}</div>
+                          <div className="text-[11px] text-slate-500">
+                            {d.sourceType} · 청크 {d.chunkCount}개 ·{' '}
+                            {new Date(d.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteKnowledgeDoc(d.id)}
+                          className="text-xs px-2 py-1 border rounded-md hover:bg-white"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border rounded-md p-3 bg-white space-y-2">
+                    <input
+                      value={newDocTitle}
+                      onChange={(e) => setNewDocTitle(e.target.value)}
+                      placeholder="문서 제목 (예: 유순 브랜드 소개서)"
+                      className="w-full border rounded-md px-2 py-1.5 text-sm"
+                    />
+                    <textarea
+                      value={newDocText}
+                      onChange={(e) => setNewDocText(e.target.value)}
+                      rows={5}
+                      placeholder="본문 (제품 설명, FAQ, 보도자료 등 — 서버에서 자동으로 청킹됩니다)"
+                      className="w-full border rounded-md px-2 py-1.5 text-sm"
+                    />
+                    <button
+                      onClick={createKnowledgeDoc}
+                      disabled={docSaving || !newDocTitle.trim() || !newDocText.trim()}
+                      className="px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white rounded-md text-sm disabled:opacity-60"
+                    >
+                      {docSaving ? '저장 중…' : '문서 추가'}
+                    </button>
+                  </div>
+                </section>
+
+                {/* 이미지 섹션 */}
+                <section>
+                  <h3 className="text-sm font-semibold mb-2">
+                    이미지 라이브러리{' '}
+                    <span className="text-slate-400 font-normal">({knowledgeImages.length})</span>
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                    {knowledgeImages.length === 0 && (
+                      <p className="text-xs text-slate-400 col-span-full">
+                        등록된 이미지가 없습니다.
+                      </p>
+                    )}
+                    {knowledgeImages.map((img) => (
+                      <div key={img.id} className="border rounded-md overflow-hidden bg-slate-50">
+                        <img src={img.url} alt="" className="w-full h-28 object-cover" />
+                        <div className="p-2 space-y-1">
+                          <div className="text-xs font-medium truncate">{img.label || '(라벨 없음)'}</div>
+                          {img.tags.length > 0 && (
+                            <div className="text-[10px] text-slate-500 truncate">
+                              #{img.tags.join(' #')}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => deleteKnowledgeImage(img.id)}
+                            className="text-[11px] px-2 py-0.5 border rounded-md hover:bg-white w-full"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border rounded-md p-3 bg-white space-y-2">
+                    <input
+                      value={newImageLabel}
+                      onChange={(e) => setNewImageLabel(e.target.value)}
+                      placeholder="라벨 (예: 유순 제품 메인컷)"
+                      className="w-full border rounded-md px-2 py-1.5 text-sm"
+                    />
+                    <input
+                      value={newImageTags}
+                      onChange={(e) => setNewImageTags(e.target.value)}
+                      placeholder="태그 (쉼표 · 공백 구분, 예: 제품, 화이트배경, 패키지)"
+                      className="w-full border rounded-md px-2 py-1.5 text-sm"
+                    />
+                    <label
+                      className={`inline-block cursor-pointer border rounded-md px-3 py-1.5 text-sm bg-violet-700 hover:bg-violet-800 text-white ${
+                        imageUploading ? 'opacity-60 pointer-events-none' : ''
+                      }`}
+                    >
+                      {imageUploading ? '업로드 중…' : '이미지 업로드 · 등록'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (f) addKnowledgeImage(f)
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      업로드 시 본인 저작권/사용권 보유에 동의한 것으로 간주됩니다.
+                    </p>
+                  </div>
+                </section>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </main>
   )
