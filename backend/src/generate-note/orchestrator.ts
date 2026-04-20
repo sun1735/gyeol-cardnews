@@ -218,9 +218,9 @@ export class Orchestrator {
     recipe: StyleRecipe,
   ): Promise<Array<{ url: string | null; status: 'edited' | 'original' | 'failed' }>> {
     const jobs = copies.map((c, i) =>
-      this.editOne(c, ranked[i], refs, recipe).catch((e) => {
+      this.editOne(c, ranked[i], refs, i, recipe).catch((e) => {
         this.logger.warn(`카드 ${i} 이미지 편집 실패: ${e?.message ?? e}`)
-        const fallback = ranked[i]?.url ?? refs[i % (refs.length || 1)] ?? null
+        const fallback = ranked[i]?.url ?? (refs.length ? refs[i % refs.length] : null)
         return { url: fallback, status: 'failed' as const }
       }),
     )
@@ -231,15 +231,21 @@ export class Orchestrator {
     copy: ValidatedCard,
     image: RankedImage | null,
     refs: string[],
+    cardIdx: number,
     recipe: StyleRecipe,
   ): Promise<{ url: string | null; status: 'edited' | 'original' | 'failed' }> {
-    const baseUrl = image?.url ?? refs[0] ?? null
+    // 카드별 베이스: 랭커 결과 우선, 없으면 참조 이미지 round-robin
+    const baseUrl = image?.url ?? (refs.length ? refs[cardIdx % refs.length] : null)
     if (!baseUrl) return { url: null, status: 'original' }
     if (!process.env.GEMINI_API_KEY) return { url: baseUrl, status: 'original' }
+
+    // SVG 는 Gemini 가 거절 — 편집 없이 원본 URL 그대로 사용
+    if (baseUrl.endsWith('.svg')) return { url: baseUrl, status: 'original' }
 
     const basePath = resolveUploadPath(baseUrl)
     const refPaths: string[] = []
     for (const r of refs) {
+      if (r.endsWith('.svg')) continue // 참조 SVG 도 스킵
       try {
         refPaths.push(resolveUploadPath(r))
       } catch {}
