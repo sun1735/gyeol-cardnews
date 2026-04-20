@@ -62,6 +62,8 @@ export default function Page() {
   const [size, setSize] = useState<SizePreset>('1:1')
   const [count, setCount] = useState(3)
   const [prompt, setPrompt] = useState('')
+  const [baseImages, setBaseImages] = useState<string[]>([]) // Mode A — 공통 참조 이미지 1~3장
+  const [baseUploading, setBaseUploading] = useState(false)
   const [manual, setManual] = useState<ManualInput[]>(
     Array.from({ length: 5 }, emptyManual)
   )
@@ -128,6 +130,7 @@ export default function Page() {
               prompt,
               count,
               brandId: selectedBrandId || undefined,
+              baseImageUrls: baseImages.length ? baseImages : undefined,
             }
           : {
               mode: 'manual',
@@ -138,6 +141,7 @@ export default function Page() {
                 cta: m.cta,
               })),
               brandId: selectedBrandId || undefined,
+              baseImageUrls: baseImages.length ? baseImages : undefined,
             }
       const r = await fetch('/api/generate/cards', {
         method: 'POST',
@@ -214,6 +218,32 @@ export default function Page() {
     fd.append('consent', 'true') // 업로드 권리 고지 동의 — 업로드 UI 의 안내 문구로 설명됨
     const r = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
     if (r.url) updateCard(id, { imageUrl: r.url })
+  }
+
+  // Mode A — 프롬프트 상단에 공통 참조 이미지 1~3장 첨부
+  async function addBaseImages(files: FileList | File[]) {
+    const remaining = 3 - baseImages.length
+    if (remaining <= 0) return
+    const list = Array.from(files).slice(0, remaining)
+    if (!list.length) return
+    setBaseUploading(true)
+    try {
+      const urls: string[] = []
+      for (const f of list) {
+        const fd = new FormData()
+        fd.append('file', f)
+        fd.append('consent', 'true')
+        const r = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
+        if (r?.url) urls.push(r.url)
+      }
+      if (urls.length) setBaseImages((prev) => [...prev, ...urls].slice(0, 3))
+    } finally {
+      setBaseUploading(false)
+    }
+  }
+
+  function removeBaseImage(i: number) {
+    setBaseImages((prev) => prev.filter((_, idx) => idx !== i))
   }
 
   async function downloadPng(cardId: string, index: number) {
@@ -528,6 +558,70 @@ export default function Page() {
                 ))}
               </div>
             )}
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                참조 이미지 <span className="text-slate-400 font-normal">(선택 · 최대 3장)</span>
+              </label>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (e.dataTransfer?.files?.length) addBaseImages(e.dataTransfer.files)
+                }}
+                className="border border-dashed rounded-md px-3 py-3 text-xs text-slate-500 bg-slate-50"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    {baseImages.length === 0
+                      ? '이미지를 드래그하거나 아래 버튼으로 첨부 — 모든 카드 배경에 공통 적용'
+                      : `${baseImages.length}/3장 첨부됨`}
+                  </span>
+                  <label
+                    className={`inline-block cursor-pointer border rounded-md px-2 py-1 bg-white hover:bg-slate-100 ${
+                      baseImages.length >= 3 || baseUploading ? 'opacity-50 pointer-events-none' : ''
+                    }`}
+                  >
+                    {baseUploading ? '업로드 중…' : '파일 선택'}
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.length) addBaseImages(e.target.files)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                </div>
+                {baseImages.length > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {baseImages.map((url, i) => (
+                      <div key={i} className="relative">
+                        <img
+                          src={url}
+                          alt=""
+                          className="w-16 h-16 object-cover rounded-md border"
+                        />
+                        <button
+                          onClick={() => removeBaseImage(i)}
+                          className="absolute -top-2 -right-2 bg-white border rounded-full w-5 h-5 text-xs"
+                          title="제거"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] text-slate-400 leading-relaxed">
+                  업로드 시 본인 저작권/사용권 보유에 동의한 것으로 간주됩니다.
+                </p>
+              </div>
+            </div>
 
             <button
               disabled={isGenerating}

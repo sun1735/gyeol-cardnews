@@ -70,4 +70,14 @@ export class GenerateCardsDto {
   @ApiPropertyOptional({ example: 'clz1brandcuid', description: '브랜드 CUID (양 모드 공통, 선택)' })
   @IsOptional() @IsString()
   brandId?: string
+
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['/uploads/1776666144533-skmkh2.png'],
+    description:
+      'Mode A — 모든 카드에 공통으로 적용할 참조 이미지 1~3장. 카드별 개별 업로드(imageUrl)가 없으면 이 배열이 round-robin 으로 배경에 주입된다. 먼저 /api/upload 로 URL 확보 후 전달.',
+  })
+  @IsOptional() @IsArray() @ArrayMaxSize(3)
+  @IsString({ each: true })
+  baseImageUrls?: string[]
 }

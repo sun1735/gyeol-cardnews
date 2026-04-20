@@ -26,6 +26,7 @@ export class GenerateController {
       count: body.count,
       cards: body.cards,
       brandId: body.brandId,
+      baseImageUrls: body.baseImageUrls,
       clientIp,
     })
   }

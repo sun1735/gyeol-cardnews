@@ -45,6 +45,7 @@ interface GenInput {
   count?: number
   brandId?: string
   cards?: ManualCardInput[]
+  baseImageUrls?: string[] // Mode A — 프롬프트에 공통 첨부된 참조 이미지 1~3장
   clientIp?: string // 운영 로그 식별용 — DTO 가 아니라 컨트롤러에서 주입
 }
 
@@ -179,18 +180,22 @@ function brandImagesOf(brand: any): string[] {
   return brand?.assets?.filter((a: any) => a.kind === 'image').map((a: any) => a.url) ?? []
 }
 
-// 단계 5: 이미지 우선순위
+// 이미지 우선순위
 // 1) 수동 입력 imageUrl (manual 모드) / GPT 응답에 온 imageUrl
-// 2) 브랜드 에셋 (선택 시)
-// 3) 프레임 기본 배경 (빈 페이지 방지)
+// 2) Mode A — 프롬프트에 공통 첨부된 참조 이미지 (round-robin 으로 분배)
+// 3) 브랜드 에셋 (선택 시)
+// 4) 프레임 기본 배경 (빈 페이지 방지)
 function resolveImage(
   manual: string | undefined,
   brandImages: string[],
   frame: Frame,
   layout: Layout,
   topicIdx: number,
+  baseImages: string[] = [],
+  cardIdx = 0,
 ): string {
   if (manual) return manual
+  if (baseImages.length) return baseImages[cardIdx % baseImages.length]
   if (brandImages.length) return brandImages[topicIdx % brandImages.length]
   if (layout === 'cover') return frame.coverBg
   if (layout === 'cta') return frame.ctaBg
@@ -250,12 +255,15 @@ export class GenerateService {
       })
     }
 
-    // 3) 생성
+    // 3) 생성 — baseImages 는 양 모드에서 공통 우선순위 적용
+    const baseImages = (input.baseImageUrls ?? []).filter(
+      (u): u is string => typeof u === 'string' && !!u.trim(),
+    )
     try {
       const built =
         input.mode === 'manual'
-          ? this.wrapManual(input.cards ?? [], brand)
-          : await this.fromPrompt(input.prompt ?? '', input.count ?? 3, brand)
+          ? this.wrapManual(input.cards ?? [], brand, baseImages)
+          : await this.fromPrompt(input.prompt ?? '', input.count ?? 3, brand, baseImages)
       const meta: GenMeta = { ...built.meta, durationMs: Date.now() - t0 }
       const outcome: 'success' | 'partial' =
         meta.source === 'template' && input.mode === 'auto' && process.env.OPENAI_API_KEY
@@ -287,11 +295,11 @@ export class GenerateService {
     }
   }
 
-  private wrapManual(manual: ManualCardInput[], brand: any): {
+  private wrapManual(manual: ManualCardInput[], brand: any, baseImages: string[]): {
     cards: CardOut[]
     meta: Omit<GenMeta, 'durationMs'>
   } {
-    const cards = this.fromManual(manual, brand)
+    const cards = this.fromManual(manual, brand, baseImages)
     return {
       cards,
       meta: {
@@ -346,7 +354,7 @@ export class GenerateService {
   }
 
   // ── 수동 입력 정규화 ─────────────────────────────
-  private fromManual(manual: ManualCardInput[], brand: any): CardOut[] {
+  private fromManual(manual: ManualCardInput[], brand: any, baseImages: string[] = []): CardOut[] {
     const n = manual.length
     const brandImages = brandImagesOf(brand)
     const brandName: string = brand?.name ?? ''
@@ -382,7 +390,7 @@ export class GenerateService {
         body: m.body || bodyFallback,
         subtext: m.subtext || subtextFallback,
         cta: m.cta || ctaFallback,
-        imageUrl: resolveImage(m.imageUrl, brandImages, frame, layout, topicIdx),
+        imageUrl: resolveImage(m.imageUrl, brandImages, frame, layout, topicIdx, baseImages, i),
         layout,
       })
     })
@@ -393,10 +401,11 @@ export class GenerateService {
     prompt: string,
     countRaw: number,
     brand: any,
+    baseImages: string[] = [],
   ): Promise<{ cards: CardOut[]; meta: Omit<GenMeta, 'durationMs'> }> {
     const n = clamp(countRaw)
     const frame = pickFrame(prompt)
-    const templateCards = this.template(prompt, n, brand, frame)
+    const templateCards = this.template(prompt, n, brand, frame, baseImages)
 
     let llmAttempt: LlmAttempt | null = null
     if (process.env.OPENAI_API_KEY) {
@@ -417,7 +426,7 @@ export class GenerateService {
             body: v.body,
             subtext: v.subtext,
             cta: v.cta,
-            imageUrl: resolveImage(undefined, brandImages, frame, v.layout, topicIdx),
+            imageUrl: resolveImage(undefined, brandImages, frame, v.layout, topicIdx, baseImages, i),
             layout: v.layout,
           }),
         )
@@ -441,7 +450,7 @@ export class GenerateService {
     }
   }
 
-  private template(prompt: string, n: number, brand: any, frame: Frame): CardOut[] {
+  private template(prompt: string, n: number, brand: any, frame: Frame, baseImages: string[] = []): CardOut[] {
     const brandImages = brandImagesOf(brand)
     const brandName: string = brand?.name ?? ''
     const brandPhrase: string = brand?.defaultPhrase || frame.ctaTitle
@@ -475,7 +484,7 @@ export class GenerateService {
         finalize({
           id: randId(),
           title, body, subtext, cta,
-          imageUrl: resolveImage(undefined, brandImages, frame, layout, topicIdx),
+          imageUrl: resolveImage(undefined, brandImages, frame, layout, topicIdx, baseImages, i),
           layout,
         }),
       )
