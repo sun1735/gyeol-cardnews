@@ -89,7 +89,11 @@ export default function Page() {
   const [baseUploading, setBaseUploading] = useState(false)
   const [ragProgress, setRagProgress] = useState<number | null>(null) // 지식노트 기반 비동기 생성 진행률
   const [ragError, setRagError] = useState<string | null>(null)
-  const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false)
+
+  // 브랜드 관리 모달 (통합 — 기본정보·지식노트·이미지·아이디어 4탭)
+  const [brandModalOpen, setBrandModalOpen] = useState(false)
+  const [brandModalTab, setBrandModalTab] = useState<'info' | 'docs' | 'images' | 'ideas'>('info')
+  const [editingBrandId, setEditingBrandId] = useState<string | null>(null) // null = 새 브랜드 생성 모드
 
   // 지식노트 — 선택된 브랜드의 문서·이미지 라이브러리
   const [knowledgeDocs, setKnowledgeDocs] = useState<
@@ -122,8 +126,8 @@ export default function Page() {
   const [cards, setCards] = useState<CardData[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState<string>('')
+  // showBrandPanel 제거됨 — 브랜드 모달(brandModalOpen) 하나로 통합
   const [isGenerating, setIsGenerating] = useState(false)
-  const [showBrandPanel, setShowBrandPanel] = useState(false)
   const [healthStatus, setHealthStatus] = useState<string>('확인 중…')
   const [backgrounds, setBackgrounds] = useState<BackgroundTemplate[]>([])
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
@@ -308,7 +312,7 @@ export default function Page() {
     setMode('note-rag')
     setPrompt(idea.prompt)
     setCount(Math.max(1, Math.min(10, idea.suggestedCount)))
-    setKnowledgePanelOpen(false)
+    setBrandModalOpen(false)
   }
 
   useEffect(() => {
@@ -319,10 +323,10 @@ export default function Page() {
 
   // 지식노트 패널이 열리거나 브랜드가 바뀌면 문서·이미지 재로드
   useEffect(() => {
-    if (knowledgePanelOpen && selectedBrandId) {
+    if (brandModalOpen && selectedBrandId) {
       loadKnowledge(selectedBrandId)
     }
-  }, [knowledgePanelOpen, selectedBrandId])
+  }, [brandModalOpen, selectedBrandId])
 
   async function handleGenerate() {
     setRagError(null)
@@ -708,15 +712,29 @@ export default function Page() {
       alert('브랜드 이름을 입력해 주세요.')
       return
     }
-    const res = await fetch('/api/brands', {
-      method: 'POST',
+    const isEdit = !!editingBrandId
+    const url = isEdit ? `/api/brands/${editingBrandId}` : '/api/brands'
+    const method = isEdit ? 'PATCH' : 'POST'
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newBrand),
     })
     if (!res.ok) {
-      alert('저장 실패 (같은 이름이 이미 있을 수 있어요)')
+      alert(isEdit ? '수정 실패' : '저장 실패 (같은 이름이 이미 있을 수 있어요)')
       return
     }
+    const j = await res.json().catch(() => ({}))
+    const savedId = j?.brand?.id ?? j?.id ?? editingBrandId
+    resetBrandForm()
+    await loadBrands()
+    if (savedId && !isEdit) {
+      setSelectedBrandId(savedId)
+      setEditingBrandId(savedId) // 새로 생성 후 바로 편집 모드로 전환
+    }
+  }
+
+  function resetBrandForm() {
     setNewBrand({
       name: '',
       tone: '',
@@ -727,53 +745,105 @@ export default function Page() {
       fontFamily: 'Pretendard, sans-serif',
       assets: [],
     })
-    await loadBrands()
+  }
+
+  function loadBrandIntoForm(b: Brand) {
+    setNewBrand({
+      name: b.name,
+      tone: b.tone ?? '',
+      defaultPhrase: b.defaultPhrase ?? '',
+      primaryColor: b.primaryColor ?? '#0f766e',
+      secondaryColor: b.secondaryColor ?? '#f0fdfa',
+      textColor: b.textColor ?? '#111827',
+      fontFamily: b.fontFamily ?? 'Pretendard, sans-serif',
+      assets: (b.assets ?? []).map((a) => ({ url: a.url, caption: a.caption ?? '', kind: a.kind })),
+    })
+  }
+
+  function openBrandModal(mode: 'create' | 'edit', brandId?: string) {
+    setBrandModalOpen(true)
+    setBrandModalTab('info')
+    if (mode === 'create') {
+      setEditingBrandId(null)
+      resetBrandForm()
+    } else {
+      const b = brands.find((x) => x.id === (brandId ?? selectedBrandId))
+      if (b) {
+        setEditingBrandId(b.id)
+        loadBrandIntoForm(b)
+        if (selectedBrandId !== b.id) setSelectedBrandId(b.id)
+      }
+    }
   }
 
   async function deleteBrand(id: string) {
-    if (!confirm('이 브랜드를 삭제할까요?')) return
+    if (!confirm('이 브랜드를 삭제할까요? 관련 지식노트·이미지 라이브러리·아이디어도 함께 삭제됩니다.'))
+      return
     await fetch(`/api/brands/${id}`, { method: 'DELETE' })
-    if (selectedBrandId === id) setSelectedBrandId('')
+    if (selectedBrandId === id) {
+      setSelectedBrandId('')
+      setEditingBrandId(null)
+      resetBrandForm()
+    }
     await loadBrands()
   }
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-6">
-      <header className="flex items-center justify-between mb-6">
+      <header className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">결 · 카드뉴스 생성기</h1>
           <p className="text-sm text-slate-500">
-            브랜드 톤앤매너에 맞춘 1~5장 카드뉴스 MVP ·{' '}
+            브랜드 톤앤매너에 맞춘 1~10장 카드뉴스 MVP ·{' '}
             <span className="font-mono">{healthStatus}</span>
           </p>
         </div>
-        <button
-          onClick={() => setShowBrandPanel((s) => !s)}
-          className="px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-100 text-sm"
-        >
-          {showBrandPanel ? '브랜드 패널 닫기' : '브랜드 관리'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 현재 브랜드 배지 — 클릭 시 편집 모달 */}
+          {selectedBrand ? (
+            <button
+              onClick={() => openBrandModal('edit', selectedBrand.id)}
+              className="flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-100 text-sm"
+              title="브랜드 관리 열기"
+            >
+              <span
+                className="w-4 h-4 rounded-sm border"
+                style={{ background: selectedBrand.primaryColor }}
+                aria-hidden
+              />
+              <span className="font-medium">🏷️ {selectedBrand.name}</span>
+              <span className="text-slate-400 text-xs">⚙</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => openBrandModal('create')}
+              className="px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-100 text-sm"
+            >
+              🏷️ 브랜드 선택 · 추가
+            </button>
+          )}
+          {/* 브랜드 목록 드롭다운 — 빠른 전환용 (헤더에도 유지) */}
+          {brands.length > 1 && (
+            <select
+              value={selectedBrandId}
+              onChange={(e) => setSelectedBrandId(e.target.value)}
+              className="border rounded-md px-2 py-2 text-sm"
+              title="브랜드 빠른 전환"
+            >
+              <option value="">(선택 없음)</option>
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
         <section className="space-y-4">
           <div className="bg-white rounded-xl border p-4 space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">브랜드 카테고리</label>
-              <select
-                value={selectedBrandId}
-                onChange={(e) => setSelectedBrandId(e.target.value)}
-                className="w-full border rounded-md px-2 py-2 text-sm"
-              >
-                <option value="">(선택 없음)</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 onClick={() => setMode('auto')}
@@ -804,12 +874,15 @@ export default function Page() {
                 <span className="block text-[10px] opacity-75">RAG 기반</span>
               </button>
             </div>
-            {mode === 'note-rag' && (
+            {mode === 'note-rag' && selectedBrand && (
               <button
-                onClick={() => setKnowledgePanelOpen((v) => !v)}
+                onClick={() => {
+                  openBrandModal('edit', selectedBrand.id)
+                  setBrandModalTab('docs')
+                }}
                 className="w-full px-3 py-1.5 text-xs border rounded-md bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100"
               >
-                {knowledgePanelOpen ? '📚 지식노트 관리 닫기' : '📚 지식노트 관리 열기'}
+                📚 지식노트 열기 ({selectedBrand.name})
               </button>
             )}
 
@@ -1264,188 +1337,50 @@ export default function Page() {
         </section>
       </div>
 
-      {showBrandPanel && (
-        <section className="mt-8 bg-white rounded-xl border p-4">
-          <h2 className="text-lg font-semibold mb-3">브랜드 카테고리 관리</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">새 브랜드</h3>
-              <input
-                className="w-full border rounded-md px-2 py-2 text-sm"
-                placeholder="브랜드 이름 (예: 유순)"
-                value={newBrand.name}
-                onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
-              />
-              <input
-                className="w-full border rounded-md px-2 py-2 text-sm"
-                placeholder="톤앤매너 (예: 따뜻하고 진솔한)"
-                value={newBrand.tone}
-                onChange={(e) => setNewBrand({ ...newBrand, tone: e.target.value })}
-              />
-              <input
-                className="w-full border rounded-md px-2 py-2 text-sm"
-                placeholder="기본 문구 (예: 오늘도 평안한 하루)"
-                value={newBrand.defaultPhrase}
-                onChange={(e) => setNewBrand({ ...newBrand, defaultPhrase: e.target.value })}
-              />
-              <div className="grid grid-cols-3 gap-2">
-                <label className="text-xs text-slate-500">
-                  주색
-                  <input
-                    type="color"
-                    value={newBrand.primaryColor}
-                    onChange={(e) =>
-                      setNewBrand({ ...newBrand, primaryColor: e.target.value })
-                    }
-                    className="w-full h-9 border rounded-md"
-                  />
-                </label>
-                <label className="text-xs text-slate-500">
-                  배경
-                  <input
-                    type="color"
-                    value={newBrand.secondaryColor}
-                    onChange={(e) =>
-                      setNewBrand({ ...newBrand, secondaryColor: e.target.value })
-                    }
-                    className="w-full h-9 border rounded-md"
-                  />
-                </label>
-                <label className="text-xs text-slate-500">
-                  글자
-                  <input
-                    type="color"
-                    value={newBrand.textColor}
-                    onChange={(e) => setNewBrand({ ...newBrand, textColor: e.target.value })}
-                    className="w-full h-9 border rounded-md"
-                  />
-                </label>
-              </div>
-              <input
-                className="w-full border rounded-md px-2 py-2 text-sm"
-                placeholder="폰트 (예: Pretendard, sans-serif)"
-                value={newBrand.fontFamily}
-                onChange={(e) => setNewBrand({ ...newBrand, fontFamily: e.target.value })}
-              />
-              <div>
-                <label className="inline-block cursor-pointer border rounded-md px-3 py-2 text-sm bg-slate-50 hover:bg-slate-100">
-                  보유 이미지 업로드
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0]
-                      if (f) uploadBrandImage(f)
-                      e.target.value = ''
-                    }}
-                  />
-                </label>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  업로드 시 본인 저작권/사용권 보유에 동의한 것으로 간주됩니다. 제3자의 초상권·저작권 침해 책임은 업로더에게 있습니다.
-                </p>
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  {newBrand.assets.map((img, i) => (
-                    <div key={i} className="relative">
-                      <img
-                        src={img.url}
-                        alt=""
-                        className="w-16 h-16 object-cover rounded-md border"
-                      />
-                      <button
-                        onClick={() =>
-                          setNewBrand((prev) => ({
-                            ...prev,
-                            assets: prev.assets.filter((_, j) => j !== i),
-                          }))
-                        }
-                        className="absolute -top-2 -right-2 bg-white border rounded-full w-5 h-5 text-xs"
-                        title="제거"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={saveBrand}
-                className="w-full bg-teal-700 hover:bg-teal-800 text-white rounded-md py-2 text-sm"
-              >
-                브랜드 저장
-              </button>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium mb-2">저장된 브랜드</h3>
-              <ul className="space-y-2">
-                {brands.length === 0 && (
-                  <li className="text-sm text-slate-500">아직 저장된 브랜드가 없어요.</li>
-                )}
-                {brands.map((b) => (
-                  <li
-                    key={b.id}
-                    className="border rounded-md p-2 flex items-center justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{b.name}</div>
-                      <div className="text-xs text-slate-500 truncate">
-                        {b.tone || '—'} · 이미지 {b.assets.length}장
-                      </div>
-                      <div className="flex gap-1 mt-1">
-                        <span
-                          className="inline-block w-4 h-4 rounded-sm border"
-                          style={{ background: b.primaryColor }}
-                        />
-                        <span
-                          className="inline-block w-4 h-4 rounded-sm border"
-                          style={{ background: b.secondaryColor }}
-                        />
-                        <span
-                          className="inline-block w-4 h-4 rounded-sm border"
-                          style={{ background: b.textColor }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => setSelectedBrandId(b.id)}
-                        className={`text-xs px-2 py-1 border rounded-md ${
-                          selectedBrandId === b.id ? 'bg-slate-900 text-white' : ''
-                        }`}
-                      >
-                        {selectedBrandId === b.id ? '선택됨' : '선택'}
-                      </button>
-                      <button
-                        onClick={() => deleteBrand(b.id)}
-                        className="text-xs px-2 py-1 border rounded-md text-red-600"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {knowledgePanelOpen && (
+      {brandModalOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-          onClick={() => setKnowledgePanelOpen(false)}
+          onClick={() => setBrandModalOpen(false)}
         >
           <div
             className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-white border-b px-5 py-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold">
-                📚 지식노트 — {selectedBrand?.name ?? '(브랜드 미선택)'}
-              </h2>
+            {/* 헤더: 브랜드 선택 · 새 브랜드 · 닫기 */}
+            <div className="sticky top-0 bg-white border-b px-5 py-3 flex items-center justify-between gap-3 flex-wrap z-10">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-semibold">🏷️ 브랜드 관리</h2>
+                {brands.length > 0 && (
+                  <select
+                    value={editingBrandId ?? ''}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      if (id) openBrandModal('edit', id)
+                      else {
+                        setEditingBrandId(null)
+                        resetBrandForm()
+                      }
+                    }}
+                    className="border rounded-md px-2 py-1 text-sm"
+                  >
+                    <option value="">+ 새 브랜드</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={() => openBrandModal('create')}
+                  className="px-2 py-1 text-xs border rounded-md hover:bg-slate-50"
+                  title="새 브랜드 생성 모드"
+                >
+                  + 새 브랜드
+                </button>
+              </div>
               <button
-                onClick={() => setKnowledgePanelOpen(false)}
+                onClick={() => setBrandModalOpen(false)}
                 className="text-slate-500 hover:text-slate-900 text-xl leading-none"
                 aria-label="닫기"
               >
@@ -1453,107 +1388,129 @@ export default function Page() {
               </button>
             </div>
 
-            {!selectedBrandId ? (
-              <div className="p-6 text-sm text-slate-500">
-                먼저 왼쪽 상단에서 브랜드를 선택해 주세요.
-              </div>
-            ) : (
-              <div className="p-5 space-y-6">
-                {/* 아이디어 추천 섹션 */}
-                <section className="border rounded-md p-3 bg-gradient-to-br from-violet-50 to-white">
-                  <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                    <h3 className="text-sm font-semibold">
-                      💡 카드뉴스 아이디어 추천{' '}
-                      <span className="text-slate-400 font-normal">({ideas.length}개 저장됨)</span>
-                    </h3>
-                    <div className="flex gap-1.5">
-                      {ideas.length > 0 && (
-                        <button
-                          onClick={deleteAllIdeas}
-                          className="px-2 py-1.5 border rounded-md text-xs hover:bg-white"
-                        >
-                          전체 삭제
-                        </button>
-                      )}
-                      <button
-                        onClick={fetchIdeas}
-                        disabled={
-                          ideasLoading ||
-                          (knowledgeDocs.length === 0 && knowledgeImages.length === 0)
-                        }
-                        className="px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white rounded-md text-xs disabled:opacity-60"
-                        title="현재 등록된 지식노트·이미지 기반으로 Gemini 가 만들 만한 카드뉴스 5개 제안"
-                      >
-                        {ideasLoading
-                          ? '분석 중…'
-                          : ideas.length
-                            ? '+ 5개 더 추천'
-                            : '아이디어 요청'}
-                      </button>
-                    </div>
-                  </div>
-                  {knowledgeDocs.length === 0 && knowledgeImages.length === 0 ? (
-                    <p className="text-xs text-slate-500">
-                      아래 문서·이미지를 먼저 1개 이상 등록하면 추천을 받을 수 있습니다.
-                    </p>
-                  ) : ideas.length === 0 && !ideasError ? (
-                    <p className="text-xs text-slate-500">
-                      버튼을 누르면 등록된 문서·이미지로부터 카드뉴스 주제 5개를 제안합니다.
-                    </p>
-                  ) : null}
-                  {ideasError && (
-                    <p className="text-xs text-red-600 leading-relaxed">오류: {ideasError}</p>
-                  )}
-                  {ideas.length > 0 && (
-                    <div className="space-y-2 mt-2">
-                      {ideas.map((idea) => (
-                        <div
-                          key={idea.id}
-                          className="border rounded-md p-3 bg-white hover:border-violet-300 transition"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="font-medium text-sm flex-1">{idea.title}</div>
-                            <span className="text-[10px] text-slate-500 shrink-0">
-                              {idea.suggestedCount}장
-                            </span>
-                            <button
-                              onClick={() => deleteIdea(idea.id)}
-                              className="text-slate-400 hover:text-red-600 text-sm leading-none shrink-0"
-                              title="삭제"
-                              aria-label="아이디어 삭제"
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <div className="text-[12px] text-slate-600 mb-1 leading-relaxed">
-                            "{idea.prompt}"
-                          </div>
-                          <div className="text-[11px] text-slate-500 mb-2 leading-relaxed">
-                            💬 {idea.reason}
-                          </div>
-                          {idea.usesImages.length > 0 && (
-                            <div className="text-[10px] text-slate-400 mb-2">
-                              활용 이미지: {idea.usesImages.join(', ')}
-                            </div>
-                          )}
-                          <button
-                            onClick={() => applyIdea(idea)}
-                            className="w-full px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs"
-                          >
-                            이 아이디어로 생성하기 →
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
+            {/* 탭 네비게이션 */}
+            <div className="border-b px-5 flex gap-1 text-sm">
+              {(
+                [
+                  { k: 'info', label: '기본 정보' },
+                  { k: 'docs', label: `문서 (${knowledgeDocs.length})`, needsBrand: true },
+                  { k: 'images', label: `이미지 라이브러리 (${knowledgeImages.length})`, needsBrand: true },
+                  { k: 'ideas', label: `아이디어 (${ideas.length})`, needsBrand: true },
+                ] as const
+              ).map((t) => {
+                const disabled = t.needsBrand && !editingBrandId
+                return (
+                  <button
+                    key={t.k}
+                    onClick={() => !disabled && setBrandModalTab(t.k)}
+                    disabled={disabled}
+                    className={`px-3 py-2 border-b-2 -mb-px transition ${
+                      brandModalTab === t.k
+                        ? 'border-violet-600 text-violet-700 font-semibold'
+                        : disabled
+                          ? 'border-transparent text-slate-300 cursor-not-allowed'
+                          : 'border-transparent text-slate-500 hover:text-slate-900'
+                    }`}
+                    title={disabled ? '먼저 브랜드를 저장해 주세요' : ''}
+                  >
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
 
-                {/* 문서 섹션 */}
-                <section>
-                  <h3 className="text-sm font-semibold mb-2">
-                    문서 <span className="text-slate-400 font-normal">({knowledgeDocs.length})</span>
-                  </h3>
-                  <div className="space-y-2 mb-3">
+            <div className="p-5 space-y-5">
+              {/* ========== 탭: 기본 정보 ========== */}
+              {brandModalTab === 'info' && (
+                <section className="space-y-3">
+                  <div className="text-xs text-slate-500">
+                    {editingBrandId ? '브랜드 정보 편집' : '새 브랜드 만들기'}
+                  </div>
+                  <input
+                    className="w-full border rounded-md px-2 py-2 text-sm"
+                    placeholder="브랜드 이름 (예: 유순)"
+                    value={newBrand.name}
+                    onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
+                  />
+                  <input
+                    className="w-full border rounded-md px-2 py-2 text-sm"
+                    placeholder="톤앤매너 (예: 따뜻하고 진솔한)"
+                    value={newBrand.tone}
+                    onChange={(e) => setNewBrand({ ...newBrand, tone: e.target.value })}
+                  />
+                  <input
+                    className="w-full border rounded-md px-2 py-2 text-sm"
+                    placeholder="기본 문구 (예: 오늘도 평안한 하루)"
+                    value={newBrand.defaultPhrase}
+                    onChange={(e) =>
+                      setNewBrand({ ...newBrand, defaultPhrase: e.target.value })
+                    }
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="text-xs text-slate-500">
+                      주색
+                      <input
+                        type="color"
+                        value={newBrand.primaryColor}
+                        onChange={(e) =>
+                          setNewBrand({ ...newBrand, primaryColor: e.target.value })
+                        }
+                        className="w-full h-9 border rounded-md"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-500">
+                      배경
+                      <input
+                        type="color"
+                        value={newBrand.secondaryColor}
+                        onChange={(e) =>
+                          setNewBrand({ ...newBrand, secondaryColor: e.target.value })
+                        }
+                        className="w-full h-9 border rounded-md"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-500">
+                      글자
+                      <input
+                        type="color"
+                        value={newBrand.textColor}
+                        onChange={(e) =>
+                          setNewBrand({ ...newBrand, textColor: e.target.value })
+                        }
+                        className="w-full h-9 border rounded-md"
+                      />
+                    </label>
+                  </div>
+                  <input
+                    className="w-full border rounded-md px-2 py-2 text-sm"
+                    placeholder="폰트 (예: Pretendard, sans-serif)"
+                    value={newBrand.fontFamily}
+                    onChange={(e) => setNewBrand({ ...newBrand, fontFamily: e.target.value })}
+                  />
+
+                  <div className="pt-2 flex items-center justify-between gap-2 flex-wrap border-t">
+                    <button
+                      onClick={saveBrand}
+                      className="bg-teal-700 hover:bg-teal-800 text-white rounded-md px-4 py-2 text-sm"
+                    >
+                      {editingBrandId ? '변경 저장' : '새 브랜드 저장'}
+                    </button>
+                    {editingBrandId && (
+                      <button
+                        onClick={() => deleteBrand(editingBrandId)}
+                        className="text-xs px-3 py-2 border rounded-md text-red-600 hover:bg-red-50"
+                      >
+                        🗑️ 이 브랜드 삭제
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* ========== 탭: 문서 ========== */}
+              {brandModalTab === 'docs' && editingBrandId && (
+                <section className="space-y-3">
+                  <div className="space-y-2">
                     {knowledgeDocs.length === 0 && (
                       <p className="text-xs text-slate-400">등록된 문서가 없습니다.</p>
                     )}
@@ -1601,24 +1558,61 @@ export default function Page() {
                     </button>
                   </div>
                 </section>
+              )}
 
-                {/* 이미지 섹션 */}
-                <section>
-                  <h3 className="text-sm font-semibold mb-2">
-                    이미지 라이브러리{' '}
-                    <span className="text-slate-400 font-normal">({knowledgeImages.length})</span>
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-                    {knowledgeImages.length === 0 && (
+              {/* ========== 탭: 이미지 라이브러리 (통합) ========== */}
+              {brandModalTab === 'images' && editingBrandId && (
+                <section className="space-y-3">
+                  <p className="text-xs text-slate-500">
+                    기본 에셋(세미·기본 배경)과 태그 라이브러리를 함께 보여줍니다.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {knowledgeImages.length === 0 && newBrand.assets.length === 0 && (
                       <p className="text-xs text-slate-400 col-span-full">
                         등록된 이미지가 없습니다.
                       </p>
                     )}
-                    {knowledgeImages.map((img) => (
-                      <div key={img.id} className="border rounded-md overflow-hidden bg-slate-50">
+                    {/* 기본 에셋 — 브랜드에 속한 BrandAsset (읽기 전용 표시) */}
+                    {newBrand.assets.map((img, i) => (
+                      <div
+                        key={`asset-${i}`}
+                        className="border rounded-md overflow-hidden bg-amber-50"
+                      >
                         <img src={img.url} alt="" className="w-full h-28 object-cover" />
                         <div className="p-2 space-y-1">
-                          <div className="text-xs font-medium truncate">{img.label || '(라벨 없음)'}</div>
+                          <div className="text-[10px] font-semibold text-amber-800">
+                            기본 에셋
+                          </div>
+                          <div className="text-xs truncate">{img.caption || '(캡션 없음)'}</div>
+                          <button
+                            onClick={() =>
+                              setNewBrand((prev) => ({
+                                ...prev,
+                                assets: prev.assets.filter((_, j) => j !== i),
+                              }))
+                            }
+                            className="text-[11px] px-2 py-0.5 border rounded-md hover:bg-white w-full"
+                            title="기본 에셋에서 제거 (변경 저장 눌러야 반영)"
+                          >
+                            제거
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {/* 태그 라이브러리 — BrandImageAsset */}
+                    {knowledgeImages.map((img) => (
+                      <div
+                        key={img.id}
+                        className="border rounded-md overflow-hidden bg-slate-50"
+                      >
+                        <img src={img.url} alt="" className="w-full h-28 object-cover" />
+                        <div className="p-2 space-y-1">
+                          <div className="text-[10px] font-semibold text-slate-600">
+                            라이브러리
+                          </div>
+                          <div className="text-xs font-medium truncate">
+                            {img.label || '(라벨 없음)'}
+                          </div>
                           {img.tags.length > 0 && (
                             <div className="text-[10px] text-slate-500 truncate">
                               #{img.tags.join(' #')}
@@ -1635,6 +1629,7 @@ export default function Page() {
                     ))}
                   </div>
                   <div className="border rounded-md p-3 bg-white space-y-2">
+                    <div className="text-xs font-medium">태그 라이브러리에 추가</div>
                     <input
                       value={newImageLabel}
                       onChange={(e) => setNewImageLabel(e.target.value)}
@@ -1644,7 +1639,7 @@ export default function Page() {
                     <input
                       value={newImageTags}
                       onChange={(e) => setNewImageTags(e.target.value)}
-                      placeholder="태그 (쉼표 · 공백 구분, 예: 제품, 화이트배경, 패키지)"
+                      placeholder="태그 (쉼표·공백 구분, 예: 제품, 화이트배경, 패키지)"
                       className="w-full border rounded-md px-2 py-1.5 text-sm"
                     />
                     <label
@@ -1669,8 +1664,93 @@ export default function Page() {
                     </p>
                   </div>
                 </section>
-              </div>
-            )}
+              )}
+
+              {/* ========== 탭: 아이디어 ========== */}
+              {brandModalTab === 'ideas' && editingBrandId && (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="text-xs text-slate-500">
+                      등록된 지식노트·이미지를 기반으로 Gemini 가 제안합니다.
+                    </div>
+                    <div className="flex gap-1.5">
+                      {ideas.length > 0 && (
+                        <button
+                          onClick={deleteAllIdeas}
+                          className="px-2 py-1.5 border rounded-md text-xs hover:bg-slate-50"
+                        >
+                          전체 삭제
+                        </button>
+                      )}
+                      <button
+                        onClick={fetchIdeas}
+                        disabled={
+                          ideasLoading ||
+                          (knowledgeDocs.length === 0 && knowledgeImages.length === 0)
+                        }
+                        className="px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white rounded-md text-xs disabled:opacity-60"
+                      >
+                        {ideasLoading
+                          ? '분석 중…'
+                          : ideas.length
+                            ? '+ 5개 더 추천'
+                            : '아이디어 요청'}
+                      </button>
+                    </div>
+                  </div>
+                  {knowledgeDocs.length === 0 && knowledgeImages.length === 0 && (
+                    <p className="text-xs text-slate-500">
+                      문서·이미지를 먼저 1개 이상 등록하면 추천을 받을 수 있습니다.
+                    </p>
+                  )}
+                  {ideasError && (
+                    <p className="text-xs text-red-600 leading-relaxed">오류: {ideasError}</p>
+                  )}
+                  {ideas.length > 0 && (
+                    <div className="space-y-2">
+                      {ideas.map((idea) => (
+                        <div
+                          key={idea.id}
+                          className="border rounded-md p-3 bg-white hover:border-violet-300 transition"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="font-medium text-sm flex-1">{idea.title}</div>
+                            <span className="text-[10px] text-slate-500 shrink-0">
+                              {idea.suggestedCount}장
+                            </span>
+                            <button
+                              onClick={() => deleteIdea(idea.id)}
+                              className="text-slate-400 hover:text-red-600 text-sm leading-none shrink-0"
+                              title="삭제"
+                              aria-label="아이디어 삭제"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div className="text-[12px] text-slate-600 mb-1 leading-relaxed">
+                            "{idea.prompt}"
+                          </div>
+                          <div className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+                            💬 {idea.reason}
+                          </div>
+                          {idea.usesImages.length > 0 && (
+                            <div className="text-[10px] text-slate-400 mb-2">
+                              활용 이미지: {idea.usesImages.join(', ')}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => applyIdea(idea)}
+                            className="w-full px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs"
+                          >
+                            이 아이디어로 생성하기 →
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
           </div>
         </div>
       )}
