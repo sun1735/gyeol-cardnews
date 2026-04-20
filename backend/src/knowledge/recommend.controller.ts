@@ -2,10 +2,15 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  Get,
   HttpException,
   HttpStatus,
   Logger,
+  NotFoundException,
+  Param,
   Post,
+  Query,
 } from '@nestjs/common'
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger'
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator'
@@ -23,17 +28,47 @@ export class RecommendIdeasDto {
 }
 
 @ApiTags('knowledge')
-@Controller('api/knowledge/recommend-ideas')
+@Controller('api/knowledge')
 export class RecommendController {
   private readonly logger = new Logger('RecommendController')
 
   constructor(private prisma: PrismaService) {}
 
-  @Post()
+  @Get('ideas')
+  @ApiOperation({ summary: '저장된 카드뉴스 아이디어 목록 (브랜드별)' })
+  async listIdeas(@Query('brandId') brandId?: string) {
+    if (!brandId) throw new BadRequestException('brandId 쿼리 필수')
+    const rows = await this.prisma.brandIdea.findMany({
+      where: { brandId },
+      orderBy: { createdAt: 'desc' },
+    })
+    return { ideas: rows.map(formatIdea) }
+  }
+
+  @Delete('ideas/:id')
+  @ApiOperation({ summary: '저장된 아이디어 삭제' })
+  async removeIdea(@Param('id') id: string) {
+    try {
+      await this.prisma.brandIdea.delete({ where: { id } })
+    } catch {
+      throw new NotFoundException('아이디어를 찾을 수 없습니다')
+    }
+    return { ok: true }
+  }
+
+  @Delete('ideas')
+  @ApiOperation({ summary: '브랜드의 모든 저장 아이디어 일괄 삭제' })
+  async removeAllIdeas(@Query('brandId') brandId?: string) {
+    if (!brandId) throw new BadRequestException('brandId 쿼리 필수')
+    const r = await this.prisma.brandIdea.deleteMany({ where: { brandId } })
+    return { deleted: r.count }
+  }
+
+  @Post('recommend-ideas')
   @ApiOperation({
-    summary: '브랜드 지식노트 분석 → 만들 만한 카드뉴스 아이디어 N개 제안',
+    summary: '브랜드 지식노트 분석 → 만들 만한 카드뉴스 아이디어 N개 제안 + DB 누적 저장',
     description:
-      '브랜드 프로필 + 등록된 모든 지식노트 + 이미지 라이브러리 라벨/태그 를 Gemini 2.5 Flash 에 넘겨 카드뉴스 캠페인 후보를 생성. 각 아이디어는 prompt·count·reason 포함해 프런트가 RAG 생성 흐름에 바로 주입 가능.',
+      '브랜드 프로필 + 등록된 모든 지식노트 + 이미지 라이브러리 라벨/태그 를 Gemini 2.5 Flash 에 넘겨 카드뉴스 캠페인 후보를 생성하고, BrandIdea 테이블에 누적 저장한다. 반환 ideas[] 에는 id 가 포함되어 프런트가 바로 삭제 호출 가능.',
   })
   async recommend(@Body() dto: RecommendIdeasDto) {
     if (!process.env.GEMINI_API_KEY) {
@@ -147,8 +182,24 @@ export class RecommendController {
             : [],
         }))
         .filter((idea) => idea.title && idea.prompt)
+
+      // DB 누적 저장 — 나중에 사용자가 다시 열어도 남아있도록
+      const saved = await Promise.all(
+        cleaned.map((idea) =>
+          this.prisma.brandIdea.create({
+            data: {
+              brandId: dto.brandId,
+              title: idea.title,
+              prompt: idea.prompt,
+              suggestedCount: idea.suggestedCount,
+              reason: idea.reason,
+              usesImages: JSON.stringify(idea.usesImages),
+            },
+          }),
+        ),
+      )
       return {
-        ideas: cleaned,
+        ideas: saved.map(formatIdea),
         context: { docsUsed: docs.length, imagesUsed: images.length },
       }
     } catch (e: any) {
@@ -158,6 +209,33 @@ export class RecommendController {
         HttpStatus.BAD_GATEWAY,
       )
     }
+  }
+}
+
+function formatIdea(r: {
+  id: string
+  brandId: string
+  title: string
+  prompt: string
+  suggestedCount: number
+  reason: string
+  usesImages: string
+  createdAt: Date
+}) {
+  let usesImages: string[] = []
+  try {
+    const parsed = JSON.parse(r.usesImages || '[]')
+    if (Array.isArray(parsed)) usesImages = parsed.filter((s) => typeof s === 'string')
+  } catch {}
+  return {
+    id: r.id,
+    brandId: r.brandId,
+    title: r.title,
+    prompt: r.prompt,
+    suggestedCount: r.suggestedCount,
+    reason: r.reason,
+    usesImages,
+    createdAt: r.createdAt,
   }
 }
 

@@ -6,7 +6,7 @@ import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset } from '@/
 
 type ReelTransition = 'fade' | 'slide' | 'zoom'
 
-const SIZE_PX: Record<SizePreset, { w: number; h: number; display: number }> = {
+const SIZE_PX: Record<Exclude<SizePreset, 'custom'>, { w: number; h: number; display: number }> = {
   '1:1': { w: 1080, h: 1080, display: 360 },
   '4:5': { w: 1080, h: 1350, display: 340 },
   '9:16': { w: 1080, h: 1920, display: 280 },
@@ -14,8 +14,28 @@ const SIZE_PX: Record<SizePreset, { w: number; h: number; display: number }> = {
 
 const SIZE_LABELS: Record<SizePreset, string> = {
   '1:1': '정사각',
-  '4:5': '세로',
-  '9:16': '스토리',
+  '4:5': '인스타 피드',
+  '9:16': '릴스 · 스토리',
+  custom: '배너 · 자유',
+}
+
+const SIZE_SUBLABELS: Record<SizePreset, string> = {
+  '1:1': '1080×1080',
+  '4:5': '1080×1350',
+  '9:16': '1080×1920',
+  custom: '직접 입력',
+}
+
+// custom 프리셋에서 실제 크기 계산 — display 폭은 360 상한으로 비율 유지.
+function resolveSizePx(
+  preset: SizePreset,
+  custom: { w: number; h: number },
+): { w: number; h: number; display: number } {
+  if (preset !== 'custom') return SIZE_PX[preset]
+  const w = Math.max(200, Math.min(4000, Math.floor(custom.w) || 1080))
+  const h = Math.max(200, Math.min(4000, Math.floor(custom.h) || 1080))
+  const display = w >= h ? 360 : Math.round((360 * w) / h)
+  return { w, h, display }
 }
 
 interface ManualInput {
@@ -62,6 +82,7 @@ type GenMode = 'auto' | 'manual' | 'note-rag'
 export default function Page() {
   const [mode, setMode] = useState<GenMode>('auto')
   const [size, setSize] = useState<SizePreset>('1:1')
+  const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
   const [count, setCount] = useState(3)
   const [prompt, setPrompt] = useState('')
   const [baseImages, setBaseImages] = useState<string[]>([]) // Mode A — 공통 참조 이미지 1~3장
@@ -85,6 +106,7 @@ export default function Page() {
   const [imageUploading, setImageUploading] = useState(false)
   const [ideas, setIdeas] = useState<
     Array<{
+      id: string
       title: string
       prompt: string
       suggestedCount: number
@@ -146,15 +168,18 @@ export default function Page() {
 
   async function loadKnowledge(brandId: string) {
     try {
-      const [d, i] = await Promise.all([
+      const [d, i, ideasRes] = await Promise.all([
         fetch(`/api/knowledge/docs?brandId=${brandId}`).then((r) => r.json()),
         fetch(`/api/knowledge/images?brandId=${brandId}`).then((r) => r.json()),
+        fetch(`/api/knowledge/ideas?brandId=${brandId}`).then((r) => r.json()),
       ])
       setKnowledgeDocs(d?.docs ?? [])
       setKnowledgeImages(i?.images ?? [])
+      setIdeas(ideasRes?.ideas ?? [])
     } catch {
       setKnowledgeDocs([])
       setKnowledgeImages([])
+      setIdeas([])
     }
   }
 
@@ -255,16 +280,28 @@ export default function Page() {
       const j = await r.json()
       if (!r.ok) {
         setIdeasError(j?.message ?? `HTTP ${r.status}`)
-        setIdeas([])
         return
       }
-      setIdeas(j?.ideas ?? [])
+      // 새로 생성된 아이디어는 기존 저장분 위에 쌓이는 형태로 보여준다.
+      await loadKnowledge(selectedBrandId)
     } catch (e: any) {
       setIdeasError(e?.message ?? '알 수 없는 오류')
-      setIdeas([])
     } finally {
       setIdeasLoading(false)
     }
+  }
+
+  async function deleteIdea(id: string) {
+    if (!selectedBrandId) return
+    await fetch(`/api/knowledge/ideas/${id}`, { method: 'DELETE' })
+    setIdeas((prev) => prev.filter((i) => i.id !== id))
+  }
+
+  async function deleteAllIdeas() {
+    if (!selectedBrandId) return
+    if (!confirm(`저장된 아이디어 ${ideas.length}개를 모두 삭제할까요?`)) return
+    await fetch(`/api/knowledge/ideas?brandId=${selectedBrandId}`, { method: 'DELETE' })
+    setIdeas([])
   }
 
   function applyIdea(idea: { prompt: string; suggestedCount: number }) {
@@ -272,7 +309,6 @@ export default function Page() {
     setPrompt(idea.prompt)
     setCount(Math.max(1, Math.min(10, idea.suggestedCount)))
     setKnowledgePanelOpen(false)
-    setIdeas([])
   }
 
   useEffect(() => {
@@ -496,8 +532,8 @@ export default function Page() {
     const mod = await import('html-to-image')
     const node = document.getElementById(`card-${cardId}`)
     if (!node) return
-    const d = SIZE_PX[size]
-    // 출력 해상도: 1:1 → 1080×1080, 4:5 → 1080×1350, 9:16 → 1080×1920 (±1px rounding)
+    const d = resolveSizePx(size, customSize)
+    // 출력 해상도: 프리셋 별 고정 또는 custom 입력값 (±1px rounding)
     const pixelRatio = d.w / d.display
     const dataUrl = await mod.toPng(node, { pixelRatio, cacheBust: true })
     const a = document.createElement('a')
@@ -576,7 +612,7 @@ export default function Page() {
         import('jszip'),
       ])
       const zip = new JSZipMod.default()
-      const d = SIZE_PX[size]
+      const d = resolveSizePx(size, customSize)
       const pixelRatio = d.w / d.display
       const brandName = selectedBrand?.name
       for (let i = 0; i < cards.length; i++) {
@@ -736,41 +772,91 @@ export default function Page() {
 
             <div>
               <label className="block text-xs text-slate-500 mb-1">사이즈 프리셋</label>
-              <div className="grid grid-cols-3 gap-1">
-                {(['1:1', '4:5', '9:16'] as SizePreset[]).map((p) => (
+              <div className="grid grid-cols-4 gap-1">
+                {(['1:1', '4:5', '9:16', 'custom'] as SizePreset[]).map((p) => (
                   <button
                     key={p}
-                    onClick={() => setSize(p)}
-                    className={`px-1 py-1.5 rounded-md text-xs border leading-tight transition ${
+                    onClick={() => {
+                      setSize(p)
+                      if (p === 'custom') setCount(1)
+                    }}
+                    className={`px-1 py-1.5 rounded-md text-[11px] border leading-tight transition ${
                       size === p
-                        ? 'bg-slate-900 text-white border-slate-900'
+                        ? p === 'custom'
+                          ? 'bg-amber-600 text-white border-amber-600'
+                          : 'bg-slate-900 text-white border-slate-900'
                         : 'bg-white hover:bg-slate-50'
                     }`}
                   >
-                    <span className="block font-semibold">{p}</span>
+                    <span className="block font-semibold">
+                      {p === 'custom' ? '배너' : p}
+                    </span>
                     <span className="block text-[10px] opacity-75">{SIZE_LABELS[p]}</span>
+                    <span className="block text-[9px] opacity-60">{SIZE_SUBLABELS[p]}</span>
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">
-                전환 시 모든 카드 프리뷰가 즉시 새 비율로 다시 렌더됩니다.
-              </p>
+              {size === 'custom' ? (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[10px] text-slate-500">가로 (px)</span>
+                    <input
+                      type="number"
+                      min={200}
+                      max={4000}
+                      value={customSize.w}
+                      onChange={(e) =>
+                        setCustomSize((s) => ({
+                          ...s,
+                          w: Math.max(200, Math.min(4000, Number(e.target.value) || 1080)),
+                        }))
+                      }
+                      className="w-full border rounded-md px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[10px] text-slate-500">세로 (px)</span>
+                    <input
+                      type="number"
+                      min={200}
+                      max={4000}
+                      value={customSize.h}
+                      onChange={(e) =>
+                        setCustomSize((s) => ({
+                          ...s,
+                          h: Math.max(200, Math.min(4000, Number(e.target.value) || 1080)),
+                        }))
+                      }
+                      className="w-full border rounded-md px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <p className="col-span-2 text-[10px] text-amber-700">
+                    배너/자유 사이즈는 이미지 1장만 생성됩니다 (카드 수 고정).
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {size === '4:5' && '📱 인스타그램 피드 표준 사이즈'}
+                  {size === '9:16' && '🎬 인스타 릴스 · 스토리 · 틱톡'}
+                  {size === '1:1' && '⬜ 인스타 정사각 · 모든 SNS 공통'}
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block text-xs text-slate-500 mb-1">
-                카드 수 (생성 시){mode === 'note-rag' ? ' · 최대 10' : ' · 최대 5'}
+                카드 수 (생성 시){size === 'custom' ? ' · 배너 고정 1장' : ' · 최대 10'}
               </label>
               <input
                 type="number"
                 min={1}
-                max={mode === 'note-rag' ? 10 : 5}
+                max={10}
                 value={count}
-                onChange={(e) => {
-                  const max = mode === 'note-rag' ? 10 : 5
-                  setCount(Math.max(1, Math.min(max, Number(e.target.value) || 1)))
-                }}
-                className="w-full border rounded-md px-2 py-2 text-sm"
+                disabled={size === 'custom'}
+                onChange={(e) =>
+                  setCount(Math.max(1, Math.min(10, Number(e.target.value) || 1)))
+                }
+                className="w-full border rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-500"
               />
             </div>
 
@@ -944,7 +1030,8 @@ export default function Page() {
                   {pngFilename(selectedBrand?.name, 0)} … {pngFilename(selectedBrand?.name, cards.length - 1)}
                 </span></div>
                 <div className="text-slate-400">
-                  해상도 {SIZE_PX[size].w}×{SIZE_PX[size].h} · {size}
+                  해상도 {resolveSizePx(size, customSize).w}×{resolveSizePx(size, customSize).h} ·{' '}
+                  {SIZE_LABELS[size]}
                 </div>
               </div>
               <p className="text-xs text-slate-500 pt-1">
@@ -1104,6 +1191,7 @@ export default function Page() {
                     card={c}
                     brand={selectedBrand}
                     size={size}
+                    customSize={customSize}
                     backgrounds={backgrounds}
                     selected={selectedCardId === c.id}
                     onSelect={() => setSelectedCardId(c.id)}
@@ -1329,18 +1417,36 @@ export default function Page() {
               <div className="p-5 space-y-6">
                 {/* 아이디어 추천 섹션 */}
                 <section className="border rounded-md p-3 bg-gradient-to-br from-violet-50 to-white">
-                  <div className="flex items-center justify-between mb-2 gap-2">
-                    <h3 className="text-sm font-semibold">💡 카드뉴스 아이디어 추천</h3>
-                    <button
-                      onClick={fetchIdeas}
-                      disabled={
-                        ideasLoading || (knowledgeDocs.length === 0 && knowledgeImages.length === 0)
-                      }
-                      className="px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white rounded-md text-xs disabled:opacity-60"
-                      title="현재 등록된 지식노트·이미지 기반으로 Gemini 가 만들 만한 카드뉴스 5개 제안"
-                    >
-                      {ideasLoading ? '분석 중…' : ideas.length ? '다시 추천' : '아이디어 요청'}
-                    </button>
+                  <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                    <h3 className="text-sm font-semibold">
+                      💡 카드뉴스 아이디어 추천{' '}
+                      <span className="text-slate-400 font-normal">({ideas.length}개 저장됨)</span>
+                    </h3>
+                    <div className="flex gap-1.5">
+                      {ideas.length > 0 && (
+                        <button
+                          onClick={deleteAllIdeas}
+                          className="px-2 py-1.5 border rounded-md text-xs hover:bg-white"
+                        >
+                          전체 삭제
+                        </button>
+                      )}
+                      <button
+                        onClick={fetchIdeas}
+                        disabled={
+                          ideasLoading ||
+                          (knowledgeDocs.length === 0 && knowledgeImages.length === 0)
+                        }
+                        className="px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white rounded-md text-xs disabled:opacity-60"
+                        title="현재 등록된 지식노트·이미지 기반으로 Gemini 가 만들 만한 카드뉴스 5개 제안"
+                      >
+                        {ideasLoading
+                          ? '분석 중…'
+                          : ideas.length
+                            ? '+ 5개 더 추천'
+                            : '아이디어 요청'}
+                      </button>
+                    </div>
                   </div>
                   {knowledgeDocs.length === 0 && knowledgeImages.length === 0 ? (
                     <p className="text-xs text-slate-500">
@@ -1356,16 +1462,24 @@ export default function Page() {
                   )}
                   {ideas.length > 0 && (
                     <div className="space-y-2 mt-2">
-                      {ideas.map((idea, i) => (
+                      {ideas.map((idea) => (
                         <div
-                          key={i}
+                          key={idea.id}
                           className="border rounded-md p-3 bg-white hover:border-violet-300 transition"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="font-medium text-sm">{idea.title}</div>
+                            <div className="font-medium text-sm flex-1">{idea.title}</div>
                             <span className="text-[10px] text-slate-500 shrink-0">
                               {idea.suggestedCount}장
                             </span>
+                            <button
+                              onClick={() => deleteIdea(idea.id)}
+                              className="text-slate-400 hover:text-red-600 text-sm leading-none shrink-0"
+                              title="삭제"
+                              aria-label="아이디어 삭제"
+                            >
+                              ×
+                            </button>
                           </div>
                           <div className="text-[12px] text-slate-600 mb-1 leading-relaxed">
                             "{idea.prompt}"
@@ -1536,10 +1650,12 @@ function CardItem({
   onMoveUp,
   onMoveDown,
   onDelete,
+  customSize,
 }: {
   card: CardData
   brand?: Brand
   size: SizePreset
+  customSize: { w: number; h: number }
   index: number
   total: number
   backgrounds: BackgroundTemplate[]
@@ -1555,7 +1671,7 @@ function CardItem({
 }) {
   const [aiEditing, setAiEditing] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
-  const d = SIZE_PX[size]
+  const d = resolveSizePx(size, customSize)
   const ratio = d.display / d.w
   const height = Math.round(d.h * ratio)
   const primary = brand?.primaryColor ?? '#0f766e'

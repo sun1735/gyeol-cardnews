@@ -21,10 +21,28 @@ model BrandProfile {
   knowledgeDocs  BrandKnowledgeDoc[]
   knowledgeChunks BrandKnowledgeChunk[]
   imageAssets    BrandImageAsset[]
+  ideas          BrandIdea[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
   @@map("brand_profiles")
+}
+
+// Gemini 가 제안한 카드뉴스 아이디어 — 브랜드별로 누적 저장, 사용자가 선별·삭제.
+model BrandIdea {
+  id             String   @id @default(cuid())
+  brandId        String
+  title          String
+  prompt         String
+  suggestedCount Int      @default(5)
+  reason         String   @default("")
+  usesImages     String   @default("") // JSON array
+  createdAt      DateTime @default(now())
+
+  brand BrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId, createdAt])
+  @@map("brand_ideas")
 }
 
 // 브랜드 자료 문서. 카피라이팅용 컨텍스트 — 제품 설명·보도자료·FAQ 등을 수집.

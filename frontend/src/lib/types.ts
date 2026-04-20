@@ -1,4 +1,4 @@
-export type SizePreset = '1:1' | '4:5' | '9:16'
+export type SizePreset = '1:1' | '4:5' | '9:16' | 'custom'
 export type Layout = 'cover' | 'content' | 'cta'
 
 // 단계 4 출력 고정 포맷: title / body / subtext / cta (+ layout, imageUrl, id)

@@ -55,14 +55,14 @@ export class GenerateCardsDto {
   @IsString() @MinLength(1) @MaxLength(2000)
   prompt?: string
 
-  @ApiPropertyOptional({ example: 5, minimum: 1, maximum: 5, description: 'auto 모드에서 필수' })
+  @ApiPropertyOptional({ example: 5, minimum: 1, maximum: 10, description: 'auto 모드에서 필수 (1~10)' })
   @ValidateIf((o) => o.mode === 'auto')
-  @IsInt() @Min(1) @Max(5)
+  @IsInt() @Min(1) @Max(10)
   count?: number
 
-  @ApiPropertyOptional({ type: [ManualCardInputDto], description: 'manual 모드에서 필수 (1~5개)' })
+  @ApiPropertyOptional({ type: [ManualCardInputDto], description: 'manual 모드에서 필수 (1~10개)' })
   @ValidateIf((o) => o.mode === 'manual')
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(5)
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10)
   @ValidateNested({ each: true })
   @Type(() => ManualCardInputDto)
   cards?: ManualCardInputDto[]

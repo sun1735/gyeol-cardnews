@@ -160,7 +160,7 @@ function randId() {
 }
 
 function clamp(n: number | undefined) {
-  return Math.min(Math.max(Math.floor(n || 1), 1), 5)
+  return Math.min(Math.max(Math.floor(n || 1), 1), 10)
 }
 
 function shorten(s: string, max: number): string {
