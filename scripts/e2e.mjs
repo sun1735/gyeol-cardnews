@@ -383,10 +383,11 @@ async function R3_no_notes_fallback() {
     body: JSON.stringify({ name: tmpName, tone: '간결한' }),
   })
   const crj = await json(cr)
-  assert(crj?.id, '임시 브랜드 생성 실패')
+  const tmpBrandId = crj?.brand?.id ?? crj?.id
+  assert(tmpBrandId, `임시 브랜드 생성 실패: HTTP ${cr.status} ${JSON.stringify(crj).slice(0, 200)}`)
   try {
     const { res, body } = await enqueueNoteJob({
-      brandId: crj.id,
+      brandId: tmpBrandId,
       prompt: '새 제품 소개 카드',
       count: 3,
     })
@@ -395,7 +396,7 @@ async function R3_no_notes_fallback() {
     assert(final.status === 'done' || final.status === 'partial', `status=${final.status}`)
     assert(Array.isArray(final.cards) && final.cards.length === 3, '카드 3장 기대')
   } finally {
-    await fetch(`${BASE}/api/brands/${crj.id}`, { method: 'DELETE' }).catch(() => {})
+    await fetch(`${BASE}/api/brands/${tmpBrandId}`, { method: 'DELETE' }).catch(() => {})
   }
 }
 
