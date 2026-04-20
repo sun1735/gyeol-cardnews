@@ -18,13 +18,22 @@ export interface EditImageInput {
   instruction?: string // 사용자 추가 지시 (선택)
 }
 
-export interface EditImageResult {
+export interface GenerateImageInput {
+  prompt: string // text-to-image 본 프롬프트 (필수)
+  refPaths?: string[] // 스타일 레퍼런스 (선택, 최대 3)
+  recipe?: StyleRecipe // 브랜드 스타일 레시피
+  aspectRatio?: '1:1' | '4:5' | '9:16' | '16:9' | string // 비율 힌트
+  width?: number // 배너 등 구체 픽셀 힌트 (모델은 정확 대응 못할 수 있음)
+  height?: number
+}
+
+export interface ImageResult {
   bytes: Buffer
   mimeType: string
   durationMs: number
 }
 
-export async function editImageWithGemini(input: EditImageInput): Promise<EditImageResult> {
+export async function editImageWithGemini(input: EditImageInput): Promise<ImageResult> {
   const logger = new Logger('ImageEditor')
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new Error('GEMINI_API_KEY 미설정 — Railway Variables 에 등록 필요')
@@ -130,6 +139,108 @@ function buildPrompt(recipe: StyleRecipe | undefined, instruction: string | unde
   }
   lines.push('')
   lines.push('출력: 1080×1080 비율 제품·배경 합성 이미지 1장. 워터마크·로고·캡션 없음.')
+  return lines.join('\n')
+}
+
+// text-to-image — 베이스 이미지 없이 프롬프트만으로 새 이미지 생성.
+// 참조 이미지가 있으면 스타일 가이드로만 사용.
+export async function generateImageWithGemini(input: GenerateImageInput): Promise<ImageResult> {
+  const logger = new Logger('ImageGenerator')
+  const key = process.env.GEMINI_API_KEY
+  if (!key) throw new Error('GEMINI_API_KEY 미설정')
+
+  const t0 = Date.now()
+
+  const refs: InlineData[] = []
+  for (const p of (input.refPaths ?? []).slice(0, 3)) {
+    try {
+      refs.push(await loadAsInlineData(p))
+    } catch (e: any) {
+      logger.warn(`스타일 레퍼런스 로드 실패 ${p}: ${e?.message ?? e}`)
+    }
+  }
+
+  const promptText = buildGeneratePrompt(input, refs.length > 0)
+
+  const body = {
+    contents: [
+      {
+        parts: [
+          { text: promptText },
+          ...refs.map((r) => ({ inlineData: r })),
+        ],
+      },
+    ],
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), EDIT_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${GEMINI_ENDPOINT}?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Gemini HTTP ${res.status}: ${text.slice(0, 300)}`)
+    }
+    const j: any = await res.json()
+    const parts: any[] = j?.candidates?.[0]?.content?.parts ?? []
+    const imagePart = parts.find((p) => p?.inlineData?.data)
+    if (!imagePart) {
+      const textPart = parts.find((p) => p?.text)
+      throw new Error(
+        'Gemini 응답에 이미지가 없음' +
+          (textPart ? ` — 모델 응답: ${String(textPart.text).slice(0, 200)}` : ''),
+      )
+    }
+    const mimeType: string = imagePart.inlineData.mimeType ?? 'image/png'
+    const bytes = Buffer.from(imagePart.inlineData.data, 'base64')
+    return { bytes, mimeType, durationMs: Date.now() - t0 }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function buildGeneratePrompt(input: GenerateImageInput, hasRefs: boolean): string {
+  const lines: string[] = []
+  const aspectLabel =
+    input.aspectRatio ??
+    (input.width && input.height
+      ? input.width === input.height
+        ? '1:1'
+        : input.width > input.height
+          ? '16:9 가로형 배너'
+          : '4:5 세로형'
+      : '1:1')
+  lines.push(
+    `인스타그램·SNS 카드뉴스용 배경/제품 이미지를 새로 생성하세요. 비율: ${aspectLabel}${
+      input.width && input.height ? ` (대략 ${input.width}×${input.height})` : ''
+    }.`,
+  )
+  lines.push(
+    '중요: 이미지 안에 어떤 글자·한글·영문·숫자·캡션도 넣지 마세요. 텍스트는 프론트엔드에서 별도로 얹습니다.',
+  )
+  if (hasRefs) {
+    lines.push('첨부된 레퍼런스 이미지는 스타일·색감·구도 가이드로만 사용하고, 복제하지 말고 재해석하세요.')
+  }
+  if (input.recipe) {
+    lines.push('')
+    lines.push('[브랜드 스타일 — 반드시 반영]')
+    lines.push(
+      `· 팔레트: ${input.recipe.palette} (주 ${input.recipe.rawColors.primary}, 보조 ${input.recipe.rawColors.secondary})`,
+    )
+    lines.push(`· 조명: ${input.recipe.lighting}`)
+    lines.push(`· 구도: ${input.recipe.composition}`)
+    lines.push(`· 분위기: ${input.recipe.sharedMood}`)
+  }
+  lines.push('')
+  lines.push('[주제 / 내용]')
+  lines.push(input.prompt.trim())
+  lines.push('')
+  lines.push('출력: 이미지 1장. 워터마크·로고·캡션·텍스트 없음. 사실적이면서 따뜻한 감각.')
   return lines.join('\n')
 }
 

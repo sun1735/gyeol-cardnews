@@ -502,6 +502,49 @@ export default function Page() {
     if (j?.url) updateCard(card.id, { imageUrl: j.url })
   }
 
+  // text-to-image — 베이스 이미지 없이 프롬프트만으로 새 이미지 생성
+  async function handleAiGenerate(card: CardData): Promise<void> {
+    const defaultPrompt = [card.title, card.body].filter(Boolean).join('. ').slice(0, 300)
+    const override = window.prompt(
+      '생성할 이미지 설명을 입력하세요 (비우면 카드 제목+본문 사용)',
+      defaultPrompt,
+    )
+    if (override === null) return // 사용자 취소
+    const finalPrompt = (override.trim() || defaultPrompt).slice(0, 1000)
+    if (!finalPrompt) {
+      alert('생성할 이미지 설명이 비어있습니다.')
+      return
+    }
+    const d = resolveSizePx(size, customSize)
+    const aspectRatio: '1:1' | '4:5' | '9:16' | '16:9' | undefined =
+      size === '1:1' || size === '4:5' || size === '9:16'
+        ? size
+        : d.w === d.h
+          ? '1:1'
+          : d.w > d.h
+            ? '16:9'
+            : '4:5'
+    const body = {
+      prompt: finalPrompt,
+      brandId: selectedBrandId || undefined,
+      refImageUrls: baseImages.length ? baseImages : undefined,
+      aspectRatio,
+      width: d.w,
+      height: d.h,
+    }
+    const res = await fetch('/api/images/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(j?.message ?? `HTTP ${res.status}`)
+    }
+    const j = await res.json()
+    if (j?.url) updateCard(card.id, { imageUrl: j.url })
+  }
+
   // Mode A — 프롬프트 상단에 공통 참조 이미지 1~3장 첨부
   async function addBaseImages(files: FileList | File[]) {
     const remaining = 3 - baseImages.length
@@ -1198,6 +1241,7 @@ export default function Page() {
                     onChange={(patch) => updateCard(c.id, patch)}
                     onImageFile={(f) => handleCardImageUpload(c.id, f)}
                     onAiEdit={() => handleAiEdit(c)}
+                    onAiGenerate={() => handleAiGenerate(c)}
                     onDownload={() => downloadPng(c.id, idx)}
                     onMoveUp={() => moveCard(c.id, -1)}
                     onMoveDown={() => moveCard(c.id, 1)}
@@ -1646,6 +1690,7 @@ function CardItem({
   onChange,
   onImageFile,
   onAiEdit,
+  onAiGenerate,
   onDownload,
   onMoveUp,
   onMoveDown,
@@ -1664,12 +1709,14 @@ function CardItem({
   onChange: (patch: Partial<CardData>) => void
   onImageFile: (f: File) => void
   onAiEdit: () => Promise<void>
+  onAiGenerate: () => Promise<void>
   onDownload: () => void
   onMoveUp: () => void
   onMoveDown: () => void
   onDelete: () => void
 }) {
   const [aiEditing, setAiEditing] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const d = resolveSizePx(size, customSize)
   const ratio = d.display / d.w
@@ -1931,7 +1978,7 @@ function CardItem({
         )}
         {card.imageUrl && (
           <button
-            disabled={aiEditing}
+            disabled={aiEditing || aiGenerating}
             onClick={async (e) => {
               stop(e)
               setAiEditing(true)
@@ -1950,6 +1997,25 @@ function CardItem({
             {aiEditing ? 'AI 편집 중…' : '✨ AI 보정'}
           </button>
         )}
+        <button
+          disabled={aiEditing || aiGenerating}
+          onClick={async (e) => {
+            stop(e)
+            setAiGenerating(true)
+            setAiError(null)
+            try {
+              await onAiGenerate()
+            } catch (err: any) {
+              setAiError(err?.message ?? '생성 실패')
+            } finally {
+              setAiGenerating(false)
+            }
+          }}
+          className="text-xs px-2 py-1 border rounded-md bg-fuchsia-600 text-white disabled:opacity-60"
+          title="Gemini 2.5 Flash Image 로 새 이미지 생성 (텍스트 → 이미지)"
+        >
+          {aiGenerating ? 'AI 생성 중…' : '🎨 AI 생성'}
+        </button>
         <button
           onClick={(e) => { stop(e); onDownload() }}
           className="text-xs px-2 py-1 border rounded-md ml-auto bg-slate-900 text-white"
