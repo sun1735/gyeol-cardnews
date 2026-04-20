@@ -220,6 +220,33 @@ export default function Page() {
     if (r.url) updateCard(id, { imageUrl: r.url })
   }
 
+  // Mode B — 카드별 AI 이미지 편집 (Gemini 2.5 Flash Image)
+  // 현재 카드의 imageUrl + 브랜드 스타일 + Mode A 참조 이미지를 근거로 새 배경 생성
+  async function handleAiEdit(card: CardData): Promise<void> {
+    if (!card.imageUrl) {
+      alert('먼저 이미지를 업로드하거나 배경을 선택해 주세요.')
+      return
+    }
+    const instruction = (card.body || '').slice(0, 200) // 카드 본문을 힌트로 전달 (선택적)
+    const body = {
+      imageUrl: card.imageUrl,
+      brandId: selectedBrandId || undefined,
+      instruction: instruction || undefined,
+      refImageUrls: baseImages.length ? baseImages : undefined,
+    }
+    const res = await fetch('/api/images/edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(j?.message ?? `HTTP ${res.status}`)
+    }
+    const j = await res.json()
+    if (j?.url) updateCard(card.id, { imageUrl: j.url })
+  }
+
   // Mode A — 프롬프트 상단에 공통 참조 이미지 1~3장 첨부
   async function addBaseImages(files: FileList | File[]) {
     const remaining = 3 - baseImages.length
@@ -812,6 +839,7 @@ export default function Page() {
                     onSelect={() => setSelectedCardId(c.id)}
                     onChange={(patch) => updateCard(c.id, patch)}
                     onImageFile={(f) => handleCardImageUpload(c.id, f)}
+                    onAiEdit={() => handleAiEdit(c)}
                     onDownload={() => downloadPng(c.id, idx)}
                     onMoveUp={() => moveCard(c.id, -1)}
                     onMoveDown={() => moveCard(c.id, 1)}
@@ -1015,6 +1043,7 @@ function CardItem({
   onSelect,
   onChange,
   onImageFile,
+  onAiEdit,
   onDownload,
   onMoveUp,
   onMoveDown,
@@ -1030,11 +1059,14 @@ function CardItem({
   onSelect: () => void
   onChange: (patch: Partial<CardData>) => void
   onImageFile: (f: File) => void
+  onAiEdit: () => Promise<void>
   onDownload: () => void
   onMoveUp: () => void
   onMoveDown: () => void
   onDelete: () => void
 }) {
+  const [aiEditing, setAiEditing] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const d = SIZE_PX[size]
   const ratio = d.display / d.w
   const height = Math.round(d.h * ratio)
@@ -1293,6 +1325,27 @@ function CardItem({
             이미지 제거
           </button>
         )}
+        {card.imageUrl && (
+          <button
+            disabled={aiEditing}
+            onClick={async (e) => {
+              stop(e)
+              setAiEditing(true)
+              setAiError(null)
+              try {
+                await onAiEdit()
+              } catch (err: any) {
+                setAiError(err?.message ?? '편집 실패')
+              } finally {
+                setAiEditing(false)
+              }
+            }}
+            className="text-xs px-2 py-1 border rounded-md bg-violet-600 text-white disabled:opacity-60"
+            title="Gemini 2.5 Flash Image 로 브랜드 톤에 맞춰 배경 재편집"
+          >
+            {aiEditing ? 'AI 편집 중…' : '✨ AI 보정'}
+          </button>
+        )}
         <button
           onClick={(e) => { stop(e); onDownload() }}
           className="text-xs px-2 py-1 border rounded-md ml-auto bg-slate-900 text-white"
@@ -1300,6 +1353,9 @@ function CardItem({
           PNG 다운로드
         </button>
       </div>
+      {aiError && (
+        <div className="text-[11px] text-red-600 leading-relaxed">AI 편집 오류: {aiError}</div>
+      )}
 
       {backgrounds.length > 0 && (
         <div className="flex gap-1.5 items-center flex-wrap pt-1">

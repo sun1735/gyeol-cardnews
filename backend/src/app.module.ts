@@ -10,6 +10,7 @@ import { GenerateModule } from './generate/generate.module'
 import { UploadModule } from './upload/upload.module'
 import { BackgroundsModule } from './backgrounds/backgrounds.module'
 import { ReelsModule } from './reels/reels.module'
+import { ImagesModule } from './images/images.module'
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ReelsModule } from './reels/reels.module'
     UploadModule,
     BackgroundsModule,
     ReelsModule,
+    ImagesModule,
   ],
 })
 export class AppModule {}
