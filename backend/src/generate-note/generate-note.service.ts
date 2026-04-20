@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { checkSafety } from '../generate/safety'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { Orchestrator } from './orchestrator'
 
@@ -30,6 +31,13 @@ export class GenerateNoteService implements OnModuleInit {
   }
 
   async enqueue(dto: GenerateFromNoteDto): Promise<{ jobId: string; status: string }> {
+    // 안전 필터 선제 차단 — 잡으로 만들지 않고 즉시 400 반환.
+    const safety = checkSafety(dto.prompt)
+    if (safety.blocked) {
+      throw new BadRequestException(
+        `입력에 허용되지 않는 표현이 포함되어 있습니다: ${safety.label} ("${safety.matched}")`,
+      )
+    }
     const brand = await this.prisma.brandProfile.findUnique({ where: { id: dto.brandId } })
     if (!brand) throw new NotFoundException('brandId 가 유효하지 않습니다')
 

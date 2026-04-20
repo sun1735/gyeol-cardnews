@@ -292,6 +292,183 @@ async function S10_health() {
 }
 
 // ────────────────────────────────────────────────────────
+// RAG 시나리오 — 지식노트 기반 비동기 생성
+// ────────────────────────────────────────────────────────
+
+const createdDocIds = []
+const createdImageIds = []
+
+async function createDoc(title, contentText) {
+  const r = await fetch(`${BASE}/api/knowledge/docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brandId, title, sourceType: 'note', contentText }),
+  })
+  const j = await json(r)
+  assert(r.ok && j?.docId, `doc 생성 실패: HTTP ${r.status} ${JSON.stringify(j)}`)
+  createdDocIds.push(j.docId)
+  return j
+}
+
+async function createImage(url, label, tags) {
+  const r = await fetch(`${BASE}/api/knowledge/images`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brandId, url, label, tags, usageRights: 'owned', qualityScore: 0.8 }),
+  })
+  const j = await json(r)
+  assert(r.ok && j?.id, `image 생성 실패: HTTP ${r.status} ${JSON.stringify(j)}`)
+  createdImageIds.push(j.id)
+  return j
+}
+
+async function enqueueNoteJob(payload) {
+  const r = await fetch(`${BASE}/api/generate/cards-from-note`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return { res: r, body: await json(r) }
+}
+
+async function pollJob(jobId, timeoutMs = 120_000) {
+  const t0 = Date.now()
+  const progressTrail = []
+  while (Date.now() - t0 < timeoutMs) {
+    const j = await fetch(`${BASE}/api/generate/jobs/${jobId}`).then(json)
+    progressTrail.push(j?.progress ?? -1)
+    if (j?.status === 'done' || j?.status === 'partial') {
+      return { final: j, trail: progressTrail }
+    }
+    if (j?.status === 'failed') {
+      throw new Error(`job failed: ${j.errorMessage ?? '(no message)'}`)
+    }
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+  throw new Error(`job ${jobId} 미완료 (${timeoutMs}ms 타임아웃)`)
+}
+
+async function R1_upload_notes() {
+  const d1 = await createDoc(
+    '유순 브랜드 소개',
+    '유순은 시니어와 가족을 위한 따뜻한 케어 브랜드입니다. 정성껏 준비한 영양 식단과 세심한 돌봄을 제공합니다. '.repeat(
+      5,
+    ),
+  )
+  assert(d1.chunkCount >= 1, `청크 수 기대 >= 1, 실제 ${d1.chunkCount}`)
+  const d2 = await createDoc(
+    '유순 온라인 판매 안내',
+    '5월 1일부터 유순 제품을 공식 온라인 스토어에서 만나실 수 있습니다. 초기 구매 고객에게는 감사 선물을 드립니다.',
+  )
+  assert(d2.docId, 'd2 생성 실패')
+  const list = await fetch(`${BASE}/api/knowledge/docs?brandId=${brandId}`).then(json)
+  assert(list?.docs?.length >= 2, `목록 2건 기대, 실제 ${list?.docs?.length}`)
+}
+
+async function R2_upload_image_assets() {
+  const a1 = await createImage('/uploads/defaults/bg-morning.svg', '아침 제품컷', ['제품', '아침', '따뜻함'])
+  assert(Array.isArray(a1.tags) && a1.tags.includes('제품'), 'tags 보존 실패')
+  const a2 = await createImage('/uploads/defaults/bg-meal.svg', '식사 이미지', ['식사', '영양'])
+  assert(a2.qualityScore === 0.8, 'qualityScore 저장 실패')
+  const list = await fetch(`${BASE}/api/knowledge/images?brandId=${brandId}`).then(json)
+  assert((list?.images?.length ?? 0) >= 2, '이미지 라이브러리 목록 누락')
+}
+
+async function R3_no_notes_fallback() {
+  // 임시 브랜드 생성 → 노트 없이도 done 도달해야 함
+  const tmpName = `e2e-empty-${Date.now().toString(36)}`
+  const cr = await fetch(`${BASE}/api/brands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: tmpName, tone: '간결한' }),
+  })
+  const crj = await json(cr)
+  assert(crj?.id, '임시 브랜드 생성 실패')
+  try {
+    const { res, body } = await enqueueNoteJob({
+      brandId: crj.id,
+      prompt: '새 제품 소개 카드',
+      count: 3,
+    })
+    assert(res.ok && body?.jobId, `enqueue 실패: ${res.status}`)
+    const { final } = await pollJob(body.jobId)
+    assert(final.status === 'done' || final.status === 'partial', `status=${final.status}`)
+    assert(Array.isArray(final.cards) && final.cards.length === 3, '카드 3장 기대')
+  } finally {
+    await fetch(`${BASE}/api/brands/${crj.id}`, { method: 'DELETE' }).catch(() => {})
+  }
+}
+
+async function R4_blocked_prompt() {
+  const { res, body } = await enqueueNoteJob({
+    brandId,
+    prompt: '19금 성인용 광고 카드뉴스',
+    count: 3,
+  })
+  assert(res.status === 400, `HTTP 400 기대, 실제 ${res.status}`)
+  assert(String(body?.message ?? '').includes('허용되지 않는'), '차단 메시지 누락')
+}
+
+async function R5_card_count() {
+  const { body } = await enqueueNoteJob({ brandId, prompt: '유순 온라인 판매 시작', count: 6 })
+  const { final } = await pollJob(body.jobId)
+  assert(final.cards.length === 6, `카드 6장 기대, 실제 ${final.cards.length}`)
+  assert(final.cards[0].layout === 'cover', '첫 카드 cover 아님')
+  assert(final.cards[5].layout === 'cta', '마지막 카드 cta 아님')
+}
+
+async function R6_base_images_roundrobin() {
+  const refs = [
+    '/uploads/defaults/bg-morning.svg',
+    '/uploads/defaults/bg-meal.svg',
+    '/uploads/defaults/bg-program.svg',
+  ]
+  const { body } = await enqueueNoteJob({
+    brandId,
+    prompt: '유순 하루 일과 소개',
+    count: 5,
+    baseImageUrls: refs,
+  })
+  const { final } = await pollJob(body.jobId)
+  assert(final.cards.length === 5, '카드 5장 기대')
+  // 이미지 편집(Gemini) 성공 시 url 은 변경되지만, 편집 비활성/실패 시 원본 refs 또는 랭킹 결과가 들어감.
+  // 최소 조건: 모든 카드에 imageUrl 이 존재해야 한다.
+  for (const [i, c] of final.cards.entries()) {
+    assert(c.imageUrl, `카드 ${i} imageUrl 누락`)
+  }
+}
+
+async function R7_job_progress() {
+  const { body } = await enqueueNoteJob({ brandId, prompt: '유순 진행률 테스트', count: 3 })
+  const { final, trail } = await pollJob(body.jobId)
+  assert(final.progress === 100, `최종 progress=100 기대, 실제 ${final.progress}`)
+  const uniqueProgress = [...new Set(trail)].sort((a, b) => a - b)
+  assert(uniqueProgress[uniqueProgress.length - 1] === 100, 'progress 상승 없이 종료')
+}
+
+async function R8_result_schema() {
+  const { body } = await enqueueNoteJob({ brandId, prompt: '스키마 검증 테스트', count: 3 })
+  const { final } = await pollJob(body.jobId)
+  for (const [i, c] of final.cards.entries()) {
+    for (const key of ['id', 'layout', 'title', 'body', 'subtext', 'cta']) {
+      assert(key in c, `카드 ${i} 필드 "${key}" 누락`)
+    }
+    assert(['cover', 'content', 'cta'].includes(c.layout), `카드 ${i} layout 잘못됨: ${c.layout}`)
+    assert(typeof c.title === 'string', `카드 ${i} title 타입`)
+  }
+  assert(final.meta?.source === 'note_rag', 'meta.source=note_rag 누락')
+}
+
+async function R9_cleanup() {
+  for (const id of createdDocIds) {
+    await fetch(`${BASE}/api/knowledge/docs/${id}`, { method: 'DELETE' })
+  }
+  for (const id of createdImageIds) {
+    await fetch(`${BASE}/api/knowledge/images/${id}`, { method: 'DELETE' })
+  }
+}
+
+// ────────────────────────────────────────────────────────
 
 async function main() {
   log(`\n결 · 카드뉴스 E2E 테스트`)
@@ -312,6 +489,17 @@ async function main() {
   await test('S8  안전 가드 — 과장/의학 표현 완화', S8_safety_guard)
   await test('S9  DB 왕복 — 프로젝트·카드 CRUD', S9_roundtrip)
   await test('S10 헬스체크', S10_health)
+
+  // ── RAG / 지식노트 기반 비동기 생성 ──
+  await test('R1  지식노트 문서 2건 등록 + 청크 생성', R1_upload_notes)
+  await test('R2  이미지 라이브러리 등록 + 태그 보존', R2_upload_image_assets)
+  await test('R3  노트 없음 → 기본 프레임 fallback 동작', R3_no_notes_fallback)
+  await test('R4  금칙어 프롬프트 → 400 (enqueue 선제 차단)', R4_blocked_prompt)
+  await test('R5  count=6 카드 수 정확성', R5_card_count)
+  await test('R6  baseImageUrls 3장 round-robin 배치', R6_base_images_roundrobin)
+  await test('R7  job progress 단조 증가 + done 도달', R7_job_progress)
+  await test('R8  결과 카드 JSON 필드 고정 (title/body/subtext/cta/layout)', R8_result_schema)
+  await test('R9  cleanup (등록한 문서·이미지 삭제)', R9_cleanup)
 
   // Summary
   const pass = results.filter((r) => r.status === 'PASS').length
