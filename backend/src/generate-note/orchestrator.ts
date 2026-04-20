@@ -275,7 +275,7 @@ function buildTemplateCopies(prompt: string, brand: any, layouts: Layout[]): Val
       layout,
       title: `포인트 ${i}`,
       body: '핵심 메시지를 담은 이야기를 전합니다.',
-      subtext: `${i + 1} / ${layouts.length}`,
+      subtext: '',
       cta: '',
     }
   })

@@ -376,7 +376,7 @@ export class GenerateService {
         : ''
 
       const subtextFallback =
-        layout === 'cover' ? (brandName || '') : `${i + 1} / ${n}`
+        layout === 'cover' ? (brandName || '') : ''
 
       const ctaFallback =
         layout === 'cta' ? '문의하기 →'
@@ -481,7 +481,7 @@ export class GenerateService {
         title = topic.title
         body = topic.body
         subtext = topic.subtext
-        cta = `${i + 1} / ${n}`
+        cta = ''
       }
 
       cards.push(
