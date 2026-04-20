@@ -1392,7 +1392,7 @@ export default function Page() {
             <div className="border-b px-5 flex gap-1 text-sm">
               {(
                 [
-                  { k: 'info', label: '기본 정보' },
+                  { k: 'info', label: '기본 정보', needsBrand: false },
                   { k: 'docs', label: `문서 (${knowledgeDocs.length})`, needsBrand: true },
                   { k: 'images', label: `이미지 라이브러리 (${knowledgeImages.length})`, needsBrand: true },
                   { k: 'ideas', label: `아이디어 (${ideas.length})`, needsBrand: true },
