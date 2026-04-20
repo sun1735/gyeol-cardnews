@@ -6,6 +6,7 @@ import { BG_URLS } from '../backgrounds/defaults'
 import { OPENAI_RESPONSE_FORMAT, validateCard, CARD_LIMITS, ValidatedCard } from './schema'
 import { buildStyleRecipe, recipeAsPromptBlock } from './style'
 import { checkSafety } from './safety'
+import { callGeminiJson, cardArraySchema } from './llm-gemini'
 
 type CardSource = 'llm' | 'template'
 
@@ -407,8 +408,11 @@ export class GenerateService {
     const frame = pickFrame(prompt)
     const templateCards = this.template(prompt, n, brand, frame, baseImages)
 
+    // LLM 우선순위: Gemini 가 있으면 Gemini (재시도 포함), 없으면 OpenAI, 없으면 템플릿.
     let llmAttempt: LlmAttempt | null = null
-    if (process.env.OPENAI_API_KEY) {
+    if (process.env.GEMINI_API_KEY) {
+      llmAttempt = await this.callGeminiWithRetry(prompt, n, brand)
+    } else if (process.env.OPENAI_API_KEY) {
       llmAttempt = await this.callLlmWithRetry(prompt, n, brand)
     }
 
@@ -490,6 +494,57 @@ export class GenerateService {
       )
     }
     return cards
+  }
+
+  // Gemini 경로 (재시도 3회 + 카드별 부분 폴백). 우선 순위: Gemini > OpenAI > 템플릿.
+  private async callGeminiWithRetry(prompt: string, n: number, brand: any): Promise<LlmAttempt | null> {
+    const BACKOFFS_MS = [500, 1000, 2000]
+    const logger = new (require('@nestjs/common').Logger)('GenerateService')
+    const recipe = buildStyleRecipe(brand)
+    const systemInstruction = [
+      '한국어 카드뉴스 카피라이터. 과장/의학적 단정/절대 표현 금지. 따뜻하고 신뢰감 있는 톤.',
+      '각 카드는 {title, body, subtext, cta, layout} 5개 필드를 모두 포함한다.',
+      '시리즈의 n장은 동일 룩앤필·톤을 공유하며 한 편의 흐름으로 이어진다.',
+    ].join(' ')
+    const userText = [
+      recipeAsPromptBlock(recipe),
+      '',
+      `주제: ${prompt}`,
+      `브랜드: ${brand?.name ?? '미지정'}`,
+      `톤: ${brand?.tone ?? '따뜻하고 진솔한'}`,
+      `기본 문구: ${brand?.defaultPhrase ?? ''}`,
+      `카드 수: ${n}`,
+      `규칙: 첫 카드 layout=cover, 마지막 layout=cta, 나머지 layout=content.`,
+      `길이 상한: title ${CARD_LIMITS.title}자, body ${CARD_LIMITS.body}자, subtext ${CARD_LIMITS.subtext}자, cta ${CARD_LIMITS.cta}자.`,
+      'subtext/cta 불필요 시 빈 문자열로 두고 필드는 반드시 포함.',
+    ].join('\n')
+
+    let anyTimedOut = false
+    for (let attempt = 0; attempt <= BACKOFFS_MS.length; attempt++) {
+      try {
+        const parsed = await callGeminiJson<{ cards: unknown[] }>({
+          systemInstruction,
+          userText,
+          schema: cardArraySchema(n),
+          timeoutMs: LLM_TIMEOUT_MS,
+          temperature: 0.7,
+        })
+        const arr = Array.isArray(parsed?.cards) ? parsed.cards : []
+        if (arr.length) {
+          const out: (ValidatedCard | null)[] = new Array(n).fill(null)
+          for (let i = 0; i < Math.min(arr.length, n); i++) out[i] = validateCard(arr[i])
+          if (out.some((c) => c !== null)) {
+            if (attempt > 0) logger.warn(`Gemini ${attempt}회 재시도 후 성공`)
+            return { cards: out, retries: attempt, timedOut: anyTimedOut }
+          }
+        }
+      } catch (e: any) {
+        if (e?.name === 'AbortError' || /abort/i.test(e?.message ?? '')) anyTimedOut = true
+        logger.warn(`Gemini 시도 ${attempt} 실패: ${e?.message ?? e}`)
+      }
+      if (attempt < BACKOFFS_MS.length) await sleep(BACKOFFS_MS[attempt])
+    }
+    return { cards: new Array(n).fill(null), retries: BACKOFFS_MS.length, timedOut: anyTimedOut }
   }
 
   // 최대 3회 재시도. 어떤 카드라도 유효하게 파싱되면 성공으로 간주 (부분 완성 허용).

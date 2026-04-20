@@ -83,6 +83,17 @@ export default function Page() {
   const [newImageLabel, setNewImageLabel] = useState('')
   const [newImageTags, setNewImageTags] = useState('')
   const [imageUploading, setImageUploading] = useState(false)
+  const [ideas, setIdeas] = useState<
+    Array<{
+      title: string
+      prompt: string
+      suggestedCount: number
+      reason: string
+      usesImages: string[]
+    }>
+  >([])
+  const [ideasLoading, setIdeasLoading] = useState(false)
+  const [ideasError, setIdeasError] = useState<string | null>(null)
   const [manual, setManual] = useState<ManualInput[]>(
     Array.from({ length: 5 }, emptyManual)
   )
@@ -229,6 +240,39 @@ export default function Page() {
     if (!confirm('이 이미지 에셋을 라이브러리에서 제거할까요?')) return
     await fetch(`/api/knowledge/images/${id}`, { method: 'DELETE' })
     await loadKnowledge(selectedBrandId)
+  }
+
+  async function fetchIdeas() {
+    if (!selectedBrandId) return
+    setIdeasError(null)
+    setIdeasLoading(true)
+    try {
+      const r = await fetch('/api/knowledge/recommend-ideas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId: selectedBrandId, maxIdeas: 5 }),
+      })
+      const j = await r.json()
+      if (!r.ok) {
+        setIdeasError(j?.message ?? `HTTP ${r.status}`)
+        setIdeas([])
+        return
+      }
+      setIdeas(j?.ideas ?? [])
+    } catch (e: any) {
+      setIdeasError(e?.message ?? '알 수 없는 오류')
+      setIdeas([])
+    } finally {
+      setIdeasLoading(false)
+    }
+  }
+
+  function applyIdea(idea: { prompt: string; suggestedCount: number }) {
+    setMode('note-rag')
+    setPrompt(idea.prompt)
+    setCount(Math.max(1, Math.min(10, idea.suggestedCount)))
+    setKnowledgePanelOpen(false)
+    setIdeas([])
   }
 
   useEffect(() => {
@@ -1283,6 +1327,69 @@ export default function Page() {
               </div>
             ) : (
               <div className="p-5 space-y-6">
+                {/* 아이디어 추천 섹션 */}
+                <section className="border rounded-md p-3 bg-gradient-to-br from-violet-50 to-white">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <h3 className="text-sm font-semibold">💡 카드뉴스 아이디어 추천</h3>
+                    <button
+                      onClick={fetchIdeas}
+                      disabled={
+                        ideasLoading || (knowledgeDocs.length === 0 && knowledgeImages.length === 0)
+                      }
+                      className="px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white rounded-md text-xs disabled:opacity-60"
+                      title="현재 등록된 지식노트·이미지 기반으로 Gemini 가 만들 만한 카드뉴스 5개 제안"
+                    >
+                      {ideasLoading ? '분석 중…' : ideas.length ? '다시 추천' : '아이디어 요청'}
+                    </button>
+                  </div>
+                  {knowledgeDocs.length === 0 && knowledgeImages.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      아래 문서·이미지를 먼저 1개 이상 등록하면 추천을 받을 수 있습니다.
+                    </p>
+                  ) : ideas.length === 0 && !ideasError ? (
+                    <p className="text-xs text-slate-500">
+                      버튼을 누르면 등록된 문서·이미지로부터 카드뉴스 주제 5개를 제안합니다.
+                    </p>
+                  ) : null}
+                  {ideasError && (
+                    <p className="text-xs text-red-600 leading-relaxed">오류: {ideasError}</p>
+                  )}
+                  {ideas.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {ideas.map((idea, i) => (
+                        <div
+                          key={i}
+                          className="border rounded-md p-3 bg-white hover:border-violet-300 transition"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="font-medium text-sm">{idea.title}</div>
+                            <span className="text-[10px] text-slate-500 shrink-0">
+                              {idea.suggestedCount}장
+                            </span>
+                          </div>
+                          <div className="text-[12px] text-slate-600 mb-1 leading-relaxed">
+                            "{idea.prompt}"
+                          </div>
+                          <div className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+                            💬 {idea.reason}
+                          </div>
+                          {idea.usesImages.length > 0 && (
+                            <div className="text-[10px] text-slate-400 mb-2">
+                              활용 이미지: {idea.usesImages.join(', ')}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => applyIdea(idea)}
+                            className="w-full px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs"
+                          >
+                            이 아이디어로 생성하기 →
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
                 {/* 문서 섹션 */}
                 <section>
                   <h3 className="text-sm font-semibold mb-2">

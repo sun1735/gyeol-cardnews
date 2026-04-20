@@ -12,9 +12,10 @@ import { Injectable, Logger } from '@nestjs/common'
 import { join, normalize } from 'path'
 import { PrismaService } from '../prisma/prisma.service'
 import { sanitizeText } from '../generate/sanitize'
-import { OPENAI_RESPONSE_FORMAT, validateCard, CARD_LIMITS, ValidatedCard } from '../generate/schema'
+import { validateCard, CARD_LIMITS, ValidatedCard } from '../generate/schema'
 import { buildStyleRecipe, recipeAsPromptBlock, StyleRecipe } from '../generate/style'
 import { checkSafety } from '../generate/safety'
+import { callGeminiJson, cardArraySchema } from '../generate/llm-gemini'
 import { editImageWithGemini, saveEditedImage } from '../images/editor'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { KnowledgeSearchService, RetrievedChunk } from './knowledge-search.service'
@@ -128,7 +129,7 @@ export class Orchestrator {
     }
   }
 
-  // 카드 레이아웃별로 LLM 카피 생성. json_schema 강제 + 전체 실패 시 템플릿.
+  // 카드 레이아웃별로 LLM 카피 생성. Gemini 2.5 Flash 우선, 실패 시 템플릿 폴백.
   private async generateCopy(
     prompt: string,
     n: number,
@@ -138,75 +139,53 @@ export class Orchestrator {
     chunks: RetrievedChunk[],
   ): Promise<ValidatedCard[]> {
     const templateCopies = buildTemplateCopies(prompt, brand, layouts)
-    if (!process.env.OPENAI_API_KEY) return templateCopies
+    if (!process.env.GEMINI_API_KEY) {
+      this.logger.warn('GEMINI_API_KEY 없음 — 템플릿 폴백 (RAG 컨텍스트 반영 불가)')
+      return templateCopies
+    }
+
+    const contextBlock = chunks.length
+      ? chunks.map((c, i) => `[${i + 1}] ${c.docTitle}: ${c.text}`).join('\n---\n')
+      : '(브랜드 지식노트가 비어 있음 — 프롬프트와 브랜드 톤만으로 작성)'
+
+    const systemInstruction = [
+      '한국어 카드뉴스 카피라이터. 과장/의학적 단정/절대 표현 금지. 따뜻하고 신뢰감 있는 톤.',
+      '각 카드는 {title, body, subtext, cta, layout} 5개 필드를 모두 포함한다.',
+      '브랜드 지식노트가 제공되면 반드시 해당 사실을 근거로 삼고, 구체적 내용·숫자·고유명사는 노트에서 가져올 것.',
+      '노트가 비어있으면 브랜드 톤과 프롬프트만으로 작성.',
+    ].join(' ')
+
+    const userText = [
+      recipeAsPromptBlock(recipe),
+      '',
+      '[브랜드 지식노트 발췌 — 근거로 활용, 인용은 자연스럽게]',
+      contextBlock,
+      '',
+      `주제: ${prompt}`,
+      `브랜드: ${brand?.name ?? '미지정'}`,
+      `카드 수: ${n}`,
+      `레이아웃 순서: ${layouts.join(', ')}`,
+      `길이 상한: title ${CARD_LIMITS.title}, body ${CARD_LIMITS.body}, subtext ${CARD_LIMITS.subtext}, cta ${CARD_LIMITS.cta} (한국어 기준)`,
+      'subtext/cta 불필요 시 빈 문자열로 두고 필드는 반드시 포함.',
+    ].join('\n')
 
     try {
-      const contextBlock = chunks.length
-        ? chunks.map((c, i) => `[${i + 1}] ${c.docTitle}: ${c.text}`).join('\n---\n')
-        : '(브랜드 지식노트가 비어 있음 — 프롬프트와 브랜드 톤만으로 작성)'
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
-      try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          signal: controller.signal,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            temperature: 0.6,
-            response_format: OPENAI_RESPONSE_FORMAT,
-            messages: [
-              {
-                role: 'system',
-                content: [
-                  '한국어 카드뉴스 카피라이터. 과장/의학적 단정/절대 표현 금지. 따뜻하고 신뢰감 있는 톤.',
-                  '각 카드는 {title, body, subtext, cta, layout} 5개 필드를 모두 포함한다.',
-                  '브랜드 지식노트가 제공되면 사실 근거로 삼고, 없으면 프롬프트·브랜드 톤만 사용.',
-                ].join(' '),
-              },
-              {
-                role: 'user',
-                content: [
-                  recipeAsPromptBlock(recipe),
-                  '',
-                  '[브랜드 지식노트 발췌 — 근거로 활용, 인용은 자연스럽게]',
-                  contextBlock,
-                  '',
-                  `주제: ${prompt}`,
-                  `브랜드: ${brand?.name ?? '미지정'}`,
-                  `카드 수: ${n}`,
-                  `레이아웃: ${layouts.join(', ')}`,
-                  `길이 상한: title ${CARD_LIMITS.title}, body ${CARD_LIMITS.body}, subtext ${CARD_LIMITS.subtext}, cta ${CARD_LIMITS.cta} (한국어 기준)`,
-                  'subtext/cta 불필요 시 빈 문자열로 두고 필드는 반드시 포함.',
-                ].join('\n'),
-              },
-            ],
-          }),
-        })
-        if (!res.ok) {
-          this.logger.warn(`OpenAI HTTP ${res.status} — 템플릿 폴백`)
-          return templateCopies
-        }
-        const j: any = await res.json()
-        const content = j?.choices?.[0]?.message?.content
-        const parsed = content ? JSON.parse(content) : null
-        if (!parsed || !Array.isArray(parsed.cards)) return templateCopies
-
-        const out: ValidatedCard[] = []
-        for (let i = 0; i < n; i++) {
-          const v = validateCard(parsed.cards[i])
-          out.push(v ?? templateCopies[i])
-        }
-        return out
-      } finally {
-        clearTimeout(timeoutId)
+      const parsed = await callGeminiJson<{ cards: unknown[] }>({
+        systemInstruction,
+        userText,
+        schema: cardArraySchema(n),
+        timeoutMs: LLM_TIMEOUT_MS,
+        temperature: 0.7,
+      })
+      if (!parsed || !Array.isArray(parsed.cards)) return templateCopies
+      const out: ValidatedCard[] = []
+      for (let i = 0; i < n; i++) {
+        const v = validateCard(parsed.cards[i])
+        out.push(v ?? templateCopies[i])
       }
+      return out
     } catch (e: any) {
-      this.logger.warn(`OpenAI 호출 예외 — 템플릿 폴백: ${e?.message ?? e}`)
+      this.logger.warn(`Gemini 호출 예외 — 템플릿 폴백: ${e?.message ?? e}`)
       return templateCopies
     }
   }

@@ -1,0 +1,88 @@
+// Gemini 2.5 Flash 텍스트 래퍼 — JSON 스키마 모드 + 타임아웃.
+// 프로젝트 전역의 카피 생성은 이 파일 한 곳에서만 외부 API 를 친다.
+// 모델 교체 시 callGeminiJson() 시그니처만 유지하면 됨.
+
+import { Logger } from '@nestjs/common'
+
+const GEMINI_MODEL = 'gemini-2.5-flash'
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+
+export interface GeminiJsonCall {
+  systemInstruction?: string
+  userText: string
+  // JSON 스키마 (OpenAI json_schema.schema 와 유사한 드래프트). Gemini 는 Schema 오브젝트를 기대한다.
+  schema: unknown
+  timeoutMs?: number
+  temperature?: number
+}
+
+// 성공 시 파싱된 JSON 을 그대로 반환. 실패 시 Error throw.
+export async function callGeminiJson<T = unknown>(call: GeminiJsonCall): Promise<T> {
+  const logger = new Logger('GeminiJson')
+  const key = process.env.GEMINI_API_KEY
+  if (!key) throw new Error('GEMINI_API_KEY 미설정')
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), call.timeoutMs ?? 25_000)
+  try {
+    const body: Record<string, unknown> = {
+      contents: [{ role: 'user', parts: [{ text: call.userText }] }],
+      generationConfig: {
+        temperature: call.temperature ?? 0.7,
+        responseMimeType: 'application/json',
+        responseSchema: call.schema,
+      },
+    }
+    if (call.systemInstruction) {
+      body.systemInstruction = { parts: [{ text: call.systemInstruction }] }
+    }
+
+    const res = await fetch(`${GEMINI_ENDPOINT}?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Gemini HTTP ${res.status}: ${text.slice(0, 300)}`)
+    }
+    const j: any = await res.json()
+    const parts: any[] = j?.candidates?.[0]?.content?.parts ?? []
+    const textPart = parts.find((p) => typeof p?.text === 'string')
+    if (!textPart) {
+      logger.warn(`Gemini 응답에 text 파트 없음: ${JSON.stringify(j).slice(0, 200)}`)
+      throw new Error('Gemini 응답 형식 비정상')
+    }
+    // responseSchema 가 있어도 Gemini 는 text 안에 JSON 문자열로 반환 — 파싱 필요.
+    return JSON.parse(textPart.text) as T
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// 카드 배열 JSON 스키마 — generate/schema.ts 의 OPENAI_RESPONSE_FORMAT 을 Gemini 형식으로 미러링.
+// Gemini Schema 는 OpenAPI 3.0 서브셋 — additionalProperties 금지, type 은 대문자(STRING/OBJECT/ARRAY)가 아닌 소문자도 수용하지만 명시적으로 적어둔다.
+export function cardArraySchema(maxCount: number) {
+  return {
+    type: 'object',
+    properties: {
+      cards: {
+        type: 'array',
+        maxItems: maxCount,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            body: { type: 'string' },
+            subtext: { type: 'string' },
+            cta: { type: 'string' },
+            layout: { type: 'string', enum: ['cover', 'content', 'cta'] },
+          },
+          required: ['title', 'body', 'subtext', 'cta', 'layout'],
+        },
+      },
+    },
+    required: ['cards'],
+  }
+}
