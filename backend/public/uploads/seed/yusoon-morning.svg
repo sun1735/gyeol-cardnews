@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a9c484"/>
+      <stop offset="100%" stop-color="#6b8e4e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#g)"/>
+  <circle cx="860" cy="240" r="110" fill="#f4f1e8" fill-opacity="0.85"/>
+  <rect x="100" y="780" width="880" height="180" rx="32" fill="#2d2a24" fill-opacity="0.35"/>
+  <text x="540" y="880" text-anchor="middle" font-size="72" fill="#ffffff" font-family="Pretendard, Noto Sans KR, sans-serif" font-weight="800">유순 · 아침 산책</text>
+</svg>

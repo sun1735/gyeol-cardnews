@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model BrandProfile {
+  id             String       @id @default(cuid())
+  name           String       @unique
+  tone           String       @default("")
+  defaultPhrase  String       @default("")
+  primaryColor   String       @default("#0f766e")
+  secondaryColor String       @default("#f0fdfa")
+  textColor      String       @default("#111827")
+  fontFamily     String       @default("Pretendard, sans-serif")
+  assets         BrandAsset[]
+  projects       Project[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("brand_profiles")
+}
+
+model BrandAsset {
+  id        String       @id @default(cuid())
+  brandId   String
+  brand     BrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  url       String
+  caption   String       @default("")
+  kind      String       @default("image") // image | font
+  createdAt DateTime     @default(now())
+
+  @@index([brandId])
+  @@map("brand_assets")
+}
+
+model Project {
+  id         String        @id @default(cuid())
+  brandId    String?
+  brand      BrandProfile? @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  title      String        @default("")
+  prompt     String        @default("")
+  sizePreset String        @default("1:1")  // 1:1 | 4:5 | 9:16
+  inputMode  String        @default("auto") // auto | manual
+  cards      Card[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([brandId])
+  @@map("projects")
+}
+
+model Card {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  order     Int      @default(0)
+  title     String   @default("")
+  body      String   @default("")
+  subtext   String   @default("") // 단계 4: 보조 텍스트
+  cta       String   @default("") // 단계 4: Call-to-Action
+  imageUrl  String?
+  layout    String   @default("content") // cover | content | cta
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, order])
+  @@map("cards")
+}

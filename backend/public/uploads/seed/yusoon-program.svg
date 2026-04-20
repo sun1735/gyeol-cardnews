@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b9a3c4"/>
+      <stop offset="100%" stop-color="#7d6b8e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#g)"/>
+  <rect x="260" y="300" width="180" height="400" rx="18" fill="#f4f1e8" fill-opacity="0.85"/>
+  <rect x="460" y="220" width="180" height="480" rx="18" fill="#f4f1e8" fill-opacity="0.85"/>
+  <rect x="660" y="360" width="180" height="340" rx="18" fill="#f4f1e8" fill-opacity="0.85"/>
+  <text x="540" y="880" text-anchor="middle" font-size="72" fill="#ffffff" font-family="Pretendard, Noto Sans KR, sans-serif" font-weight="800">유순 · 프로그램</text>
+</svg>

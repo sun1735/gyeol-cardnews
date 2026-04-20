@@ -1,0 +1,27 @@
+# deps
+node_modules/
+
+# build output
+dist/
+.next/
+out/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# prisma
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+
+# runtime uploads (사용자 업로드는 Railway Volume 또는 S3)
+backend/public/uploads/reels/*.mp4
+
+# logs / os
+*.log
+.DS_Store
+Thumbs.db
+
+# claude code local
+.claude/settings.local.json
