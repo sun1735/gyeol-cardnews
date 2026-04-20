@@ -12,6 +12,7 @@ import { BackgroundsModule } from './backgrounds/backgrounds.module'
 import { ReelsModule } from './reels/reels.module'
 import { ImagesModule } from './images/images.module'
 import { KnowledgeModule } from './knowledge/knowledge.module'
+import { GenerateNoteModule } from './generate-note/generate-note.module'
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { KnowledgeModule } from './knowledge/knowledge.module'
     ReelsModule,
     ImagesModule,
     KnowledgeModule,
+    GenerateNoteModule,
   ],
 })
 export class AppModule {}
