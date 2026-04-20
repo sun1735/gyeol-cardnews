@@ -1,7 +1,32 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { createHash } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { sanitizeText } from './sanitize'
 import { BG_URLS } from '../backgrounds/defaults'
+import { OPENAI_RESPONSE_FORMAT, validateCard, CARD_LIMITS, ValidatedCard } from './schema'
+import { buildStyleRecipe, recipeAsPromptBlock } from './style'
+import { checkSafety } from './safety'
+
+type CardSource = 'llm' | 'template'
+
+export interface GenMeta {
+  sources: CardSource[]
+  retries: number
+  source: 'llm' | 'template' | 'mixed'
+  durationMs: number
+  timedOut: boolean
+}
+
+interface LlmAttempt {
+  cards: (ValidatedCard | null)[] // 길이 = n, null = 해당 인덱스 카드 검증 실패
+  retries: number
+  timedOut: boolean
+}
+
+// 단일 LLM 호출 타임아웃 — 초과 시 AbortController 로 끊고 재시도 루프로 넘김.
+const LLM_TIMEOUT_MS = 15_000
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 type Layout = 'cover' | 'content' | 'cta'
 
@@ -20,6 +45,7 @@ interface GenInput {
   count?: number
   brandId?: string
   cards?: ManualCardInput[]
+  clientIp?: string // 운영 로그 식별용 — DTO 가 아니라 컨트롤러에서 주입
 }
 
 interface CardOut {
@@ -188,7 +214,34 @@ function finalize(c: CardOut): CardOut {
 export class GenerateService {
   constructor(private prisma: PrismaService) {}
 
-  async run(input: GenInput): Promise<{ cards: CardOut[] }> {
+  async run(input: GenInput): Promise<{ cards: CardOut[]; meta: GenMeta }> {
+    const t0 = Date.now()
+
+    // 1) 입력 안전 필터 — LLM 호출 전 NSFW/브랜드안전 위반 차단.
+    const safetyInputs: string[] = []
+    if (input.mode === 'auto') safetyInputs.push(input.prompt ?? '')
+    if (input.mode === 'manual') {
+      for (const c of input.cards ?? []) {
+        safetyInputs.push(c.title ?? '', c.body ?? '', c.subtext ?? '', c.cta ?? '')
+      }
+    }
+    const safety = checkSafety(...safetyInputs)
+    if (safety.blocked) {
+      await this.writeLog({
+        input,
+        outcome: 'blocked',
+        source: null,
+        retries: 0,
+        durationMs: Date.now() - t0,
+        timedOut: false,
+        blockedBy: safety.category,
+      })
+      throw new BadRequestException(
+        `입력에 허용되지 않는 표현이 포함되어 있습니다: ${safety.label} ("${safety.matched}")`,
+      )
+    }
+
+    // 2) 브랜드 조회
     let brand: any = null
     if (input.brandId) {
       brand = await this.prisma.brandProfile.findUnique({
@@ -196,11 +249,100 @@ export class GenerateService {
         include: { assets: true },
       })
     }
-    const cards =
-      input.mode === 'manual'
-        ? this.fromManual(input.cards ?? [], brand)
-        : await this.fromPrompt(input.prompt ?? '', input.count ?? 3, brand)
-    return { cards }
+
+    // 3) 생성
+    try {
+      const built =
+        input.mode === 'manual'
+          ? this.wrapManual(input.cards ?? [], brand)
+          : await this.fromPrompt(input.prompt ?? '', input.count ?? 3, brand)
+      const meta: GenMeta = { ...built.meta, durationMs: Date.now() - t0 }
+      const outcome: 'success' | 'partial' =
+        meta.source === 'template' && input.mode === 'auto' && process.env.OPENAI_API_KEY
+          ? 'partial'
+          : meta.source === 'mixed'
+            ? 'partial'
+            : 'success'
+      await this.writeLog({
+        input,
+        outcome,
+        source: meta.source,
+        retries: meta.retries,
+        durationMs: meta.durationMs,
+        timedOut: meta.timedOut,
+        blockedBy: null,
+      })
+      return { cards: built.cards, meta }
+    } catch (e) {
+      await this.writeLog({
+        input,
+        outcome: 'failed',
+        source: null,
+        retries: 0,
+        durationMs: Date.now() - t0,
+        timedOut: false,
+        blockedBy: null,
+      })
+      throw e
+    }
+  }
+
+  private wrapManual(manual: ManualCardInput[], brand: any): {
+    cards: CardOut[]
+    meta: Omit<GenMeta, 'durationMs'>
+  } {
+    const cards = this.fromManual(manual, brand)
+    return {
+      cards,
+      meta: {
+        sources: cards.map(() => 'template' as const),
+        retries: 0,
+        source: 'template',
+        timedOut: false,
+      },
+    }
+  }
+
+  private async writeLog(args: {
+    input: GenInput
+    outcome: 'success' | 'partial' | 'failed' | 'blocked'
+    source: GenMeta['source'] | null
+    retries: number
+    durationMs: number
+    timedOut: boolean
+    blockedBy: string | null
+  }): Promise<void> {
+    const logger = new Logger('GenerateService')
+    const { input } = args
+    const promptText =
+      input.mode === 'auto'
+        ? input.prompt ?? ''
+        : (input.cards ?? []).map((c) => [c.title, c.body, c.subtext, c.cta].join(' ')).join(' | ')
+    const promptHash = promptText
+      ? createHash('sha256').update(promptText).digest('hex').slice(0, 16)
+      : null
+    const promptPreview = promptText ? promptText.slice(0, 80) : null
+    try {
+      await this.prisma.generationLog.create({
+        data: {
+          mode: input.mode,
+          brandId: input.brandId ?? null,
+          promptHash,
+          promptPreview,
+          count: input.mode === 'auto' ? input.count ?? 0 : (input.cards ?? []).length,
+          outcome: args.outcome,
+          source: args.source ?? null,
+          retries: args.retries,
+          durationMs: args.durationMs,
+          timedOut: args.timedOut,
+          blockedBy: args.blockedBy,
+          clientIp: input.clientIp ?? null,
+        },
+      })
+    } catch (e: any) {
+      // 감사 로그 실패가 사용자 요청을 깨뜨리면 안 되므로 경고만 남기고 삼킨다.
+      logger.warn(`GenerationLog 저장 실패 (무시하고 진행): ${e?.message ?? e}`)
+    }
   }
 
   // ── 수동 입력 정규화 ─────────────────────────────
@@ -246,15 +388,57 @@ export class GenerateService {
     })
   }
 
-  // ── 프롬프트 기반 생성 ────────────────────────────
-  private async fromPrompt(prompt: string, countRaw: number, brand: any): Promise<CardOut[]> {
+  // ── 프롬프트 기반 생성 (재시도 + 카드별 부분 폴백) ────────────────────────────
+  private async fromPrompt(
+    prompt: string,
+    countRaw: number,
+    brand: any,
+  ): Promise<{ cards: CardOut[]; meta: Omit<GenMeta, 'durationMs'> }> {
     const n = clamp(countRaw)
     const frame = pickFrame(prompt)
+    const templateCards = this.template(prompt, n, brand, frame)
+
+    let llmAttempt: LlmAttempt | null = null
     if (process.env.OPENAI_API_KEY) {
-      const gpt = await this.tryGpt(prompt, n, brand, frame)
-      if (gpt) return gpt
+      llmAttempt = await this.callLlmWithRetry(prompt, n, brand)
     }
-    return this.template(prompt, n, brand, frame)
+
+    const brandImages = brandImagesOf(brand)
+    const sources: CardSource[] = []
+    const cards: CardOut[] = []
+    for (let i = 0; i < n; i++) {
+      const v = llmAttempt?.cards[i] ?? null
+      if (v) {
+        const topicIdx = v.layout === 'content' ? Math.max(0, i - 1) : i
+        cards.push(
+          finalize({
+            id: randId(),
+            title: v.title,
+            body: v.body,
+            subtext: v.subtext,
+            cta: v.cta,
+            imageUrl: resolveImage(undefined, brandImages, frame, v.layout, topicIdx),
+            layout: v.layout,
+          }),
+        )
+        sources.push('llm')
+      } else {
+        cards.push(templateCards[i])
+        sources.push('template')
+      }
+    }
+    const allLlm = sources.every((s) => s === 'llm')
+    const allTpl = sources.every((s) => s === 'template')
+    const source: GenMeta['source'] = allLlm ? 'llm' : allTpl ? 'template' : 'mixed'
+    return {
+      cards,
+      meta: {
+        sources,
+        retries: llmAttempt?.retries ?? 0,
+        source,
+        timedOut: llmAttempt?.timedOut ?? false,
+      },
+    }
   }
 
   private template(prompt: string, n: number, brand: any, frame: Frame): CardOut[] {
@@ -299,10 +483,36 @@ export class GenerateService {
     return cards
   }
 
-  private async tryGpt(prompt: string, n: number, brand: any, frame: Frame): Promise<CardOut[] | null> {
+  // 최대 3회 재시도. 어떤 카드라도 유효하게 파싱되면 성공으로 간주 (부분 완성 허용).
+  // 모든 카드가 null 이거나 네트워크/파싱 실패면 다음 시도. 개별 호출은 LLM_TIMEOUT_MS 에서 abort.
+  private async callLlmWithRetry(prompt: string, n: number, brand: any): Promise<LlmAttempt | null> {
+    const BACKOFFS_MS = [500, 1000, 2000]
     const logger = new (require('@nestjs/common').Logger)('GenerateService')
+    let anyTimedOut = false
+    for (let attempt = 0; attempt <= BACKOFFS_MS.length; attempt++) {
+      const { cards: result, timedOut } = await this.callLlmOnce(prompt, n, brand)
+      if (timedOut) anyTimedOut = true
+      if (result && result.some((c) => c !== null)) {
+        if (attempt > 0) logger.warn(`OpenAI ${attempt}회 재시도 후 성공`)
+        return { cards: result, retries: attempt, timedOut: anyTimedOut }
+      }
+      if (attempt < BACKOFFS_MS.length) await sleep(BACKOFFS_MS[attempt])
+    }
+    return { cards: new Array(n).fill(null), retries: BACKOFFS_MS.length, timedOut: anyTimedOut }
+  }
+
+  // 1회 호출. cards: null = 전체 실패(네트워크/HTTP/JSON 파싱/타임아웃). 배열 = 인덱스별 검증 결과.
+  private async callLlmOnce(
+    prompt: string,
+    n: number,
+    brand: any,
+  ): Promise<{ cards: (ValidatedCard | null)[] | null; timedOut: boolean }> {
+    const logger = new (require('@nestjs/common').Logger)('GenerateService')
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        signal: controller.signal,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -311,63 +521,70 @@ export class GenerateService {
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           temperature: 0.6,
-          response_format: { type: 'json_object' },
+          response_format: OPENAI_RESPONSE_FORMAT,
           messages: [
             {
               role: 'system',
-              content:
-                '한국어 카드뉴스 카피라이터. 과장/의학적 단정/절대 표현 금지. 따뜻하고 신뢰감 있는 톤. ' +
-                '반드시 JSON만 반환하며 각 카드는 {title, body, subtext, cta, layout} 5개 필드를 모두 포함한다.',
+              content: [
+                '한국어 카드뉴스 카피라이터. 과장/의학적 단정/절대 표현 금지. 따뜻하고 신뢰감 있는 톤.',
+                '각 카드는 {title, body, subtext, cta, layout} 5개 필드를 모두 포함한다.',
+                '시리즈의 5장은 동일한 브랜드 룩앤필과 톤을 공유해야 한다 — 단어 선택·문장 리듬·마감 감각을 일관되게 유지한다.',
+              ].join(' '),
             },
             {
               role: 'user',
               content: [
+                recipeAsPromptBlock(buildStyleRecipe(brand)),
+                '',
                 `주제: ${prompt}`,
                 `브랜드: ${brand?.name ?? '미지정'}`,
                 `톤: ${brand?.tone ?? '따뜻하고 진솔한'}`,
                 `기본 문구: ${brand?.defaultPhrase ?? ''}`,
                 `카드 수: ${n}`,
                 '',
-                'JSON 스키마: {"cards":[{"title":"...","body":"...","subtext":"...","cta":"...","layout":"cover|content|cta"}]}',
-                '규칙: 첫 카드 cover, 마지막 cta, 나머지 content. title 18자, body 80자, subtext 20자, cta 12자 이내.',
+                `규칙: 첫 카드 layout=cover, 마지막 layout=cta, 나머지 layout=content.`,
+                `길이 상한: title ${CARD_LIMITS.title}자, body ${CARD_LIMITS.body}자, subtext ${CARD_LIMITS.subtext}자, cta ${CARD_LIMITS.cta}자.`,
+                `subtext/cta 가 불필요한 카드는 빈 문자열("")로 두고 필드는 반드시 포함한다.`,
+                `일관성: 위 스타일 가이드의 팔레트/조명/구도/폰트 분위기를 모든 카드에 동일하게 반영한다.`,
               ].join('\n'),
             },
           ],
         }),
       })
       if (!res.ok) {
-        logger.warn(`OpenAI 응답 비정상 (HTTP ${res.status}) — 템플릿 폴백`)
-        return null
+        logger.warn(`OpenAI 응답 비정상 (HTTP ${res.status})`)
+        return { cards: null, timedOut: false }
       }
       const j: any = await res.json()
       const content = j?.choices?.[0]?.message?.content
       if (!content) {
-        logger.warn('OpenAI 응답 content 비어있음 — 템플릿 폴백')
-        return null
+        logger.warn('OpenAI 응답 content 비어있음')
+        return { cards: null, timedOut: false }
       }
       const parsed = JSON.parse(content)
-      if (!Array.isArray(parsed.cards) || !parsed.cards.length) {
-        logger.warn('OpenAI 응답 cards 배열 파싱 실패 — 템플릿 폴백')
-        return null
+      if (!Array.isArray(parsed.cards)) {
+        logger.warn('OpenAI 응답 cards 배열 파싱 실패')
+        return { cards: null, timedOut: false }
       }
 
-      const brandImages = brandImagesOf(brand)
-      return parsed.cards.slice(0, n).map((c: any, i: number) => {
-        const layout = (['cover', 'content', 'cta'].includes(c.layout) ? c.layout : deriveLayout(i, n)) as Layout
-        const topicIdx = layout === 'content' ? Math.max(0, i - 1) : i
-        return finalize({
-          id: randId(),
-          title: String(c.title ?? ''),
-          body: String(c.body ?? ''),
-          subtext: String(c.subtext ?? ''),
-          cta: String(c.cta ?? ''),
-          imageUrl: resolveImage(undefined, brandImages, frame, layout, topicIdx),
-          layout,
-        })
-      })
+      // 길이 n 을 맞춘다 — 부족한 슬롯은 null (템플릿으로 메꿈), 초과는 절삭.
+      const out: (ValidatedCard | null)[] = new Array(n).fill(null)
+      for (let i = 0; i < Math.min(parsed.cards.length, n); i++) {
+        const v = validateCard(parsed.cards[i])
+        if (!v) logger.warn(`카드 ${i} 스키마 검증 실패 — 해당 슬롯만 템플릿으로 폴백`)
+        out[i] = v
+      }
+      return { cards: out, timedOut: false }
     } catch (e: any) {
-      logger.warn(`OpenAI 호출 실패 — 템플릿 폴백: ${e?.message ?? e}`)
-      return null
+      const aborted = e?.name === 'AbortError' || controller.signal.aborted
+      if (aborted) {
+        logger.warn(`OpenAI 호출 타임아웃(${LLM_TIMEOUT_MS}ms) — 재시도로 넘김`)
+        return { cards: null, timedOut: true }
+      }
+      logger.warn(`OpenAI 호출 예외: ${e?.message ?? e}`)
+      return { cards: null, timedOut: false }
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 }

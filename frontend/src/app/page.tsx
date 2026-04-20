@@ -211,6 +211,7 @@ export default function Page() {
   async function handleCardImageUpload(id: string, file: File) {
     const fd = new FormData()
     fd.append('file', file)
+    fd.append('consent', 'true') // 업로드 권리 고지 동의 — 업로드 UI 의 안내 문구로 설명됨
     const r = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
     if (r.url) updateCard(id, { imageUrl: r.url })
   }
@@ -337,6 +338,7 @@ export default function Page() {
   async function uploadBrandImage(file: File) {
     const fd = new FormData()
     fd.append('file', file)
+    fd.append('consent', 'true') // 업로드 권리 고지 동의
     const r = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
     if (r.url) {
       setNewBrand((prev) => ({
@@ -815,6 +817,9 @@ export default function Page() {
                     }}
                   />
                 </label>
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  업로드 시 본인 저작권/사용권 보유에 동의한 것으로 간주됩니다. 제3자의 초상권·저작권 침해 책임은 업로더에게 있습니다.
+                </p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {newBrand.assets.map((img, i) => (
                     <div key={i} className="relative">
