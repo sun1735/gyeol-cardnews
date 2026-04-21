@@ -93,6 +93,14 @@ export default function Page() {
   const [ragProgress, setRagProgress] = useState<number | null>(null) // 지식노트 기반 비동기 생성 진행률
   const [ragError, setRagError] = useState<string | null>(null)
 
+  // AI 이미지 생성 모달 — window.prompt 대체
+  const [aiGenDialog, setAiGenDialog] = useState<{
+    cardId: string
+    prompt: string
+    loading: boolean
+    error: string | null
+  } | null>(null)
+
   // 브랜드 관리 모달 (통합 — 기본정보·지식노트·이미지·아이디어 4탭)
   const [brandModalOpen, setBrandModalOpen] = useState(false)
   const [brandModalTab, setBrandModalTab] = useState<'info' | 'docs' | 'images' | 'ideas'>('info')
@@ -520,50 +528,77 @@ export default function Page() {
     if (j?.url) updateCard(card.id, { imageUrl: j.url })
   }
 
-  // text-to-image — 베이스 이미지 없이 프롬프트만으로 새 이미지 생성
-  async function handleAiGenerate(card: CardData): Promise<void> {
+  // text-to-image 모달 열기 — 카드 기준 프롬프트 프리필
+  function openAiGenerateDialog(card: CardData) {
     const defaultPrompt = [card.title, card.body].filter(Boolean).join('. ').slice(0, 300)
-    const override = window.prompt(
-      '생성할 이미지 설명을 입력하세요 (비우면 카드 제목+본문 사용)',
-      defaultPrompt,
-    )
-    if (override === null) return // 사용자 취소
-    const finalPrompt = (override.trim() || defaultPrompt).slice(0, 1000)
+    setAiGenDialog({
+      cardId: card.id,
+      prompt: defaultPrompt,
+      loading: false,
+      error: null,
+    })
+  }
+
+  // 모달 안에서 "생성" 버튼 클릭 시 호출
+  async function submitAiGenerate() {
+    if (!aiGenDialog) return
+    const card = cards.find((c) => c.id === aiGenDialog.cardId)
+    if (!card) return
+    const finalPrompt = aiGenDialog.prompt.trim().slice(0, 1000)
     if (!finalPrompt) {
-      alert('생성할 이미지 설명이 비어있습니다.')
+      setAiGenDialog({ ...aiGenDialog, error: '설명을 한 문장 이상 입력해 주세요.' })
       return
     }
-    const d = resolveSizePx(size, customSize)
-    const aspectRatio: '1:1' | '4:5' | '9:16' | '16:9' | undefined =
-      size === '1:1' || size === '4:5' || size === '9:16'
-        ? size
-        : d.w === d.h
-          ? '1:1'
-          : d.w > d.h
-            ? '16:9'
-            : '4:5'
-    const body = {
-      prompt: finalPrompt,
-      brandId: selectedBrandId || undefined,
-      refImageUrls: baseImages.length ? baseImages : undefined,
-      aspectRatio,
-      width: d.w,
-      height: d.h,
+    setAiGenDialog({ ...aiGenDialog, loading: true, error: null })
+    try {
+      const d = resolveSizePx(size, customSize)
+      const aspectRatio: '1:1' | '4:5' | '9:16' | '16:9' | undefined =
+        size === '1:1' || size === '4:5' || size === '9:16'
+          ? size
+          : d.w === d.h
+            ? '1:1'
+            : d.w > d.h
+              ? '16:9'
+              : '4:5'
+      const res = await fetch('/api/images/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          brandId: selectedBrandId || undefined,
+          refImageUrls: baseImages.length ? baseImages : undefined,
+          aspectRatio,
+          width: d.w,
+          height: d.h,
+        }),
+      })
+      if (res.status === 429) {
+        setAiGenDialog({
+          ...aiGenDialog,
+          loading: false,
+          error: '요청 빈도 제한에 걸렸습니다 (AI 생성: 분당 3회). 잠시 후 다시 시도해 주세요.',
+        })
+        return
+      }
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setAiGenDialog({
+          ...aiGenDialog,
+          loading: false,
+          error: j?.message ?? `HTTP ${res.status}`,
+        })
+        return
+      }
+      const j = await res.json()
+      if (j?.url) updateCard(card.id, { imageUrl: j.url })
+      setAiGenDialog(null) // 성공 시 닫기
+    } catch (e: any) {
+      setAiGenDialog({
+        ...aiGenDialog,
+        loading: false,
+        error: e?.message ?? '알 수 없는 오류',
+      })
     }
-    const res = await fetch('/api/images/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (res.status === 429) {
-      throw new Error('요청 빈도 제한에 걸렸습니다 (AI 생성: 분당 3회 · 시간당 30회). 잠시 후 다시 시도해 주세요.')
-    }
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      throw new Error(j?.message ?? `HTTP ${res.status}`)
-    }
-    const j = await res.json()
-    if (j?.url) updateCard(card.id, { imageUrl: j.url })
   }
 
   // Mode A — 프롬프트 상단에 공통 참조 이미지 1~3장 첨부
@@ -1596,7 +1631,7 @@ export default function Page() {
                     onChange={(patch) => updateCard(c.id, patch)}
                     onImageFile={(f) => handleCardImageUpload(c.id, f)}
                     onAiEdit={() => handleAiEdit(c)}
-                    onAiGenerate={() => handleAiGenerate(c)}
+                    onAiGenerate={() => openAiGenerateDialog(c)}
                     onDownload={() => downloadPng(c.id, idx)}
                     onMoveUp={() => moveCard(c.id, -1)}
                     onMoveDown={() => moveCard(c.id, 1)}
@@ -2174,6 +2209,137 @@ export default function Page() {
           </div>
         </div>
       )}
+
+      {/* AI 이미지 생성 모달 — 촌스러운 window.prompt 대체 */}
+      {aiGenDialog && (() => {
+        const card = cards.find((c) => c.id === aiGenDialog.cardId)
+        const closeDialog = () => {
+          if (!aiGenDialog.loading) setAiGenDialog(null)
+        }
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={closeDialog}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="border-b px-5 py-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <span>🎨</span> AI 이미지 생성
+                </h2>
+                <button
+                  onClick={closeDialog}
+                  disabled={aiGenDialog.loading}
+                  className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-2xl leading-none flex items-center justify-center disabled:opacity-40"
+                  aria-label="닫기"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {card?.imageUrl && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <img
+                      src={card.imageUrl}
+                      alt=""
+                      className="w-14 h-14 rounded-md object-cover border border-slate-200 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-slate-500">현재 이미지</div>
+                      <div className="text-sm text-slate-700 truncate">
+                        {card.title || '(제목 없음)'}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        새로 생성하면 이 이미지는 교체됩니다
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-700">
+                    이미지 설명
+                  </span>
+                  <span className="ml-2 text-xs font-normal text-slate-400">
+                    장면·구도·색감을 구체적으로
+                  </span>
+                  <textarea
+                    rows={5}
+                    value={aiGenDialog.prompt}
+                    onChange={(e) =>
+                      setAiGenDialog((d) => (d ? { ...d, prompt: e.target.value, error: null } : d))
+                    }
+                    disabled={aiGenDialog.loading}
+                    placeholder="예) 따뜻한 베이지 배경에 제품이 중앙, 부드러운 자연광, 여유로운 여백"
+                    className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 resize-none focus:border-fuchsia-500 disabled:bg-slate-50"
+                    autoFocus
+                  />
+                </label>
+
+                <div className="text-xs text-slate-500 leading-relaxed space-y-1">
+                  <div>
+                    💡 브랜드 스타일 레시피 + Mode A 참조 이미지가{' '}
+                    <span className="text-slate-700 font-medium">자동 반영</span> 됩니다.
+                  </div>
+                  <div>
+                    ⏱️ 약 5~10초 소요 · 이미지 1회 생성 비용 ≈ 53원
+                  </div>
+                </div>
+
+                {aiGenDialog.error && (
+                  <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 leading-relaxed">
+                    <strong>오류:</strong> {aiGenDialog.error}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t px-5 py-3 flex items-center justify-end gap-2 bg-slate-50">
+                <button
+                  onClick={closeDialog}
+                  disabled={aiGenDialog.loading}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={submitAiGenerate}
+                  disabled={aiGenDialog.loading || !aiGenDialog.prompt.trim()}
+                  className="px-5 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-lg text-sm font-semibold shadow-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                >
+                  {aiGenDialog.loading ? (
+                    <>
+                      <svg
+                        className="animate-spin h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          opacity="0.25"
+                        />
+                        <path
+                          fill="currentColor"
+                          d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7V2z"
+                        />
+                      </svg>
+                      생성 중…
+                    </>
+                  ) : (
+                    <>🎨 생성하기</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </main>
   )
 }
@@ -2209,15 +2375,15 @@ function CardItem({
   onChange: (patch: Partial<CardData>) => void
   onImageFile: (f: File) => void
   onAiEdit: () => Promise<void>
-  onAiGenerate: () => Promise<void>
+  onAiGenerate: () => void
   onDownload: () => void
   onMoveUp: () => void
   onMoveDown: () => void
   onDelete: () => void
 }) {
   const [aiEditing, setAiEditing] = useState(false)
-  const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [styleOpen, setStyleOpen] = useState(false)
   const d = resolveSizePx(size, customSize)
   const ratio = d.display / d.w
   const height = Math.round(d.h * ratio)
@@ -2228,11 +2394,26 @@ function CardItem({
 
   const isCover = card.layout === 'cover'
   const onImage = !!card.imageUrl && isCover
-  const titleSize = isCover ? Math.round(d.display * 0.08) : Math.round(d.display * 0.062)
-  const bodySize = Math.round(d.display * 0.042)
-  const subtextSize = Math.round(d.display * 0.036)
-  const ctaSize = Math.round(d.display * 0.04)
+
+  // 텍스트 스타일 — 사용자가 카드별로 커스터마이징. 미지정 시 layout 기반 기본값.
+  const ts = card.textStyle ?? {}
+  const sizeScale = Math.max(0.6, Math.min(1.6, ts.sizeScale ?? 1.0))
+  const align = ts.align ?? 'left'
+  const verticalAlign =
+    ts.verticalAlign ?? (isCover ? 'bottom' : card.layout === 'cta' ? 'center' : 'center')
+  const titleWeight = ts.titleWeight ?? 800
+
+  const titleSize = Math.round((isCover ? d.display * 0.08 : d.display * 0.062) * sizeScale)
+  const bodySize = Math.round(d.display * 0.042 * sizeScale)
+  const subtextSize = Math.round(d.display * 0.036 * sizeScale)
+  const ctaSize = Math.round(d.display * 0.04 * sizeScale)
   const pad = Math.round(d.display * 0.08)
+
+  const justifyContent =
+    verticalAlign === 'top' ? 'flex-start' : verticalAlign === 'bottom' ? 'flex-end' : 'center'
+  const textAlignCss: 'left' | 'center' | 'right' = align
+  const ctaAlignSelf =
+    align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
 
   const stop = (e: React.MouseEvent) => e.stopPropagation()
 
@@ -2343,7 +2524,8 @@ function CardItem({
               padding: pad,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: isCover ? 'flex-end' : 'center',
+              justifyContent,
+              textAlign: textAlignCss,
               gap: Math.round(d.display * 0.018),
             }}
           >
@@ -2362,7 +2544,7 @@ function CardItem({
             <div
               style={{
                 fontSize: titleSize,
-                fontWeight: 800,
+                fontWeight: titleWeight,
                 color: onImage ? '#ffffff' : text,
                 lineHeight: 1.25,
                 letterSpacing: '-0.02em',
@@ -2385,7 +2567,7 @@ function CardItem({
             {card.cta && (
               <div
                 style={{
-                  alignSelf: 'flex-start',
+                  alignSelf: ctaAlignSelf,
                   marginTop: Math.round(d.display * 0.015),
                   fontSize: ctaSize,
                   fontWeight: 600,
@@ -2451,6 +2633,142 @@ function CardItem({
         />
       </div>
 
+      {/* 텍스트 스타일 편집 — 접히는 섹션 */}
+      <div className="border rounded-md bg-slate-50/50" onClick={stop}>
+        <button
+          onClick={(e) => { stop(e); setStyleOpen((v) => !v) }}
+          className="w-full px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-100 rounded-md"
+        >
+          <span className="font-semibold text-slate-700">✏️ 텍스트 스타일</span>
+          <span className="text-slate-500">{styleOpen ? '▴' : '▾'}</span>
+        </button>
+        {styleOpen && (
+          <div className="px-3 pb-3 pt-1 space-y-2.5 border-t">
+            {/* 수평 정렬 */}
+            <div>
+              <div className="text-[11px] font-medium text-slate-600 mb-1">수평 정렬</div>
+              <div className="grid grid-cols-3 gap-1">
+                {(['left', 'center', 'right'] as const).map((a) => {
+                  const active = (ts.align ?? 'left') === a
+                  const label = a === 'left' ? '왼쪽' : a === 'center' ? '중앙' : '오른쪽'
+                  const icon = a === 'left' ? '⇤' : a === 'center' ? '⇔' : '⇥'
+                  return (
+                    <button
+                      key={a}
+                      onClick={(e) => {
+                        stop(e)
+                        onChange({ textStyle: { ...ts, align: a } })
+                      }}
+                      className={`px-2 py-1.5 text-xs rounded border transition ${
+                        active
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      {icon} {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 수직 위치 */}
+            <div>
+              <div className="text-[11px] font-medium text-slate-600 mb-1">수직 위치</div>
+              <div className="grid grid-cols-3 gap-1">
+                {(['top', 'center', 'bottom'] as const).map((v) => {
+                  const currentDefault = isCover ? 'bottom' : 'center'
+                  const active = (ts.verticalAlign ?? currentDefault) === v
+                  const label = v === 'top' ? '위' : v === 'center' ? '가운데' : '아래'
+                  const icon = v === 'top' ? '⇡' : v === 'center' ? '⇔' : '⇣'
+                  return (
+                    <button
+                      key={v}
+                      onClick={(e) => {
+                        stop(e)
+                        onChange({ textStyle: { ...ts, verticalAlign: v } })
+                      }}
+                      className={`px-2 py-1.5 text-xs rounded border transition ${
+                        active
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      {icon} {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 글자 크기 */}
+            <div>
+              <div className="text-[11px] font-medium text-slate-600 mb-1 flex items-center justify-between">
+                <span>글자 크기</span>
+                <span className="text-slate-400">{Math.round((ts.sizeScale ?? 1) * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0.7}
+                max={1.5}
+                step={0.05}
+                value={ts.sizeScale ?? 1}
+                onChange={(e) =>
+                  onChange({ textStyle: { ...ts, sizeScale: Number(e.target.value) } })
+                }
+                className="w-full accent-teal-600"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                <span>작게</span>
+                <span>기본</span>
+                <span>크게</span>
+              </div>
+            </div>
+
+            {/* 제목 굵기 */}
+            <div>
+              <div className="text-[11px] font-medium text-slate-600 mb-1">제목 굵기</div>
+              <div className="grid grid-cols-4 gap-1">
+                {([400, 600, 700, 800] as const).map((w) => {
+                  const active = (ts.titleWeight ?? 800) === w
+                  const label = w === 400 ? '가늘게' : w === 600 ? '보통' : w === 700 ? '굵게' : '매우굵게'
+                  return (
+                    <button
+                      key={w}
+                      onClick={(e) => {
+                        stop(e)
+                        onChange({ textStyle: { ...ts, titleWeight: w } })
+                      }}
+                      style={{ fontWeight: w }}
+                      className={`px-1.5 py-1.5 text-xs rounded border transition ${
+                        active
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 초기화 */}
+            {Object.keys(ts).length > 0 && (
+              <button
+                onClick={(e) => {
+                  stop(e)
+                  onChange({ textStyle: undefined })
+                }}
+                className="w-full text-[11px] py-1 border rounded bg-white hover:bg-slate-50 text-slate-600"
+              >
+                스타일 기본값으로 초기화
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-2 items-center flex-wrap">
         <label
           onClick={stop}
@@ -2478,7 +2796,7 @@ function CardItem({
         )}
         {card.imageUrl && (
           <button
-            disabled={aiEditing || aiGenerating}
+            disabled={aiEditing}
             onClick={async (e) => {
               stop(e)
               setAiEditing(true)
@@ -2498,23 +2816,15 @@ function CardItem({
           </button>
         )}
         <button
-          disabled={aiEditing || aiGenerating}
-          onClick={async (e) => {
+          disabled={aiEditing}
+          onClick={(e) => {
             stop(e)
-            setAiGenerating(true)
-            setAiError(null)
-            try {
-              await onAiGenerate()
-            } catch (err: any) {
-              setAiError(err?.message ?? '생성 실패')
-            } finally {
-              setAiGenerating(false)
-            }
+            onAiGenerate()
           }}
           className="text-xs px-2 py-1 border rounded-md bg-fuchsia-600 text-white disabled:opacity-60"
           title="Gemini 2.5 Flash Image 로 새 이미지 생성 (텍스트 → 이미지)"
         >
-          {aiGenerating ? 'AI 생성 중…' : '🎨 AI 생성'}
+          🎨 AI 생성
         </button>
         <button
           onClick={(e) => { stop(e); onDownload() }}
