@@ -1199,7 +1199,7 @@ export default function Page() {
                       onClick={() => setMode(m.k)}
                       className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-[10px] text-left transition ${
                         active
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200'
                           : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
@@ -1209,14 +1209,20 @@ export default function Page() {
                         </span>
                         <span
                           className={`block text-[12px] mt-0.5 ${
-                            active ? 'text-white/70' : 'text-slate-500'
+                            active ? 'text-indigo-700/80' : 'text-slate-500'
                           }`}
                         >
                           {m.desc}
                         </span>
                       </span>
                       {active && (
-                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          aria-hidden
+                          className="text-indigo-700"
+                        >
                           <path
                             d="M3 8l3.5 3.5L13 5"
                             stroke="currentColor"
@@ -1261,7 +1267,7 @@ export default function Page() {
                       }}
                       className={`px-3 py-2.5 rounded-[10px] text-left transition ${
                         active
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200 border border-transparent'
                           : 'text-slate-700 hover:bg-slate-50 border border-slate-200'
                       }`}
                     >
@@ -1269,13 +1275,17 @@ export default function Page() {
                         <span className="text-[14px] font-semibold tabular-nums">
                           {isCustom ? '배너' : p}
                         </span>
-                        <span className={`text-[11px] tabular-nums ${active ? 'text-white/60' : 'text-slate-400'}`}>
+                        <span
+                          className={`text-[11px] tabular-nums ${
+                            active ? 'text-indigo-500' : 'text-slate-400'
+                          }`}
+                        >
                           {SIZE_SUBLABELS[p]}
                         </span>
                       </div>
                       <div
                         className={`text-[11px] mt-0.5 ${
-                          active ? 'text-white/70' : 'text-slate-500'
+                          active ? 'text-indigo-700/80' : 'text-slate-500'
                         }`}
                       >
                         {SIZE_LABELS[p]}
