@@ -28,14 +28,28 @@ export class KnowledgeImagesController {
     if (!brand) throw new BadRequestException('brandId 가 유효하지 않습니다')
     await assertBrandOwnership(this.prisma, dto.brandId, user)
 
+    // 해시 기반 중복 제거 — 같은 브랜드에 같은 이미지가 이미 있으면 재사용
+    if (dto.sha256) {
+      const existing = await this.prisma.brandImageAsset.findFirst({
+        where: { brandId: dto.brandId, sha256: dto.sha256 },
+      })
+      if (existing) return formatImage(existing)
+    }
+
     const asset = await this.prisma.brandImageAsset.create({
       data: {
         brandId: dto.brandId,
         url: dto.url,
+        thumbnailUrl: dto.thumbnailUrl ?? null,
         label: dto.label ?? '',
         tags: JSON.stringify(dto.tags ?? []),
         usageRights: dto.usageRights ?? 'owned',
         qualityScore: dto.qualityScore ?? 0.5,
+        width: dto.width ?? null,
+        height: dto.height ?? null,
+        sizeBytes: dto.sizeBytes ?? null,
+        mimeType: dto.mimeType ?? null,
+        sha256: dto.sha256 ?? null,
       },
     })
     return formatImage(asset)
@@ -70,10 +84,16 @@ function formatImage(a: {
   id: string
   brandId: string
   url: string
+  thumbnailUrl?: string | null
   label: string
   tags: string
   usageRights: string
   qualityScore: number
+  width?: number | null
+  height?: number | null
+  sizeBytes?: number | null
+  mimeType?: string | null
+  sha256?: string | null
   createdAt: Date
 }) {
   let tags: string[] = []
@@ -85,10 +105,16 @@ function formatImage(a: {
     id: a.id,
     brandId: a.brandId,
     url: a.url,
+    thumbnailUrl: a.thumbnailUrl ?? null,
     label: a.label,
     tags,
     usageRights: a.usageRights,
     qualityScore: a.qualityScore,
+    width: a.width ?? null,
+    height: a.height ?? null,
+    sizeBytes: a.sizeBytes ?? null,
+    mimeType: a.mimeType ?? null,
+    sha256: a.sha256 ?? null,
     createdAt: a.createdAt,
   }
 }

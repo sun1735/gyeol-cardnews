@@ -125,19 +125,28 @@ model BrandKnowledgeChunk {
 }
 
 // 태그 달린 이미지 라이브러리. 카드별 이미지 후보 랭킹 대상.
+// DB 에는 파일 바이너리 대신 "관리 정보"만 저장 — 실제 파일은 스토리지(현재 로컬/Volume, 차후 R2).
 model BrandImageAsset {
   id           String   @id @default(cuid())
   brandId      String
-  url          String
+  url          String    // 원본 (WebP 변환본) URL
+  thumbnailUrl String?   // 512px 썸네일 URL — 그리드·미리보기용
   label        String   @default("")
   tags         String   @default("") // JSON stringified string[] — 간단 매칭용
   usageRights  String   @default("owned") // owned | licensed | unknown
   qualityScore Float    @default(0.5) // 0~1
+  // 메타데이터 (Stage 1 — sharp 로 자동 추출)
+  width        Int?
+  height       Int?
+  sizeBytes    Int?
+  mimeType     String?
+  sha256       String?   // 전역 중복 제거 키
   createdAt    DateTime @default(now())
 
   brand BrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
   @@index([brandId, createdAt])
+  @@index([sha256])
   @@map("brand_image_assets")
 }
 

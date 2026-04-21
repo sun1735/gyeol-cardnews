@@ -189,7 +189,17 @@ export default function Page() {
     Array<{ id: string; title: string; sourceType: string; chunkCount: number; createdAt: string }>
   >([])
   const [knowledgeImages, setKnowledgeImages] = useState<
-    Array<{ id: string; url: string; label: string; tags: string[]; qualityScore: number }>
+    Array<{
+      id: string
+      url: string
+      thumbnailUrl?: string | null
+      label: string
+      tags: string[]
+      qualityScore: number
+      width?: number | null
+      height?: number | null
+      sizeBytes?: number | null
+    }>
   >([])
   const [newDocTitle, setNewDocTitle] = useState('')
   const [newDocText, setNewDocText] = useState('')
@@ -339,7 +349,7 @@ export default function Page() {
         })
         return
       }
-      // 2) knowledge 이미지 에셋으로 등록
+      // 2) knowledge 이미지 에셋 등록 — sharp 메타데이터 그대로 전달 (해시 기반 중복 제거 활용)
       const tags = newImageTags
         .split(/[,，\s]+/)
         .map((t) => t.trim())
@@ -350,10 +360,16 @@ export default function Page() {
         body: JSON.stringify({
           brandId: selectedBrandId,
           url: up.url,
+          thumbnailUrl: up.thumbnailUrl ?? undefined,
           label: newImageLabel.trim(),
           tags,
           usageRights: 'owned',
           qualityScore: 0.8,
+          width: up.width ?? undefined,
+          height: up.height ?? undefined,
+          sizeBytes: up.sizeBytes ?? undefined,
+          mimeType: up.mimeType ?? undefined,
+          sha256: up.sha256 ?? undefined,
         }),
       })
       if (r.ok) {
@@ -2381,7 +2397,12 @@ export default function Page() {
                           key={img.id}
                           className="group relative border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-violet-300 transition"
                         >
-                          <img src={img.url} alt="" className="w-full aspect-square object-cover" />
+                          <img
+                            src={img.thumbnailUrl || img.url}
+                            alt=""
+                            loading="lazy"
+                            className="w-full aspect-square object-cover"
+                          />
                           <div className="absolute top-1.5 left-1.5 bg-violet-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                             라이브러리
                           </div>
