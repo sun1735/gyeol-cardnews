@@ -791,12 +791,23 @@ export default function Page() {
   return (
     <main className="mx-auto max-w-7xl px-5 py-6">
       <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">결 · 카드뉴스 생성기</h1>
-          <p className="mt-1 text-slate-500">
-            브랜드 톤앤매너에 맞춘 1~10장 카드뉴스 MVP ·{' '}
-            <span className="font-mono text-sm">{healthStatus}</span>
-          </p>
+        <div className="flex items-center gap-3">
+          {/* 로고 이니셜 — teal 원에 G, 우측에 워드마크 */}
+          <div
+            className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-600 to-teal-800 flex items-center justify-center text-white font-black text-xl shadow-sm tracking-tight"
+            aria-hidden
+          >
+            G
+          </div>
+          <div>
+            <h1 className="text-3xl font-black tracking-tight leading-none">
+              GYEOL<span className="text-teal-700">.</span>
+            </h1>
+            <p className="mt-1.5 text-slate-500 text-sm">
+              브랜드 톤앤매너 카드뉴스 생성기 ·{' '}
+              <span className="font-mono">{healthStatus}</span>
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* 현재 브랜드 배지 — 클릭 시 편집 모달 */}
