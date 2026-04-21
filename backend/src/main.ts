@@ -17,6 +17,14 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }))
   app.use(urlencoded({ extended: true, limit: '50mb' }))
 
+  // Railway·Vercel 등 프록시 뒤에서 실제 클라이언트 IP 를 X-Forwarded-For 로 받기.
+  // ThrottlerGuard 의 IP 기반 rate limit 이 엣지 노드별로 분산되지 않도록 필수.
+  // 'trust proxy'=true 는 모든 프록시 신뢰 — 단일 프록시 뒤(Railway) 에서는 안전.
+  const httpAdapter = app.getHttpAdapter().getInstance()
+  if (typeof httpAdapter?.set === 'function') {
+    httpAdapter.set('trust proxy', true)
+  }
+
   // 전역 검증 파이프 — DTO 기반 검증 + 알 수 없는 필드 제거 + 타입 변환
   app.useGlobalPipes(
     new ValidationPipe({
