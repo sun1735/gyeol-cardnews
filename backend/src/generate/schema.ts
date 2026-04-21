@@ -50,11 +50,26 @@ export const OPENAI_RESPONSE_FORMAT = {
   },
 }
 
-// "1 / 5", "3/10" 같이 페이지 번호만 있는 값은 깎아서 빈 문자열로.
-// cta/subtext 에 자주 섞여 들어와 이미지 위에 찍히는 걸 방지.
-const PAGE_NUMBER_ONLY = /^\s*\d+\s*\/\s*\d+\s*$/
+// 페이지 번호·순번 표시는 cta/subtext 어디에 있든 전부 제거.
+// 카드뉴스 이미지 위에 "1/5" 같은 게 찍히지 않도록 강력 필터.
+// 허용되지 않는 패턴 (두 자리 이하 숫자쌍만 — "1000/50" 같은 큰 숫자는 legit 가능성):
+//   "1/5"  "2 / 5"  " 3 /10 "  "카드 1/5"  "1 of 5"  "1-5"  "Page 2/5"  "2 of 5 →"  "(2/5)"
+const PATTERNS = [
+  /\b\d{1,2}\s*\/\s*\d{1,2}\b/g, // 1/5, 10/10
+  /\b\d{1,2}\s+of\s+\d{1,2}\b/gi, // 1 of 5
+  /\bpage\s*\d{1,2}\b/gi, // page 2
+  /[\(\[【]\s*\d{1,2}\s*\/\s*\d{1,2}\s*[\)\]】]/g, // (1/5), [2/5]
+]
 function stripPageNumber(s: string): string {
-  return PAGE_NUMBER_ONLY.test(s) ? '' : s
+  let out = s
+  for (const p of PATTERNS) out = out.replace(p, '')
+  // 잔여 기호·공백 정리: "· · " 나 앞뒤 구두점 · 공백
+  out = out
+    .replace(/[·\-–—•|]+/g, ' ') // 구분자 공백화
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,.;:!?/()\[\]【】]+|[\s,.;:!?/()\[\]【】]+$/g, '')
+    .trim()
+  return out
 }
 
 // 파싱 후 카드 1장 검증. 실패 시 null → 상위에서 재시도 또는 템플릿 폴백.

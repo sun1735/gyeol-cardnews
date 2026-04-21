@@ -167,7 +167,7 @@ export class Orchestrator {
       `레이아웃 순서: ${layouts.join(', ')}`,
       `길이 상한: title ${CARD_LIMITS.title}, body ${CARD_LIMITS.body}, subtext ${CARD_LIMITS.subtext}, cta ${CARD_LIMITS.cta} (한국어 기준)`,
       'subtext/cta 불필요 시 빈 문자열로 두고 필드는 반드시 포함.',
-      '❌ 절대 금지: cta 나 subtext 에 "1/5", "2/5" 같은 페이지 번호·순번 표시를 넣지 말 것. 필요 없으면 빈 문자열.',
+      '❌ 절대 금지 (매우 중요): cta·subtext·title·body 어디에도 "1/5", "2/5", "3/10", "1 of 5", "page 2", "(1/5)" 같은 페이지 번호·순번 표시를 넣지 말 것. 필요 없으면 빈 문자열. 카드뉴스 이미지 위에 찍히면 완전히 지저분해 보임.',
     ].join('\n')
 
     try {

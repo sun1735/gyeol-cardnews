@@ -2901,11 +2901,23 @@ function CardItem({
   const ctaAlignSelf =
     align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
 
-  // 렌더 직전 페이지 번호 패턴(예: "1/5", "3 / 10") 숨김 — 이미지에 찍히는 것 방지
-  const isJustPageNumber = (s: string | undefined) =>
-    !!s && /^\s*\d+\s*\/\s*\d+\s*$/.test(s)
-  const renderedSubtext = isJustPageNumber(card.subtext) ? '' : card.subtext
-  const renderedCta = isJustPageNumber(card.cta) ? '' : card.cta
+  // 렌더 직전 페이지 번호·순번 흔적 제거 — 이미지에 찍히는 것 방지.
+  // 백엔드 (schema.ts stripPageNumber) 와 동일 규칙을 프론트에서도 한 번 더 적용.
+  const scrubPageNumbers = (s: string | undefined): string => {
+    if (!s) return ''
+    let out = s
+      .replace(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g, '') // 1/5, 10/10
+      .replace(/\b\d{1,2}\s+of\s+\d{1,2}\b/gi, '') // 1 of 5
+      .replace(/\bpage\s*\d{1,2}\b/gi, '') // page 2
+      .replace(/[\(\[【]\s*\d{1,2}\s*\/\s*\d{1,2}\s*[\)\]】]/g, '') // (1/5)
+      .replace(/[·\-–—•|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[\s,.;:!?/()\[\]【】]+|[\s,.;:!?/()\[\]【】]+$/g, '')
+      .trim()
+    return out
+  }
+  const renderedSubtext = scrubPageNumbers(card.subtext)
+  const renderedCta = scrubPageNumbers(card.cta)
 
   const stop = (e: React.MouseEvent) => e.stopPropagation()
 
