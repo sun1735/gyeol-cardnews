@@ -4,4 +4,22 @@
 
 html, body {
   font-family: ui-sans-serif, system-ui, -apple-system, 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-size: 15px; /* 16px 기본에서 약간 줄여 밀도 유지하되, 앱 내 text-sm(14px) 대비 기본 텍스트가 더 읽히기 쉬움 */
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 한국어 숫자 혼합 본문 가독성 */
+body {
+  font-feature-settings: "tnum" 1, "ss02" 1;
+}
+
+/* 텍스트 버튼의 포커스 링 — 키보드 사용자 가시성 */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgb(15 118 110 / 0.5); /* teal-700 반투명 */
+  outline-offset: 1px;
 }

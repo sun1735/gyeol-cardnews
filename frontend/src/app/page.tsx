@@ -790,12 +790,12 @@ export default function Page() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-6">
-      <header className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+      <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">결 · 카드뉴스 생성기</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-3xl font-bold tracking-tight">결 · 카드뉴스 생성기</h1>
+          <p className="mt-1 text-slate-500">
             브랜드 톤앤매너에 맞춘 1~10장 카드뉴스 MVP ·{' '}
-            <span className="font-mono">{healthStatus}</span>
+            <span className="font-mono text-sm">{healthStatus}</span>
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -803,31 +803,31 @@ export default function Page() {
           {selectedBrand ? (
             <button
               onClick={() => openBrandModal('edit', selectedBrand.id)}
-              className="flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-100 text-sm"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 hover:border-slate-400 shadow-sm transition"
               title="브랜드 관리 열기"
             >
               <span
-                className="w-4 h-4 rounded-sm border"
+                className="w-5 h-5 rounded border"
                 style={{ background: selectedBrand.primaryColor }}
                 aria-hidden
               />
-              <span className="font-medium">🏷️ {selectedBrand.name}</span>
-              <span className="text-slate-400 text-xs">⚙</span>
+              <span className="font-semibold">🏷️ {selectedBrand.name}</span>
+              <span className="text-slate-400">⚙</span>
             </button>
           ) : (
             <button
               onClick={() => openBrandModal('create')}
-              className="px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-100 text-sm"
+              className="px-4 py-2.5 rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-semibold shadow-sm transition"
             >
               🏷️ 브랜드 선택 · 추가
             </button>
           )}
-          {/* 브랜드 목록 드롭다운 — 빠른 전환용 (헤더에도 유지) */}
+          {/* 브랜드 목록 드롭다운 — 빠른 전환용 */}
           {brands.length > 1 && (
             <select
               value={selectedBrandId}
               onChange={(e) => setSelectedBrandId(e.target.value)}
-              className="border rounded-md px-2 py-2 text-sm"
+              className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white"
               title="브랜드 빠른 전환"
             >
               <option value="">(선택 없음)</option>
@@ -841,38 +841,52 @@ export default function Page() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
         <section className="space-y-4">
-          <div className="bg-white rounded-xl border p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                onClick={() => setMode('auto')}
-                className={`px-2 py-2 rounded-md text-xs border leading-tight ${
-                  mode === 'auto' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white'
-                }`}
-              >
-                <span className="block font-semibold">자동</span>
-                <span className="block text-[10px] opacity-75">프롬프트 → 5장</span>
-              </button>
-              <button
-                onClick={() => setMode('manual')}
-                className={`px-2 py-2 rounded-md text-xs border leading-tight ${
-                  mode === 'manual' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white'
-                }`}
-              >
-                <span className="block font-semibold">수동</span>
-                <span className="block text-[10px] opacity-75">카드별 직접 입력</span>
-              </button>
-              <button
-                onClick={() => setMode('note-rag')}
-                className={`px-2 py-2 rounded-md text-xs border leading-tight ${
-                  mode === 'note-rag' ? 'bg-violet-700 text-white border-violet-700' : 'bg-white'
-                }`}
-                title="브랜드 지식노트 + 이미지 라이브러리로 더 정확한 카드 생성"
-              >
-                <span className="block font-semibold">✨ 지식노트</span>
-                <span className="block text-[10px] opacity-75">RAG 기반</span>
-              </button>
+          <div className="bg-white rounded-xl border p-5 space-y-4">
+            {/* 모드 선택 — 스택된 행 형태 */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                생성 방식
+              </label>
+              <div className="space-y-1.5">
+                {(
+                  [
+                    { k: 'auto', icon: '⚡', title: '자동', desc: '프롬프트 한 줄 → 카드 1~10장' },
+                    { k: 'manual', icon: '✍️', title: '수동', desc: '카드별 제목·본문 직접 입력' },
+                    { k: 'note-rag', icon: '✨', title: '지식노트', desc: 'RAG 기반, 브랜드 자료 자동 활용' },
+                  ] as const
+                ).map((m) => {
+                  const active = mode === m.k
+                  const isRag = m.k === 'note-rag'
+                  return (
+                    <button
+                      key={m.k}
+                      onClick={() => setMode(m.k)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition ${
+                        active
+                          ? isRag
+                            ? 'bg-violet-700 text-white border-violet-700 shadow-sm'
+                            : 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                          : 'bg-white border-slate-200 hover:border-slate-400'
+                      }`}
+                    >
+                      <span className="text-xl leading-none">{m.icon}</span>
+                      <span className="flex-1">
+                        <span className="block font-semibold">{m.title}</span>
+                        <span
+                          className={`block text-xs mt-0.5 ${
+                            active ? 'opacity-80' : 'text-slate-500'
+                          }`}
+                        >
+                          {m.desc}
+                        </span>
+                      </span>
+                      {active && <span>✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
             {mode === 'note-rag' && selectedBrand && (
               <button
@@ -880,42 +894,58 @@ export default function Page() {
                   openBrandModal('edit', selectedBrand.id)
                   setBrandModalTab('docs')
                 }}
-                className="w-full px-3 py-1.5 text-xs border rounded-md bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100"
+                className="w-full px-3 py-2 text-sm border rounded-lg bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100 font-medium"
               >
-                📚 지식노트 열기 ({selectedBrand.name})
+                📚 지식노트 관리 ({selectedBrand.name})
               </button>
             )}
 
             <div>
-              <label className="block text-xs text-slate-500 mb-1">사이즈 프리셋</label>
-              <div className="grid grid-cols-4 gap-1">
-                {(['1:1', '4:5', '9:16', 'custom'] as SizePreset[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      setSize(p)
-                      if (p === 'custom') setCount(1)
-                    }}
-                    className={`px-1 py-1.5 rounded-md text-[11px] border leading-tight transition ${
-                      size === p
-                        ? p === 'custom'
-                          ? 'bg-amber-600 text-white border-amber-600'
-                          : 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="block font-semibold">
-                      {p === 'custom' ? '배너' : p}
-                    </span>
-                    <span className="block text-[10px] opacity-75">{SIZE_LABELS[p]}</span>
-                    <span className="block text-[9px] opacity-60">{SIZE_SUBLABELS[p]}</span>
-                  </button>
-                ))}
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                사이즈 프리셋
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['1:1', '4:5', '9:16', 'custom'] as SizePreset[]).map((p) => {
+                  const active = size === p
+                  const isCustom = p === 'custom'
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        setSize(p)
+                        if (p === 'custom') setCount(1)
+                      }}
+                      className={`px-3 py-2.5 rounded-lg border text-left transition ${
+                        active
+                          ? isCustom
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                            : 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                          : 'bg-white border-slate-200 hover:border-slate-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">
+                          {isCustom ? '배너' : p}
+                        </span>
+                        <span className={`text-xs ${active ? 'opacity-80' : 'text-slate-400'}`}>
+                          {SIZE_SUBLABELS[p]}
+                        </span>
+                      </div>
+                      <div
+                        className={`text-xs mt-0.5 ${
+                          active ? 'opacity-80' : 'text-slate-500'
+                        }`}
+                      >
+                        {SIZE_LABELS[p]}
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
               {size === 'custom' ? (
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="text-[10px] text-slate-500">가로 (px)</span>
+                    <span className="text-xs font-medium text-slate-600">가로 (px)</span>
                     <input
                       type="number"
                       min={200}
@@ -927,11 +957,11 @@ export default function Page() {
                           w: Math.max(200, Math.min(4000, Number(e.target.value) || 1080)),
                         }))
                       }
-                      className="w-full border rounded-md px-2 py-1 text-sm"
+                      className="w-full border rounded-lg px-3 py-2 mt-1"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-[10px] text-slate-500">세로 (px)</span>
+                    <span className="text-xs font-medium text-slate-600">세로 (px)</span>
                     <input
                       type="number"
                       min={200}
@@ -943,15 +973,15 @@ export default function Page() {
                           h: Math.max(200, Math.min(4000, Number(e.target.value) || 1080)),
                         }))
                       }
-                      className="w-full border rounded-md px-2 py-1 text-sm"
+                      className="w-full border rounded-lg px-3 py-2 mt-1"
                     />
                   </label>
-                  <p className="col-span-2 text-[10px] text-amber-700">
-                    배너/자유 사이즈는 이미지 1장만 생성됩니다 (카드 수 고정).
+                  <p className="col-span-2 text-xs text-amber-700 mt-1">
+                    배너/자유 사이즈는 이미지 1장만 생성됩니다.
                   </p>
                 </div>
               ) : (
-                <p className="text-[10px] text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-2">
                   {size === '4:5' && '📱 인스타그램 피드 표준 사이즈'}
                   {size === '9:16' && '🎬 인스타 릴스 · 스토리 · 틱톡'}
                   {size === '1:1' && '⬜ 인스타 정사각 · 모든 SNS 공통'}
@@ -960,29 +990,52 @@ export default function Page() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-500 mb-1">
-                카드 수 (생성 시){size === 'custom' ? ' · 배너 고정 1장' : ' · 최대 10'}
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                카드 수
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  {size === 'custom' ? '배너는 1장 고정' : '최대 10장'}
+                </span>
               </label>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={count}
-                disabled={size === 'custom'}
-                onChange={(e) =>
-                  setCount(Math.max(1, Math.min(10, Number(e.target.value) || 1)))
-                }
-                className="w-full border rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-500"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCount((c) => Math.max(1, c - 1))}
+                  disabled={size === 'custom' || count <= 1}
+                  className="w-10 h-10 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 font-semibold"
+                  aria-label="카드 수 감소"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={count}
+                  disabled={size === 'custom'}
+                  onChange={(e) =>
+                    setCount(Math.max(1, Math.min(10, Number(e.target.value) || 1)))
+                  }
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-center font-semibold disabled:bg-slate-100 disabled:text-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCount((c) => Math.min(10, c + 1))}
+                  disabled={size === 'custom' || count >= 10}
+                  className="w-10 h-10 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 font-semibold"
+                  aria-label="카드 수 증가"
+                >
+                  +
+                </button>
+              </div>
             </div>
 
             {mode !== 'manual' ? (
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   프롬프트
                   {mode === 'note-rag' && (
-                    <span className="ml-2 text-[11px] font-normal text-violet-700">
-                      지식노트 + 이미지 라이브러리로 자동 컨텍스트 주입
+                    <span className="ml-2 text-xs font-normal text-violet-700">
+                      지식노트 자동 참조
                     </span>
                   )}
                 </label>
@@ -995,10 +1048,10 @@ export default function Page() {
                       ? '예) 유순 제품 5월 1일 온라인 판매 시작 — 인스타 피드 6장'
                       : '예) 유순 임산부와 유아를 위한 케어 서비스 안내'
                   }
-                  className="w-full border rounded-md px-2 py-2 text-sm"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 resize-none focus:border-teal-500"
                 />
-                <p className="mt-1 text-xs text-slate-500">
-                  과장·의학적 단정 표현은 자동으로 완화됩니다.
+                <p className="mt-1.5 text-xs text-slate-500">
+                  💡 과장·의학적 단정 표현은 자동으로 완화됩니다.
                 </p>
               </div>
             ) : (
@@ -1108,16 +1161,39 @@ export default function Page() {
             <button
               disabled={isGenerating}
               onClick={handleGenerate}
-              className="w-full bg-teal-700 hover:bg-teal-800 text-white rounded-md py-2 text-sm font-medium disabled:opacity-60"
+              className="w-full bg-teal-700 hover:bg-teal-800 text-white rounded-lg py-3.5 text-base font-bold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isGenerating
-                ? mode === 'note-rag'
-                  ? `생성 중… ${ragProgress ?? 0}%`
-                  : '생성 중…'
-                : '카드 생성'}
+              {isGenerating ? (
+                <span className="inline-flex items-center gap-2">
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      opacity="0.25"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7V2z"
+                    />
+                  </svg>
+                  {mode === 'note-rag'
+                    ? `생성 중… ${ragProgress ?? 0}%`
+                    : '생성 중…'}
+                </span>
+              ) : (
+                <>✨ 카드 생성하기</>
+              )}
             </button>
             {mode === 'note-rag' && ragProgress !== null && (
-              <div className="h-1.5 w-full bg-violet-100 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-violet-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-violet-600 transition-[width] duration-300"
                   style={{ width: `${Math.min(100, Math.max(0, ragProgress))}%` }}
@@ -1125,8 +1201,8 @@ export default function Page() {
               </div>
             )}
             {ragError && (
-              <div className="text-[11px] text-red-600 leading-relaxed">
-                지식노트 생성 오류: {ragError}
+              <div className="text-sm text-red-600 leading-relaxed bg-red-50 border border-red-200 rounded-lg p-3">
+                <strong className="font-semibold">오류:</strong> {ragError}
               </div>
             )}
           </div>
@@ -1240,8 +1316,56 @@ export default function Page() {
 
         <section className="space-y-4">
           {cards.length === 0 ? (
-            <div className="bg-white rounded-xl border p-12 text-center text-slate-500">
-              왼쪽에서 프롬프트나 수동 입력을 작성한 뒤 <b>카드 생성</b>을 눌러주세요.
+            <div className="bg-white rounded-xl border p-10 space-y-6">
+              <div className="text-center">
+                <div className="text-5xl mb-3">🎴</div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  첫 카드뉴스를 만들어 보세요
+                </h2>
+                <p className="mt-2 text-slate-500">
+                  왼쪽에서 프롬프트를 쓰고 <span className="font-semibold text-teal-700">카드 생성하기</span> 를 눌러보세요.
+                </p>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                  예시 프롬프트 · 클릭 시 자동 입력
+                </div>
+                <div className="grid gap-2">
+                  {[
+                    {
+                      label: '🌿 시니어 케어 하루 소개',
+                      text: '시니어 돌봄 브랜드의 따뜻한 하루 일과 — 아침 산책, 영양 식단, 정서 프로그램을 가족에게 소개하는 5장',
+                      count: 5,
+                    },
+                    {
+                      label: '🍼 임산부 · 영유아 케어 서비스',
+                      text: '임산부와 영유아를 위한 맞춤 케어 서비스 안내 — 주차별 건강 상담, 영양, 가족 참여 프로그램 4장',
+                      count: 4,
+                    },
+                    {
+                      label: '🚀 신제품 온라인 판매 안내',
+                      text: '브랜드 신제품의 온라인 판매 시작 안내 — 대표 제품, 혜택, 구매 유도까지 6장',
+                      count: 6,
+                    },
+                  ].map((ex) => (
+                    <button
+                      key={ex.label}
+                      onClick={() => {
+                        setMode('auto')
+                        setPrompt(ex.text)
+                        setCount(ex.count)
+                      }}
+                      className="text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-teal-400 hover:bg-teal-50/40 transition"
+                    >
+                      <div className="font-semibold text-slate-800">{ex.label}</div>
+                      <div className="text-sm text-slate-500 mt-0.5 line-clamp-2">
+                        {ex.text}
+                      </div>
+                      <div className="text-xs text-teal-700 mt-1">{ex.count}장 · 자동 모드</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             <>
