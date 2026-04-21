@@ -66,7 +66,7 @@ export class RecommendController {
   }
 
   // 아이디어 추천은 긴 컨텍스트 (~3k in / 1k out) Gemini 호출 — 분당 5회, 시간당 50회
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, long: { limit: 50, ttl: 3_600_000 } })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('recommend-ideas')
   @ApiOperation({
     summary: '브랜드 지식노트 분석 → 만들 만한 카드뉴스 아이디어 N개 제안 + DB 누적 저장',
