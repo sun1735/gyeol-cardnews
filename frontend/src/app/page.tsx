@@ -3073,22 +3073,6 @@ function CardItem({
               </div>
             )}
           </div>
-
-          <div
-            style={{
-              position: 'absolute',
-              left: Math.round(d.display * 0.04),
-              top: Math.round(d.display * 0.04),
-              fontSize: Math.round(d.display * 0.03),
-              padding: `${Math.round(d.display * 0.01)}px ${Math.round(d.display * 0.02)}px`,
-              background: primary,
-              color: '#fff',
-              borderRadius: 4,
-              fontWeight: 600,
-            }}
-          >
-            {index + 1} / {total}
-          </div>
         </div>
       </div>
 
