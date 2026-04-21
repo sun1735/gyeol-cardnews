@@ -1525,49 +1525,70 @@ export default function Page() {
 
         <section className="space-y-4">
           {cards.length === 0 ? (
-            <div className="bg-white rounded-xl border p-6 sm:p-8 space-y-5">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900">사용법</h2>
-                  <p className="mt-1.5 text-sm text-slate-600">
-                    아래 3단계만 하면 카드뉴스를 바로 만들 수 있어요.
-                  </p>
+            (() => {
+              const step1Done = !!selectedBrandId
+              const step2Done =
+                mode === 'manual'
+                  ? manual.some((m) => m.title || m.body || m.subtext || m.cta)
+                  : prompt.trim().length > 0
+              const readyCount = Number(step1Done) + Number(step2Done)
+              const nextGuide = !step1Done
+                ? '브랜드를 먼저 선택하면 톤이 더 정확해집니다.'
+                : !step2Done
+                  ? '프롬프트 한 줄만 입력하면 준비 완료입니다.'
+                  : '왼쪽 하단의 카드 생성 버튼을 눌러주세요.'
+
+              const stepClass = (done: boolean) =>
+                done
+                  ? 'rounded-lg border border-teal-200 bg-teal-50 px-3 py-2.5'
+                  : 'rounded-lg border border-slate-200 bg-white px-3 py-2.5'
+
+              return (
+                <div className="bg-white rounded-xl border p-6 sm:p-8 space-y-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-bold text-slate-900">사용법</h2>
+                      <p className="mt-1 text-sm text-slate-600">
+                        복잡하게 볼 필요 없이, 아래 순서대로만 진행하면 됩니다.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
+                      }
+                      className="px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
+                    >
+                      {selectedBrandId ? '브랜드 관리' : '브랜드 선택'}
+                    </button>
+                  </div>
+
+                  <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    준비 상태: <strong>{readyCount}/2 완료</strong> · {nextGuide}
+                  </div>
+
+                  <ol className="space-y-2">
+                    <li className={stepClass(step1Done)}>
+                      <div className="text-xs text-teal-700 font-semibold">STEP 1</div>
+                      <div className="text-sm font-semibold text-slate-900 mt-0.5">
+                        브랜드 선택 (선택이지만 추천)
+                      </div>
+                    </li>
+                    <li className={stepClass(step2Done)}>
+                      <div className="text-xs text-teal-700 font-semibold">STEP 2</div>
+                      <div className="text-sm font-semibold text-slate-900 mt-0.5">
+                        생성 방식 선택 후 프롬프트 입력
+                      </div>
+                    </li>
+                    <li className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+                      <div className="text-xs text-teal-700 font-semibold">STEP 3</div>
+                      <div className="text-sm font-semibold text-slate-900 mt-0.5">
+                        왼쪽 하단 `카드 생성하기` 클릭
+                      </div>
+                    </li>
+                  </ol>
                 </div>
-                <button
-                  onClick={() =>
-                    openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
-                  }
-                  className="px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
-                >
-                  {selectedBrandId ? '브랜드 관리' : '브랜드 만들기'}
-                </button>
-              </div>
-
-              <ol className="grid sm:grid-cols-3 gap-2">
-                <li className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
-                  <div className="text-xs font-semibold text-teal-700">STEP 1</div>
-                  <div className="mt-1 font-semibold text-slate-900">생성 방식 선택</div>
-                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                    왼쪽에서 자동/수동/지식노트를 고르세요.
-                  </p>
-                </li>
-                <li className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
-                  <div className="text-xs font-semibold text-teal-700">STEP 2</div>
-                  <div className="mt-1 font-semibold text-slate-900">프롬프트 입력</div>
-                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                    한 문장으로 목적만 적어도 충분합니다.
-                  </p>
-                </li>
-                <li className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
-                  <div className="text-xs font-semibold text-teal-700">STEP 3</div>
-                  <div className="mt-1 font-semibold text-slate-900">카드 생성 클릭</div>
-                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                    왼쪽 하단 버튼을 누르면 결과가 바로 표시됩니다.
-                  </p>
-                </li>
-              </ol>
-
-            </div>
+              )
+            })()
           ) : (
             <>
               {/* 단계 6: 카드 리스트 / 현재 카드 선택 */}
