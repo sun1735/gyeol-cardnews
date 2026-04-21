@@ -1549,7 +1549,7 @@ export default function Page() {
                     <div>
                       <h2 className="text-xl sm:text-2xl font-bold text-slate-900">사용법</h2>
                       <p className="mt-1 text-sm text-slate-600">
-                        복잡하게 볼 필요 없이, 아래 순서대로만 진행하면 됩니다.
+                        처음 사용자도 아래 순서대로 진행하면 1~2분 안에 첫 카드뉴스를 만들 수 있어요.
                       </p>
                     </div>
                     <button
@@ -1562,28 +1562,51 @@ export default function Page() {
                     </button>
                   </div>
 
-                  <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 leading-relaxed">
                     준비 상태: <strong>{readyCount}/2 완료</strong> · {nextGuide}
+                  </div>
+
+                  <div className="text-xs text-slate-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5 leading-relaxed">
+                    처음에는 <strong>자동 모드 + 1:1 + 5장</strong> 조합을 권장합니다. 생성 후 카드별 텍스트와 이미지는 언제든 수정할 수 있어요.
                   </div>
 
                   <ol className="space-y-2">
                     <li className={stepClass(step1Done)}>
-                      <div className="text-xs text-teal-700 font-semibold">STEP 1</div>
-                      <div className="text-sm font-semibold text-slate-900 mt-0.5">
-                        브랜드 선택 (선택이지만 추천)
-                      </div>
+                      <div className="text-xs text-teal-700 font-semibold">STEP 1 · 브랜드 설정</div>
+                      <div className="text-sm font-semibold text-slate-900 mt-0.5">브랜드 선택(권장)</div>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        브랜드를 선택하면 톤, 색감, 기본 문구가 자동 반영되어 결과가 더 안정적입니다.
+                      </p>
                     </li>
                     <li className={stepClass(step2Done)}>
-                      <div className="text-xs text-teal-700 font-semibold">STEP 2</div>
+                      <div className="text-xs text-teal-700 font-semibold">STEP 2 · 입력</div>
                       <div className="text-sm font-semibold text-slate-900 mt-0.5">
                         생성 방식 선택 후 프롬프트 입력
                       </div>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        예: 유순 제품 5월 1일 온라인 판매 시작, 인스타 피드용 카드뉴스 5장
+                      </p>
+                      <button
+                        onClick={() => {
+                          setMode('auto')
+                          setPrompt(
+                            '유순 제품 5월 1일 온라인 판매 시작, 인스타 피드용 카드뉴스 5장',
+                          )
+                          setCount(5)
+                        }}
+                        className="mt-2 px-2.5 py-1 text-xs rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
+                      >
+                        예시 문구 자동 입력
+                      </button>
                     </li>
                     <li className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-                      <div className="text-xs text-teal-700 font-semibold">STEP 3</div>
+                      <div className="text-xs text-teal-700 font-semibold">STEP 3 · 생성</div>
                       <div className="text-sm font-semibold text-slate-900 mt-0.5">
                         왼쪽 하단 `카드 생성하기` 클릭
                       </div>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        생성 후 카드별로 텍스트/이미지 수정, PNG/ZIP/릴스 내보내기가 가능합니다.
+                      </p>
                     </li>
                   </ol>
                 </div>
