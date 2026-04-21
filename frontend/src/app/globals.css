@@ -2,40 +2,113 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* 브랜드 색 — 단일 체계. 기본 teal 계열을 더 깊은 톤으로 */
+  --n2c-ink: #0b1220;
+  --n2c-ink-muted: #475467;
+  --n2c-ink-subtle: #667085;
+  --n2c-bg: #fafaf9;
+  --n2c-surface: #ffffff;
+  --n2c-border: #e5e7eb;
+  --n2c-border-soft: #eef0f3;
+  --n2c-primary: #0e7c6b;
+  --n2c-primary-hover: #0b6456;
+  --n2c-primary-soft: #e7f5f2;
+}
+
 html, body {
   font-family: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo',
     'Segoe UI', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.6;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.011em;
+  color: var(--n2c-ink);
+  background: var(--n2c-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* 한국어 숫자 혼합 본문 가독성 */
-body {
-  font-feature-settings: "tnum" 1, "ss02" 1;
   text-rendering: optimizeLegibility;
+  font-feature-settings: "tnum" 1, "ss02" 1, "cv11" 1;
 }
 
-/* 텍스트 버튼의 포커스 링 — 키보드 사용자 가시성 */
+h1, h2, h3, h4 {
+  letter-spacing: -0.021em;
+  color: var(--n2c-ink);
+}
+
+/* 포커스 링 — 키보드 사용자 */
+:focus-visible {
+  outline: 2px solid rgb(14 124 107 / 0.4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 button:focus-visible,
 select:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgb(15 118 110 / 0.5); /* teal-700 반투명 */
+  outline: 2px solid rgb(14 124 107 / 0.4);
   outline-offset: 1px;
 }
 
-/* 앱 전반 가독성 개선: 회색 계열을 한 톤 진하게 */
-.text-slate-400 {
-  color: rgb(100 116 139); /* slate-500 */
+/* 회색 톤 — 가독성 상향 */
+.text-slate-400 { color: rgb(100 116 139); }
+.text-slate-500 { color: rgb(71 85 105); }
+.text-slate-300 { color: rgb(148 163 184); }
+
+/* 선택 영역 색상 */
+::selection {
+  background: rgb(14 124 107 / 0.15);
 }
 
-.text-slate-500 {
-  color: rgb(71 85 105); /* slate-600 */
+/* 부드러운 스크롤바 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgb(203 213 225); border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184); }
+
+/* primary 버튼 — 깊이감 있는 teal */
+.n2c-btn-primary {
+  background: var(--n2c-primary);
+  color: white;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.04), inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+.n2c-btn-primary:hover { background: var(--n2c-primary-hover); }
+.n2c-btn-primary:active { transform: translateY(0.5px); }
+
+/* 섹션 카드 — 그림자 매우 미세 */
+.n2c-card {
+  background: var(--n2c-surface);
+  border: 1px solid var(--n2c-border-soft);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
 }
 
-.text-slate-300 {
-  color: rgb(148 163 184); /* slate-400 */
+/* 입력 — 깔끔한 테두리와 포커스 */
+.n2c-input {
+  background: var(--n2c-surface);
+  border: 1px solid var(--n2c-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.n2c-input:focus {
+  outline: none;
+  border-color: var(--n2c-primary);
+  box-shadow: 0 0 0 3px rgb(14 124 107 / 0.1);
+}
+
+/* 보조 뱃지 — 색 없이 은은하게 */
+.n2c-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--n2c-primary-soft);
+  color: var(--n2c-primary);
 }

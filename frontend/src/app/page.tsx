@@ -1043,55 +1043,70 @@ export default function Page() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-6">
-      <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          {/* 로고 이니셜 — teal 그라디언트 원에 N2C */}
+      <header className="flex items-center justify-between mb-10 gap-4 flex-wrap">
+        <a href="/" className="flex items-center gap-2.5 group">
+          {/* 로고 — 미니멀 N2C 마크 */}
           <div
-            className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-600 to-teal-800 flex items-center justify-center text-white font-black text-sm shadow-sm tracking-tight"
+            className="w-9 h-9 rounded-[10px] flex items-center justify-center text-white font-bold text-[11px] tracking-tight"
+            style={{ background: 'linear-gradient(145deg, #0e7c6b 0%, #0b3b35 100%)' }}
             aria-hidden
           >
             N2C
           </div>
           <div>
-            <h1 className="text-3xl font-black tracking-tight leading-none">
-              Note<span className="text-teal-700">2</span>Card
+            <h1 className="text-[19px] font-bold tracking-[-0.02em] leading-none">
+              Note<span style={{ color: 'var(--n2c-primary)' }}>2</span>Card
             </h1>
-            <p className="mt-1.5 text-slate-500 text-sm">
-              노트투카드 · 브랜드 지식노트 기반 카드뉴스 생성기
+            <p className="mt-1 text-[12px] text-slate-500 leading-none">
+              브랜드 지식노트 · 카드뉴스 생성기
             </p>
           </div>
-        </div>
+        </a>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* 현재 브랜드 배지 — 클릭 시 편집 모달 */}
+          {/* 현재 브랜드 배지 */}
           {selectedBrand ? (
             <button
               onClick={() => openBrandModal('edit', selectedBrand.id)}
-              className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 hover:border-slate-400 shadow-sm transition"
-              title="브랜드 관리 열기"
+              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-slate-200 bg-white hover:border-slate-300 transition"
+              title="브랜드 관리"
             >
               <span
-                className="w-5 h-5 rounded border"
+                className="w-5 h-5 rounded-full border border-slate-200"
                 style={{ background: selectedBrand.primaryColor }}
                 aria-hidden
               />
-              <span className="font-semibold">🏷️ {selectedBrand.name}</span>
-              <span className="text-slate-400">⚙</span>
+              <span className="text-sm font-medium">{selectedBrand.name}</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                className="text-slate-400"
+                aria-hidden
+              >
+                <path
+                  d="M2.5 4.5L6 8l3.5-3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
           ) : (
             <button
               onClick={() => openBrandModal('create')}
-              className="px-4 py-2.5 rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-semibold shadow-sm transition"
+              className="px-3.5 py-1.5 rounded-full border border-slate-200 bg-white hover:border-slate-300 text-sm font-medium transition"
             >
-              🏷️ 브랜드 선택 · 추가
+              브랜드 선택
             </button>
           )}
-          {/* 브랜드 목록 드롭다운 — 빠른 전환용 */}
+          {/* 브랜드 드롭다운 */}
           {brands.length > 1 && (
             <select
               value={selectedBrandId}
               onChange={(e) => setSelectedBrandId(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white"
-              title="브랜드 빠른 전환"
+              className="border border-slate-200 rounded-full px-3 py-1.5 text-sm bg-white hover:border-slate-300 transition"
+              title="브랜드 전환"
             >
               <option value="">(선택 없음)</option>
               {brands.map((b) => (
@@ -1101,44 +1116,48 @@ export default function Page() {
               ))}
             </select>
           )}
-          {/* 요금제 링크 */}
-          <a
-            href="/pricing"
-            className="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          >
-            💎 요금제
-          </a>
-          {/* 사용량 메터 (로그인 시) */}
-          {isLoggedIn && quotaUsage && (
+          {/* 사용량 · 요금제 */}
+          {isLoggedIn && quotaUsage ? (
             <a
               href="/pricing"
-              className="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs text-slate-600 leading-tight"
-              title={`이번 달 AI 이미지 ${quotaUsage.counts.imageGen} / ${quotaUsage.limits.imageGen} · 텍스트 ${quotaUsage.counts.textGen} / ${quotaUsage.limits.textGen}`}
+              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-slate-200 bg-white hover:border-slate-300 text-sm transition"
+              title={`AI 이미지 ${quotaUsage.counts.imageGen}/${quotaUsage.limits.imageGen} · 텍스트 ${quotaUsage.counts.textGen}/${quotaUsage.limits.textGen}`}
             >
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold uppercase text-[10px] text-teal-700">
-                  {quotaUsage.plan}
-                </span>
-                <span>
-                  🎨 {quotaUsage.counts.imageGen}/{quotaUsage.limits.imageGen}
-                </span>
-              </div>
-              <div className="text-[10px] text-slate-400">이번 달 AI 이미지</div>
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                style={{
+                  background: quotaUsage.plan === 'free' ? '#f1f5f9' : 'var(--n2c-primary-soft)',
+                  color: quotaUsage.plan === 'free' ? '#64748b' : 'var(--n2c-primary)',
+                }}
+              >
+                {quotaUsage.plan}
+              </span>
+              <span className="text-slate-600 text-[13px] tabular-nums">
+                {quotaUsage.counts.imageGen}
+                <span className="text-slate-400">/{quotaUsage.limits.imageGen}</span>
+              </span>
+            </a>
+          ) : (
+            <a
+              href="/pricing"
+              className="px-3.5 py-1.5 rounded-full text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+            >
+              요금제
             </a>
           )}
-          {/* 로그인·로그아웃 */}
+          {/* 인증 */}
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               {session?.user?.image && (
                 <img
                   src={session.user.image}
                   alt=""
-                  className="w-9 h-9 rounded-full border border-slate-200"
+                  className="w-8 h-8 rounded-full border border-slate-200"
                 />
               )}
               <button
                 onClick={() => signOut({ callbackUrl: '/' })}
-                className="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm"
+                className="text-sm text-slate-500 hover:text-slate-900 px-2 py-1 transition"
                 title={session?.user?.email ?? '로그아웃'}
               >
                 로그아웃
@@ -1149,9 +1168,9 @@ export default function Page() {
           ) : (
             <button
               onClick={() => signIn('google')}
-              className="px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold shadow-sm"
+              className="n2c-btn-primary px-4 py-2 rounded-full text-sm font-medium"
             >
-              Google 로그인
+              시작하기
             </button>
           )}
         </div>
@@ -1159,46 +1178,55 @@ export default function Page() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
         <section className="space-y-4">
-          <div className="bg-white rounded-xl border p-5 space-y-4">
-            {/* 모드 선택 — 스택된 행 형태 */}
+          <div className="n2c-card p-6 space-y-5">
+            {/* 모드 선택 */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-3">
                 생성 방식
-              </label>
+              </div>
               <div className="space-y-1.5">
                 {(
                   [
-                    { k: 'auto', icon: '⚡', title: '자동', desc: '프롬프트 한 줄 → 카드 1~10장' },
-                    { k: 'manual', icon: '✍️', title: '수동', desc: '카드별 제목·본문 직접 입력' },
-                    { k: 'note-rag', icon: '✨', title: '지식노트', desc: 'RAG 기반, 브랜드 자료 자동 활용' },
+                    { k: 'auto', title: '자동', desc: '프롬프트 한 줄 → 카드 1~10장' },
+                    { k: 'manual', title: '수동', desc: '카드별 제목·본문 직접 입력' },
+                    { k: 'note-rag', title: '지식노트 기반', desc: '브랜드 자료 자동 참조' },
                   ] as const
                 ).map((m) => {
                   const active = mode === m.k
-                  const isRag = m.k === 'note-rag'
                   return (
                     <button
                       key={m.k}
                       onClick={() => setMode(m.k)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition ${
+                      className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-[10px] text-left transition ${
                         active
-                          ? isRag
-                            ? 'bg-violet-700 text-white border-violet-700 shadow-sm'
-                            : 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-slate-400'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <span className="text-xl leading-none">{m.icon}</span>
                       <span className="flex-1">
-                        <span className="block font-semibold">{m.title}</span>
+                        <span className="block text-[14px] font-semibold tracking-[-0.01em]">
+                          {m.title}
+                        </span>
                         <span
-                          className={`block text-xs mt-0.5 ${
-                            active ? 'opacity-80' : 'text-slate-500'
+                          className={`block text-[12px] mt-0.5 ${
+                            active ? 'text-white/70' : 'text-slate-500'
                           }`}
                         >
                           {m.desc}
                         </span>
                       </span>
-                      {active && <span>✓</span>}
+                      {active && (
+                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+                          <path
+                            d="M3 8l3.5 3.5L13 5"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
                     </button>
                   )
                 })}
@@ -1210,17 +1238,17 @@ export default function Page() {
                   openBrandModal('edit', selectedBrand.id)
                   setBrandModalTab('docs')
                 }}
-                className="w-full px-3 py-2 text-sm border rounded-lg bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100 font-medium"
+                className="w-full px-3 py-2 text-sm rounded-[10px] text-slate-600 bg-slate-50 hover:bg-slate-100 transition"
               >
-                📚 지식노트 관리 ({selectedBrand.name})
+                {selectedBrand.name} 지식노트 관리 →
               </button>
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                사이즈 프리셋
-              </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-3">
+                사이즈
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
                 {(['1:1', '4:5', '9:16', 'custom'] as SizePreset[]).map((p) => {
                   const active = size === p
                   const isCustom = p === 'custom'
@@ -1231,25 +1259,23 @@ export default function Page() {
                         setSize(p)
                         if (p === 'custom') setCount(1)
                       }}
-                      className={`px-3 py-2.5 rounded-lg border text-left transition ${
+                      className={`px-3 py-2.5 rounded-[10px] text-left transition ${
                         active
-                          ? isCustom
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                            : 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-slate-400'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-700 hover:bg-slate-50 border border-slate-200'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">
+                        <span className="text-[14px] font-semibold tabular-nums">
                           {isCustom ? '배너' : p}
                         </span>
-                        <span className={`text-xs ${active ? 'opacity-80' : 'text-slate-400'}`}>
+                        <span className={`text-[11px] tabular-nums ${active ? 'text-white/60' : 'text-slate-400'}`}>
                           {SIZE_SUBLABELS[p]}
                         </span>
                       </div>
                       <div
-                        className={`text-xs mt-0.5 ${
-                          active ? 'opacity-80' : 'text-slate-500'
+                        className={`text-[11px] mt-0.5 ${
+                          active ? 'text-white/70' : 'text-slate-500'
                         }`}
                       >
                         {SIZE_LABELS[p]}
@@ -1297,27 +1323,29 @@ export default function Page() {
                   </p>
                 </div>
               ) : (
-                <p className="text-xs text-slate-500 mt-2">
-                  {size === '4:5' && '📱 인스타그램 피드 표준 사이즈'}
-                  {size === '9:16' && '🎬 인스타 릴스 · 스토리 · 틱톡'}
-                  {size === '1:1' && '⬜ 인스타 정사각 · 모든 SNS 공통'}
+                <p className="text-[12px] text-slate-500 mt-2.5">
+                  {size === '4:5' && '인스타그램 피드 표준 사이즈'}
+                  {size === '9:16' && '인스타 릴스 · 스토리 · 틱톡'}
+                  {size === '1:1' && '인스타 정사각 · 모든 SNS 공통'}
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                카드 수
-                <span className="ml-2 text-xs font-normal text-slate-500">
-                  {size === 'custom' ? '배너는 1장 고정' : '최대 10장'}
-                </span>
-              </label>
+              <div className="flex items-baseline justify-between mb-3">
+                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em]">
+                  카드 수
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {size === 'custom' ? '배너 1장 고정' : '최대 10'}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setCount((c) => Math.max(1, c - 1))}
                   disabled={size === 'custom' || count <= 1}
-                  className="w-10 h-10 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 font-semibold"
+                  className="w-10 h-10 rounded-[10px] border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 text-lg text-slate-600"
                   aria-label="카드 수 감소"
                 >
                   −
@@ -1331,13 +1359,13 @@ export default function Page() {
                   onChange={(e) =>
                     setCount(Math.max(1, Math.min(10, Number(e.target.value) || 1)))
                   }
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-center font-semibold disabled:bg-slate-100 disabled:text-slate-500"
+                  className="flex-1 border border-slate-200 rounded-[10px] px-3 py-2 text-center font-semibold tabular-nums disabled:bg-slate-50 disabled:text-slate-400"
                 />
                 <button
                   type="button"
                   onClick={() => setCount((c) => Math.min(10, c + 1))}
                   disabled={size === 'custom' || count >= 10}
-                  className="w-10 h-10 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 font-semibold"
+                  className="w-10 h-10 rounded-[10px] border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 text-lg text-slate-600"
                   aria-label="카드 수 증가"
                 >
                   +
@@ -1347,14 +1375,16 @@ export default function Page() {
 
             {mode !== 'manual' ? (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  프롬프트
+                <div className="flex items-baseline justify-between mb-3">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em]">
+                    프롬프트
+                  </div>
                   {mode === 'note-rag' && (
-                    <span className="ml-2 text-xs font-normal text-violet-700">
+                    <div className="text-[11px] text-slate-500">
                       지식노트 자동 참조
-                    </span>
+                    </div>
                   )}
-                </label>
+                </div>
                 <textarea
                   rows={5}
                   value={prompt}
@@ -1364,10 +1394,10 @@ export default function Page() {
                       ? '예) 유순 제품 5월 1일 온라인 판매 시작 — 인스타 피드 6장'
                       : '예) 유순 임산부와 유아를 위한 케어 서비스 안내'
                   }
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 resize-none focus:border-teal-500"
+                  className="n2c-input w-full resize-none text-[14px]"
                 />
-                <p className="mt-1.5 text-xs text-slate-500">
-                  💡 과장·의학적 단정 표현은 자동으로 완화됩니다.
+                <p className="mt-2 text-[12px] text-slate-500 leading-relaxed">
+                  과장·의학적 단정 표현은 자동으로 완화됩니다.
                 </p>
               </div>
             ) : (
@@ -1411,31 +1441,32 @@ export default function Page() {
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-1">
-                참조 이미지 <span className="text-slate-400 font-normal">(선택 · 최대 3장)</span>
-              </label>
+              <div className="flex items-baseline justify-between mb-3">
+                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em]">
+                  참조 이미지
+                </div>
+                <div className="text-[11px] text-slate-400">선택 · 최대 3장</div>
+              </div>
               <div
-                onDragOver={(e) => {
-                  e.preventDefault()
-                }}
+                onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault()
                   if (e.dataTransfer?.files?.length) addBaseImages(e.dataTransfer.files)
                 }}
-                className="border border-dashed rounded-md px-3 py-3 text-xs text-slate-500 bg-slate-50"
+                className="border border-dashed border-slate-200 rounded-[12px] p-3 transition hover:border-slate-300"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span>
+                  <span className="text-[12px] text-slate-500">
                     {baseImages.length === 0
-                      ? '이미지를 드래그하거나 아래 버튼으로 첨부 — 모든 카드 배경에 공통 적용'
-                      : `${baseImages.length}/3장 첨부됨`}
+                      ? '드래그 또는 파일 선택'
+                      : `${baseImages.length} / 3 장`}
                   </span>
                   <label
-                    className={`inline-block cursor-pointer border rounded-md px-2 py-1 bg-white hover:bg-slate-100 ${
-                      baseImages.length >= 3 || baseUploading ? 'opacity-50 pointer-events-none' : ''
+                    className={`inline-flex items-center text-[12px] font-medium text-slate-700 px-2.5 py-1 rounded-md hover:bg-slate-50 cursor-pointer ${
+                      baseImages.length >= 3 || baseUploading ? 'opacity-40 pointer-events-none' : ''
                     }`}
                   >
-                    {baseUploading ? '업로드 중…' : '파일 선택'}
+                    {baseUploading ? '업로드 중' : '파일 선택'}
                     <input
                       type="file"
                       multiple
@@ -1449,17 +1480,17 @@ export default function Page() {
                   </label>
                 </div>
                 {baseImages.length > 0 && (
-                  <div className="flex gap-2 mt-2 flex-wrap">
+                  <div className="flex gap-2 mt-3 flex-wrap">
                     {baseImages.map((url, i) => (
-                      <div key={i} className="relative">
+                      <div key={i} className="relative group">
                         <img
                           src={url}
                           alt=""
-                          className="w-16 h-16 object-cover rounded-md border"
+                          className="w-14 h-14 object-cover rounded-lg"
                         />
                         <button
                           onClick={() => removeBaseImage(i)}
-                          className="absolute -top-2 -right-2 bg-white border rounded-full w-5 h-5 text-xs"
+                          className="absolute -top-1.5 -right-1.5 bg-white shadow-sm border border-slate-200 rounded-full w-5 h-5 text-xs text-slate-500 hover:text-red-600 hover:border-red-200"
                           title="제거"
                         >
                           ×
@@ -1468,16 +1499,16 @@ export default function Page() {
                     ))}
                   </div>
                 )}
-                <p className="mt-2 text-[11px] text-slate-400 leading-relaxed">
-                  업로드 시 본인 저작권/사용권 보유에 동의한 것으로 간주됩니다.
-                </p>
               </div>
+              <p className="mt-2 text-[11px] text-slate-400 leading-relaxed">
+                본인 저작권/사용권 보유에 동의한 것으로 간주됩니다.
+              </p>
             </div>
 
             <button
               disabled={isGenerating}
               onClick={handleGenerate}
-              className="w-full bg-teal-700 hover:bg-teal-800 text-white rounded-lg py-3.5 text-base font-bold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="n2c-btn-primary w-full rounded-[12px] py-3.5 text-[15px] font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isGenerating ? (
                 <span className="inline-flex items-center gap-2">
@@ -1501,11 +1532,11 @@ export default function Page() {
                     />
                   </svg>
                   {mode === 'note-rag'
-                    ? `생성 중… ${ragProgress ?? 0}%`
-                    : '생성 중…'}
+                    ? `생성 중 ${ragProgress ?? 0}%`
+                    : '생성 중'}
                 </span>
               ) : (
-                <>✨ 카드 생성하기</>
+                '카드 생성'
               )}
             </button>
             {mode === 'note-rag' && ragProgress !== null && (
@@ -1727,44 +1758,104 @@ export default function Page() {
                     : '프롬프트 한 줄만 입력하면 준비 완료입니다.'
                   : `${activeGuide.label} 모드 준비 완료. 왼쪽 하단의 카드 생성 버튼을 눌러주세요.`
 
-              const modeBadgeClass =
-                mode === 'note-rag'
-                  ? 'bg-violet-100 text-violet-800 border-violet-200'
-                  : mode === 'manual'
-                    ? 'bg-amber-100 text-amber-800 border-amber-200'
-                    : 'bg-slate-100 text-slate-800 border-slate-200'
               const nextTitle = isBrandRequired && !step1Done
-                ? 'STEP 1 · 브랜드 선택'
+                ? '브랜드 선택'
                 : !step2Done
-                  ? 'STEP 2 · 입력 작성'
-                  : 'STEP 3 · 카드 생성하기'
+                  ? '입력 작성'
+                  : '카드 생성하기'
               const step1StateLabel = isBrandRequired ? (step1Done ? '완료' : '필수') : '선택'
-              const stepCardClass = (done: boolean, active: boolean) =>
-                done
-                  ? 'rounded-lg border border-teal-200 bg-teal-50 px-3 py-3'
-                  : active
-                    ? 'rounded-lg border border-teal-300 bg-teal-50/70 ring-1 ring-teal-200 px-3 py-3'
-                    : 'rounded-lg border border-slate-200 bg-white px-3 py-3'
+
+              const stepRow = (n: number, title: string, desc: string, state: 'done' | 'next' | 'pending', example?: string) => (
+                <li className="flex gap-4 items-start py-4 border-b border-slate-100 last:border-0">
+                  <div
+                    className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold tabular-nums ${
+                      state === 'done'
+                        ? 'text-white'
+                        : state === 'next'
+                          ? 'text-white'
+                          : 'bg-slate-100 text-slate-400'
+                    }`}
+                    style={
+                      state === 'done'
+                        ? { background: 'var(--n2c-primary)' }
+                        : state === 'next'
+                          ? { background: '#0b1220' }
+                          : undefined
+                    }
+                  >
+                    {state === 'done' ? (
+                      <svg width="12" height="12" viewBox="0 0 12 12">
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      n
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <div className={`text-[14px] font-semibold ${state === 'pending' ? 'text-slate-500' : ''}`}>{title}</div>
+                      {state === 'next' && (
+                        <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-500">
+                          지금 할 일
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-[13px] mt-1 leading-relaxed ${state === 'pending' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {desc}
+                    </p>
+                    {example && state !== 'done' && (
+                      <button
+                        onClick={() => {
+                          setPrompt(example)
+                          if (mode === 'auto') setCount(5)
+                          if (mode === 'note-rag') setCount(6)
+                        }}
+                        className="mt-2 px-2.5 py-1 text-[12px] rounded-md border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition"
+                      >
+                        예시 입력
+                      </button>
+                    )}
+                  </div>
+                </li>
+              )
+
+              const step1State: 'done' | 'next' | 'pending' = isBrandRequired
+                ? step1Done
+                  ? 'done'
+                  : 'next'
+                : 'pending'
+              const step2State: 'done' | 'next' | 'pending' = step2Done
+                ? 'done'
+                : step1Done
+                  ? 'next'
+                  : 'pending'
+              const step3State: 'done' | 'next' | 'pending' =
+                step1Done && step2Done ? 'next' : 'pending'
 
               return (
-                <div className="bg-white rounded-xl border p-6 sm:p-8 space-y-4">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="n2c-card p-8 sm:p-10">
+                  <div className="flex items-start justify-between gap-3 flex-wrap mb-6">
                     <div>
-                      <h2 className="text-xl sm:text-2xl font-bold text-slate-900">사용법</h2>
-                      <p className="mt-1 text-sm text-slate-600">3단계로 빠르게 시작할 수 있어요.</p>
+                      <h2 className="text-[24px] font-bold tracking-[-0.02em] leading-tight">
+                        시작하기
+                      </h2>
+                      <p className="mt-1.5 text-slate-600 text-[14px]">
+                        3단계만 거치면 첫 카드뉴스가 완성됩니다
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${modeBadgeClass}`}
-                      >
-                        현재 모드 · {activeGuide.label}
+                      <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                        {activeGuide.label} 모드
                       </span>
                       {isBrandRequired && (
                         <button
                           onClick={() =>
-                            openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
+                            openBrandModal(
+                              selectedBrandId ? 'edit' : 'create',
+                              selectedBrandId || undefined,
+                            )
                           }
-                          className="px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
+                          className="text-[13px] text-slate-700 border border-slate-200 rounded-full px-3 py-1.5 hover:border-slate-300 transition"
                         >
                           {selectedBrandId ? '브랜드 관리' : '브랜드 선택'}
                         </button>
@@ -1772,83 +1863,42 @@ export default function Page() {
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                    준비 상태: <strong>{requiredDone}/{requiredTotal} 완료</strong> · {nextGuide}
-                  </div>
-
-                  <div className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2.5">
-                    <div className="text-[11px] font-semibold text-teal-700">지금 할 일</div>
-                    <div className="text-sm font-semibold text-slate-900 mt-0.5">{nextTitle}</div>
-                    <div className="text-xs text-slate-600 mt-1">{activeGuide.helper}</div>
-                  </div>
-
-                  <ol className="grid sm:grid-cols-3 gap-2">
-                    <li className={stepCardClass(isBrandRequired && step1Done, isBrandRequired && !step1Done)}>
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-teal-700 font-semibold">STEP 1</div>
-                        <div className="text-xs font-semibold text-teal-700">{step1StateLabel}</div>
-                      </div>
-                      <div className="text-sm font-semibold text-slate-900 mt-1">
-                        브랜드 선택 {isBrandRequired ? '(필수)' : '(선택)'}
-                      </div>
-                      <p className="text-xs text-slate-600 mt-1">
-                        {isBrandRequired
-                          ? '지식노트 자료를 쓰려면 브랜드 선택이 필요합니다.'
-                          : '자동/수동에서는 선택사항이며, 선택 시 톤·색감·문구가 자동 반영됩니다.'}
-                      </p>
-                    </li>
-                    <li className={stepCardClass(step2Done, step1Done && !step2Done)}>
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-teal-700 font-semibold">STEP 2</div>
-                        <div className="text-xs font-semibold text-teal-700">{step2Done ? '완료' : '진행'}</div>
-                      </div>
-                      <div className="text-sm font-semibold text-slate-900 mt-1">{activeGuide.step2Title}</div>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{activeGuide.step2Desc}</p>
-                      {activeGuide.step2Example && (
-                        <button
-                          onClick={() => {
-                            setPrompt(activeGuide.step2Example ?? '')
-                            if (mode === 'auto') setCount(5)
-                            if (mode === 'note-rag') setCount(6)
-                          }}
-                          className="mt-2 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
-                        >
-                          예시 입력
-                        </button>
-                      )}
-                    </li>
-                    <li className={stepCardClass(step1Done && step2Done, step1Done && step2Done)}>
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-teal-700 font-semibold">STEP 3</div>
-                        <div className="text-xs font-semibold text-teal-700">
-                          {step1Done && step2Done ? '준비 완료' : '대기'}
-                        </div>
-                      </div>
-                      <div className="text-sm font-semibold text-slate-900 mt-1">카드 생성하기 클릭</div>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{activeGuide.step3Desc}</p>
-                    </li>
+                  <ol>
+                    {stepRow(
+                      1,
+                      `브랜드 ${isBrandRequired ? '선택' : '선택 (선택 사항)'}`,
+                      isBrandRequired
+                        ? '지식노트 모드는 브랜드 선택이 필요합니다. 브랜드의 톤·색상·자료가 자동 반영됩니다.'
+                        : '브랜드 없이도 생성할 수 있지만, 선택하면 톤·색감·문구가 자동으로 맞춰집니다.',
+                      step1State,
+                    )}
+                    {stepRow(
+                      2,
+                      activeGuide.step2Title,
+                      activeGuide.step2Desc,
+                      step2State,
+                      activeGuide.step2Example,
+                    )}
+                    {stepRow(
+                      3,
+                      '카드 생성하기',
+                      activeGuide.step3Desc,
+                      step3State,
+                    )}
                   </ol>
 
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                    <div className="text-xs font-semibold text-slate-700">브랜드 기능 안내</div>
-                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                      브랜드를 설정하면 톤, 색상, 기본 문구, 지식노트(문서/이미지)를 함께 관리할 수 있습니다.
-                    </p>
-                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                      {isBrandRequired
-                        ? '현재 지식노트 모드에서는 브랜드 선택이 필수입니다.'
-                        : '현재 모드에서는 브랜드 없이도 생성 가능하며, 선택하면 결과 일관성이 더 좋아집니다.'}
-                    </p>
+                  <div className="mt-6 pt-6 border-t border-slate-100 text-[12px] text-slate-500 leading-relaxed">
+                    브랜드를 만들어두면 톤·색상·기본 문구·지식노트 문서·이미지 라이브러리를 함께 관리할 수 있습니다.
                   </div>
                 </div>
               )
             })()
           ) : (
             <>
-              {/* 단계 6: 카드 리스트 / 현재 카드 선택 */}
-              <div className="bg-white rounded-xl border p-3 flex items-center gap-2 overflow-x-auto sticky top-2 z-10">
-                <span className="text-xs text-slate-500 flex-shrink-0 font-medium pr-1">
-                  카드 리스트
+              {/* 카드 리스트 */}
+              <div className="n2c-card p-2.5 flex items-center gap-2 overflow-x-auto sticky top-2 z-10">
+                <span className="text-[11px] text-slate-500 flex-shrink-0 font-semibold uppercase tracking-wider px-2">
+                  카드
                 </span>
                 {cards.map((c, i) => (
                   <button
@@ -2721,17 +2771,26 @@ export default function Page() {
         )
       })()}
 
-      {/* 푸터 — 법적 링크 */}
-      <footer className="mt-16 pt-8 border-t text-sm text-slate-500 flex items-center justify-between flex-wrap gap-3">
-        <div>© 2026 Note2Card · 노트투카드</div>
-        <div className="flex items-center gap-4">
-          <a href="/pricing" className="hover:text-slate-900 hover:underline">
+      {/* 푸터 */}
+      <footer className="mt-20 pt-6 border-t border-slate-100 text-[13px] text-slate-500 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-5 h-5 rounded-md flex items-center justify-center text-white font-bold text-[8px]"
+            style={{ background: 'linear-gradient(145deg, #0e7c6b, #0b3b35)' }}
+            aria-hidden
+          >
+            N2C
+          </div>
+          <span>© 2026 Note2Card</span>
+        </div>
+        <div className="flex items-center gap-5">
+          <a href="/pricing" className="hover:text-slate-900 transition">
             요금제
           </a>
-          <a href="/terms" className="hover:text-slate-900 hover:underline">
+          <a href="/terms" className="hover:text-slate-900 transition">
             이용약관
           </a>
-          <a href="/privacy" className="hover:text-slate-900 hover:underline">
+          <a href="/privacy" className="hover:text-slate-900 transition">
             개인정보처리방침
           </a>
         </div>
