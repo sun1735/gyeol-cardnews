@@ -1330,57 +1330,188 @@ export default function Page() {
 
         <section className="space-y-4">
           {cards.length === 0 ? (
-            <div className="bg-white rounded-xl border p-10 space-y-6">
-              <div className="text-center">
-                <div className="text-5xl mb-3">🎴</div>
-                <h2 className="text-xl font-bold text-slate-900">
-                  첫 카드뉴스를 만들어 보세요
-                </h2>
-                <p className="mt-2 text-slate-500">
-                  왼쪽에서 프롬프트를 쓰고 <span className="font-semibold text-teal-700">카드 생성하기</span> 를 눌러보세요.
-                </p>
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                  예시 프롬프트 · 클릭 시 자동 입력
-                </div>
-                <div className="grid gap-2">
-                  {[
-                    {
-                      label: '🌿 시니어 케어 하루 소개',
-                      text: '시니어 돌봄 브랜드의 따뜻한 하루 일과 — 아침 산책, 영양 식단, 정서 프로그램을 가족에게 소개하는 5장',
-                      count: 5,
-                    },
-                    {
-                      label: '🍼 임산부 · 영유아 케어 서비스',
-                      text: '임산부와 영유아를 위한 맞춤 케어 서비스 안내 — 주차별 건강 상담, 영양, 가족 참여 프로그램 4장',
-                      count: 4,
-                    },
-                    {
-                      label: '🚀 신제품 온라인 판매 안내',
-                      text: '브랜드 신제품의 온라인 판매 시작 안내 — 대표 제품, 혜택, 구매 유도까지 6장',
-                      count: 6,
-                    },
-                  ].map((ex) => (
+            (() => {
+              // 각 단계 완료 판정 — 진행 상황에 따라 체크·강조를 동적으로 그림
+              const step1Done = !!selectedBrandId
+              const step2Done = !!mode // 기본값이 'auto' 라 사실상 항상 완료 — 표시는 참고용
+              const step3Done =
+                mode === 'manual'
+                  ? manual.some((m) => m.title || m.body)
+                  : prompt.trim().length > 0
+              const step4Done = count > 0 && !!size
+              // "다음 할 일"은 첫 번째 미완료 단계 (step 1→5 순)
+              const nextStep = !step1Done
+                ? 1
+                : !step3Done
+                  ? 3
+                  : 5 // 2·4 는 기본값이 있어 유저가 건드릴 필요 없음
+              const steps = [
+                {
+                  n: 1,
+                  title: '브랜드 선택 또는 새로 만들기',
+                  desc: '우측 상단 🏷️ 배지 클릭 → 브랜드 만들기. 톤·색·폰트·지식노트가 여기서 설정됩니다.',
+                  icon: '🏷️',
+                  done: step1Done,
+                  action: (
                     <button
-                      key={ex.label}
-                      onClick={() => {
-                        setMode('auto')
-                        setPrompt(ex.text)
-                        setCount(ex.count)
-                      }}
-                      className="text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-teal-400 hover:bg-teal-50/40 transition"
+                      onClick={() =>
+                        openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
+                      }
+                      className="mt-2 px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
                     >
-                      <div className="font-semibold text-slate-800">{ex.label}</div>
-                      <div className="text-sm text-slate-500 mt-0.5 line-clamp-2">
-                        {ex.text}
-                      </div>
-                      <div className="text-xs text-teal-700 mt-1">{ex.count}장 · 자동 모드</div>
+                      {selectedBrandId ? '브랜드 관리 열기 →' : '+ 브랜드 만들기'}
                     </button>
-                  ))}
+                  ),
+                },
+                {
+                  n: 2,
+                  title: '생성 방식 고르기',
+                  desc: '왼쪽 패널에서 ⚡자동 / ✍️수동 / ✨지식노트 중 하나. 처음엔 "자동" 이 쉬워요.',
+                  icon: '⚡',
+                  done: step2Done,
+                },
+                {
+                  n: 3,
+                  title: '프롬프트 쓰거나 예시 선택',
+                  desc: '"유순 제품 5월 1일 판매 시작" 처럼 상황을 한 문장으로. 아래 빠른 시작도 가능.',
+                  icon: '✍️',
+                  done: step3Done,
+                },
+                {
+                  n: 4,
+                  title: '사이즈·카드 수 조정',
+                  desc: '기본 정사각 1:1 · 3장. 인스타 피드는 4:5, 릴스/스토리는 9:16, 자유 비율은 배너 선택.',
+                  icon: '📐',
+                  done: step4Done,
+                },
+                {
+                  n: 5,
+                  title: '"카드 생성하기" 클릭',
+                  desc: '왼쪽 패널 맨 아래 큰 초록 버튼. 5~15초 내에 카드가 이 자리에 뜹니다.',
+                  icon: '✨',
+                  done: false,
+                },
+              ]
+              return (
+                <div className="bg-white rounded-xl border p-6 sm:p-8 space-y-6">
+                  <div>
+                    <div className="text-4xl mb-2">🎴</div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                      사용법 · 5단계로 따라하기
+                    </h2>
+                    <p className="mt-1.5 text-slate-600">
+                      처음이라도 1~2분이면 카드뉴스 한 벌이 완성됩니다. 아래 순서대로 진행해 보세요.
+                    </p>
+                  </div>
+
+                  {/* 5단계 가이드 */}
+                  <ol className="space-y-3">
+                    {steps.map((s) => {
+                      const isNext = s.n === nextStep
+                      return (
+                        <li
+                          key={s.n}
+                          className={`flex gap-3 rounded-xl border p-4 transition ${
+                            s.done
+                              ? 'border-teal-200 bg-teal-50/40'
+                              : isNext
+                                ? 'border-teal-400 bg-white shadow-sm ring-2 ring-teal-100'
+                                : 'border-slate-200 bg-white'
+                          }`}
+                        >
+                          <div
+                            className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold ${
+                              s.done
+                                ? 'bg-teal-600 text-white'
+                                : isNext
+                                  ? 'bg-teal-700 text-white'
+                                  : 'bg-slate-100 text-slate-500'
+                            }`}
+                            aria-hidden
+                          >
+                            {s.done ? '✓' : s.n}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-lg">{s.icon}</span>
+                              <h3 className="font-semibold text-slate-900">{s.title}</h3>
+                              {isNext && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-600 text-white font-semibold">
+                                  지금 할 일
+                                </span>
+                              )}
+                              {s.done && !isNext && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-semibold">
+                                  완료
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+                              {s.desc}
+                            </p>
+                            {s.action}
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ol>
+
+                  {/* 빠른 시작 — Step 2~4 자동 */}
+                  <div className="border-t pt-5">
+                    <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+                      <h3 className="text-base font-bold text-slate-900">🚀 빠른 시작</h3>
+                      <span className="text-sm text-slate-500">
+                        클릭 한 번으로 Step 2~4 자동 설정
+                      </span>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-2">
+                      {[
+                        {
+                          emoji: '🌿',
+                          label: '시니어 케어 하루',
+                          text: '시니어 돌봄 브랜드의 따뜻한 하루 일과 — 아침 산책, 영양 식단, 정서 프로그램을 가족에게 소개하는 5장',
+                          count: 5,
+                        },
+                        {
+                          emoji: '🍼',
+                          label: '임산부·영유아 케어',
+                          text: '임산부와 영유아를 위한 맞춤 케어 서비스 안내 — 주차별 건강 상담, 영양, 가족 참여 프로그램 4장',
+                          count: 4,
+                        },
+                        {
+                          emoji: '🚀',
+                          label: '신제품 온라인 판매',
+                          text: '브랜드 신제품의 온라인 판매 시작 안내 — 대표 제품, 혜택, 구매 유도까지 6장',
+                          count: 6,
+                        },
+                      ].map((ex) => (
+                        <button
+                          key={ex.label}
+                          onClick={() => {
+                            setMode('auto')
+                            setPrompt(ex.text)
+                            setCount(ex.count)
+                          }}
+                          className="text-left p-3 rounded-lg border border-slate-200 hover:border-teal-400 hover:bg-teal-50/40 transition"
+                        >
+                          <div className="text-2xl">{ex.emoji}</div>
+                          <div className="font-semibold text-slate-800 mt-1">{ex.label}</div>
+                          <div className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                            {ex.text}
+                          </div>
+                          <div className="text-xs text-teal-700 mt-2 font-semibold">
+                            {ex.count}장 · 자동 모드
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3 leading-relaxed">
+                      클릭 후 왼쪽 패널 하단의 <strong className="text-teal-700">✨ 카드 생성하기</strong> 를 누르면 끝 · 브랜드 선택·사이즈 변경은 생성 전후 언제든 가능
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })()
           ) : (
             <>
               {/* 단계 6: 카드 리스트 / 현재 카드 선택 */}
