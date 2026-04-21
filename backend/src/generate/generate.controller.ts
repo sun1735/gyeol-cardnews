@@ -3,11 +3,17 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import { GenerateService } from './generate.service'
 import { GenerateCardsDto } from './dto/generate-cards.dto'
+import { CurrentUser } from '../auth/auth.guard'
+import type { AuthUser } from '../auth/auth.service'
+import { QuotaService } from '../quota/quota.service'
 
 @ApiTags('generate')
 @Controller('api/generate')
 export class GenerateController {
-  constructor(private svc: GenerateService) {}
+  constructor(
+    private svc: GenerateService,
+    private quota: QuotaService,
+  ) {}
 
   // 텍스트 카피 생성 — 분당 10회, 시간당 100회
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -22,7 +28,12 @@ export class GenerateController {
       'OPENAI_API_KEY 가 없거나 실패해도 템플릿 폴백으로 항상 결과를 반환한다.',
     ].join(' '),
   })
-  async generateCards(@Body() body: GenerateCardsDto, @Ip() clientIp: string) {
+  async generateCards(
+    @Body() body: GenerateCardsDto,
+    @Ip() clientIp: string,
+    @CurrentUser() user: AuthUser | null,
+  ) {
+    await this.quota.checkAndIncrement(user, 'textGen')
     return this.svc.run({
       mode: body.mode,
       prompt: body.prompt,

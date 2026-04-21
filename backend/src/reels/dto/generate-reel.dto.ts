@@ -14,13 +14,13 @@ import {
 export class GenerateReelDto {
   @ApiProperty({
     description:
-      '카드 프레임 (2~5장). 각 항목은 `data:image/png;base64,...` 또는 순수 base64 PNG.',
+      '카드 프레임 (2~10장). 각 항목은 `data:image/png;base64,...` 또는 순수 base64 이미지 문자열.',
     type: [String],
     example: ['data:image/png;base64,iVBORw0KGgo...'],
   })
   @IsArray()
   @ArrayMinSize(2)
-  @ArrayMaxSize(5)
+  @ArrayMaxSize(10)
   @IsString({ each: true })
   frames: string[]
 

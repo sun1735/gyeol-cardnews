@@ -27,6 +27,9 @@ import { PrismaService } from '../prisma/prisma.service'
 import { buildStyleRecipe } from '../generate/style'
 import { checkSafety } from '../generate/safety'
 import { editImageWithGemini, generateImageWithGemini, saveEditedImage } from './editor'
+import { CurrentUser } from '../auth/auth.guard'
+import type { AuthUser } from '../auth/auth.service'
+import { QuotaService } from '../quota/quota.service'
 
 export class EditImageDto {
   @ApiProperty({ example: '/uploads/1776666144533-skmkh2.png', description: '원본 이미지 URL (/uploads/...)' })
@@ -81,7 +84,10 @@ export class GenerateImageDto {
 @ApiTags('images')
 @Controller('api/images')
 export class ImagesController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private quota: QuotaService,
+  ) {}
 
   // 이미지 편집은 호출당 ~$0.04 — IP별 분당 3회, 시간당 30회로 제한
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
@@ -94,7 +100,7 @@ export class ImagesController {
       '출력 이미지에는 텍스트가 포함되지 않으며, 프론트엔드에서 CSS 로 오버레이된다.',
     ].join(' '),
   })
-  async edit(@Body() body: EditImageDto) {
+  async edit(@Body() body: EditImageDto, @CurrentUser() user: AuthUser | null) {
     const logger = new Logger('ImagesController')
     if (!process.env.GEMINI_API_KEY) {
       throw new HttpException(
@@ -102,6 +108,8 @@ export class ImagesController {
         HttpStatus.SERVICE_UNAVAILABLE,
       )
     }
+    // 월 한도 체크 + 카운터 증가 (로그인 유저만)
+    await this.quota.checkAndIncrement(user, 'imageGen')
 
     const safety = checkSafety(body.instruction)
     if (safety.blocked) {
@@ -155,7 +163,7 @@ export class ImagesController {
       '비율/픽셀 힌트는 모델에 전달되지만 정확한 해상도 대응은 보장되지 않음 — 최종 크기는 프론트 CSS 가 맞춤.',
     ].join(' '),
   })
-  async generate(@Body() body: GenerateImageDto) {
+  async generate(@Body() body: GenerateImageDto, @CurrentUser() user: AuthUser | null) {
     const logger = new Logger('ImagesController')
     if (!process.env.GEMINI_API_KEY) {
       throw new HttpException(
@@ -163,6 +171,8 @@ export class ImagesController {
         HttpStatus.SERVICE_UNAVAILABLE,
       )
     }
+    // 월 한도 체크 + 카운터 증가 (로그인 유저만)
+    await this.quota.checkAndIncrement(user, 'imageGen')
 
     const safety = checkSafety(body.prompt)
     if (safety.blocked) {

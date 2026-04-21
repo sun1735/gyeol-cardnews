@@ -98,6 +98,23 @@ export default function Page() {
   const { data: session, status: authStatus } = useSession()
   const authedFetch = useAuthedFetch()
   const isLoggedIn = authStatus === 'authenticated'
+
+  // 사용량 메터 — 로그인 시 /api/quota/me 로 이번 달 카운트 조회
+  const [quotaUsage, setQuotaUsage] = useState<{
+    plan: string
+    limits: { imageGen: number; textGen: number; ragJob: number; ideaGen: number }
+    counts: { imageGen: number; textGen: number; ragJob: number; ideaGen: number }
+  } | null>(null)
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setQuotaUsage(null)
+      return
+    }
+    authedFetch('/api/quota/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setQuotaUsage(d))
+      .catch(() => {})
+  }, [isLoggedIn, session])
   const [mode, setMode] = useState<GenMode>('auto')
   const [size, setSize] = useState<SizePreset>('1:1')
   const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
@@ -207,7 +224,9 @@ export default function Page() {
   // 단계 10: 릴스 내보내기
   const [reelTransition, setReelTransition] = useState<ReelTransition>('fade')
   const [reelDuration, setReelDuration] = useState(3)
+  const [reelImageQuality, setReelImageQuality] = useState<number>(0.88)
   const [isExportingReel, setIsExportingReel] = useState(false)
+  const [reelStatus, setReelStatus] = useState<string | null>(null)
   const [lastReelUrl, setLastReelUrl] = useState<string | null>(null)
 
   const selectedBrand = useMemo(
@@ -615,12 +634,20 @@ export default function Page() {
     if (res.status === 429) {
       throw new Error('요청 빈도 제한에 걸렸습니다 (AI 편집: 분당 3회 · 시간당 30회). 잠시 후 다시 시도해 주세요.')
     }
+    if (res.status === 402) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(`${j?.message ?? '월 한도 초과'} (요금제 페이지 /pricing 에서 업그레이드)`)
+    }
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
       throw new Error(j?.message ?? `HTTP ${res.status}`)
     }
     const j = await res.json()
     if (j?.url) updateCard(card.id, { imageUrl: j.url })
+    // 사용량 카운터 리프레시
+    if (isLoggedIn) {
+      authedFetch('/api/quota/me').then((r) => r.ok && r.json()).then((d) => d && setQuotaUsage(d)).catch(() => {})
+    }
   }
 
   // text-to-image 모달 열기 — 카드 기준 프롬프트 프리필
@@ -675,6 +702,15 @@ export default function Page() {
         })
         return
       }
+      if (res.status === 402) {
+        const j = await res.json().catch(() => ({}))
+        setAiGenDialog({
+          ...aiGenDialog,
+          loading: false,
+          error: `${j?.message ?? '월 한도 초과'} (/pricing 에서 업그레이드)`,
+        })
+        return
+      }
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         setAiGenDialog({
@@ -687,6 +723,10 @@ export default function Page() {
       const j = await res.json()
       if (j?.url) updateCard(card.id, { imageUrl: j.url })
       setAiGenDialog(null) // 성공 시 닫기
+      // 사용량 카운터 리프레시
+      if (isLoggedIn) {
+        authedFetch('/api/quota/me').then((r) => r.ok && r.json()).then((d) => d && setQuotaUsage(d)).catch(() => {})
+      }
     } catch (e: any) {
       setAiGenDialog({
         ...aiGenDialog,
@@ -747,6 +787,7 @@ export default function Page() {
       return
     }
     setIsExportingReel(true)
+    setReelStatus('릴스 준비 중…')
     setLastReelUrl(null)
     const previousSize = size
     const needsSwitch = size !== '9:16'
@@ -763,37 +804,78 @@ export default function Page() {
       const d = SIZE_PX['9:16']
       const pixelRatio = d.w / d.display
 
-      const frames: string[] = []
-      for (const c of cards) {
-        const node = document.getElementById(`card-${c.id}`)
-        if (!node) continue
-        const dataUrl = await mod.toPng(node, { pixelRatio, cacheBust: true })
-        frames.push(dataUrl)
+      const renderFrames = async (quality: number): Promise<string[]> => {
+        const frames: string[] = []
+        for (let i = 0; i < cards.length; i++) {
+          const c = cards[i]
+          const node = document.getElementById(`card-${c.id}`)
+          if (!node) continue
+          setReelStatus(`프레임 렌더링 중… (${i + 1}/${cards.length})`)
+          const dataUrl = await mod.toJpeg(node, {
+            pixelRatio,
+            quality,
+            cacheBust: true,
+            backgroundColor: '#ffffff',
+          })
+          frames.push(dataUrl)
+        }
+        return frames
       }
-      if (frames.length < 2) throw new Error('프레임 렌더 실패')
 
-      const res = await authedFetch('/api/reels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frames,
-          transition: reelTransition,
-          durationPerCard: reelDuration,
-          brandName: selectedBrand?.name,
-        }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({} as any))
-        throw new Error(`HTTP ${res.status} · ${j?.message ?? '서버 오류'}`)
+      const qualityAttempts = Array.from(new Set([reelImageQuality, 0.72])).filter(
+        (q) => q >= 0.5 && q <= 0.95,
+      )
+
+      let j: any = null
+      let lastErr: Error | null = null
+      for (let i = 0; i < qualityAttempts.length; i++) {
+        const q = qualityAttempts[i]
+        const frames = await renderFrames(q)
+        if (frames.length < 2) throw new Error('프레임 렌더 실패')
+
+        setReelStatus(`서버에서 영상 생성 중… (품질 ${Math.round(q * 100)}%)`)
+        const res = await authedFetch('/api/reels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            frames,
+            transition: reelTransition,
+            durationPerCard: reelDuration,
+            brandName: selectedBrand?.name,
+          }),
+        })
+        if (res.ok) {
+          j = await res.json()
+          break
+        }
+
+        const errBody = await res.json().catch(() => ({} as any))
+        const msg = String(errBody?.message ?? `HTTP ${res.status} · 서버 오류`)
+        const canRetryWithSmallerPayload =
+          i < qualityAttempts.length - 1 &&
+          (res.status === 413 ||
+            /payload|too large|entity too large|request body|body limit/i.test(msg))
+        if (canRetryWithSmallerPayload) {
+          setReelStatus('용량 최적화 후 재시도 중…')
+          continue
+        }
+        lastErr = new Error(`HTTP ${res.status} · ${msg}`)
+        break
       }
-      const j = await res.json()
+
+      if (!j) throw lastErr ?? new Error('릴스 생성 실패')
+
+      setReelStatus('다운로드 준비 중…')
       setLastReelUrl(j.url)
       // 자동 다운로드
       const a = document.createElement('a')
       a.href = j.url
       a.download = j.filename
       a.click()
+      setReelStatus('릴스 생성 완료')
+      setTimeout(() => setReelStatus(null), 2000)
     } catch (e: any) {
+      setReelStatus(null)
       await openAlert({
         title: '릴스 생성 실패',
         message: String(e?.message ?? e),
@@ -1018,6 +1100,31 @@ export default function Page() {
                 </option>
               ))}
             </select>
+          )}
+          {/* 요금제 링크 */}
+          <a
+            href="/pricing"
+            className="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          >
+            💎 요금제
+          </a>
+          {/* 사용량 메터 (로그인 시) */}
+          {isLoggedIn && quotaUsage && (
+            <a
+              href="/pricing"
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs text-slate-600 leading-tight"
+              title={`이번 달 AI 이미지 ${quotaUsage.counts.imageGen} / ${quotaUsage.limits.imageGen} · 텍스트 ${quotaUsage.counts.textGen} / ${quotaUsage.limits.textGen}`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold uppercase text-[10px] text-teal-700">
+                  {quotaUsage.plan}
+                </span>
+                <span>
+                  🎨 {quotaUsage.counts.imageGen}/{quotaUsage.limits.imageGen}
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400">이번 달 AI 이미지</div>
+            </a>
           )}
           {/* 로그인·로그아웃 */}
           {isLoggedIn ? (
@@ -1443,8 +1550,18 @@ export default function Page() {
 
           {cards.length >= 2 && (
             <div className="bg-white rounded-xl border p-4 space-y-3">
-              <div className="text-sm font-medium flex items-center gap-2">
-                🎬 릴스 내보내기 <span className="text-xs text-slate-400 font-normal">9:16 MP4</span>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  🎬 릴스 내보내기 <span className="text-xs text-slate-400 font-normal">9:16 MP4</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="px-2 py-0.5 rounded-full border bg-slate-50 text-slate-700">
+                    {cards.length}장
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full border bg-slate-50 text-slate-700">
+                    총 {Math.round((cards.length * reelDuration - (cards.length - 1) * 0.5) * 10) / 10}초
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -1467,6 +1584,29 @@ export default function Page() {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">렌더 품질</label>
+                <div className="grid grid-cols-2 gap-1">
+                  {[
+                    { label: '표준', value: 0.82, hint: '빠름' },
+                    { label: '고화질', value: 0.88, hint: '권장' },
+                  ].map((q) => (
+                    <button
+                      key={q.label}
+                      onClick={() => setReelImageQuality(q.value)}
+                      className={`px-2 py-1.5 rounded-md text-xs border ${
+                        reelImageQuality === q.value
+                          ? 'bg-teal-700 text-white border-teal-700'
+                          : 'bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="font-semibold">{q.label}</span>
+                      <span className="ml-1 opacity-80">({q.hint})</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1499,9 +1639,15 @@ export default function Page() {
                 {isExportingReel ? '🎬 렌더링 중… (수초~수십초)' : '🎬 릴스 MP4 내보내기'}
               </button>
 
+              {reelStatus && (
+                <div className="text-xs text-teal-800 bg-teal-50 border border-teal-200 rounded-md px-3 py-2">
+                  {reelStatus}
+                </div>
+              )}
+
               {lastReelUrl && (
                 <div className="border rounded-md overflow-hidden bg-black">
-                  <video src={lastReelUrl} controls className="w-full h-auto" />
+                  <video src={lastReelUrl} controls className="w-full h-auto" preload="metadata" />
                   <a
                     href={lastReelUrl}
                     download
@@ -1517,7 +1663,7 @@ export default function Page() {
                   ? '현재 9:16 프리뷰 그대로 렌더합니다.'
                   : `현재 프리뷰(${size})가 아닌 9:16 로 자동 전환 후 렌더, 완료 시 복귀.`}
                 {' · '}
-                카드 수정 후 다시 버튼을 누르면 최신 상태로 재렌더됩니다.
+                카드 수정 후 다시 버튼을 누르면 최신 상태로 재렌더됩니다. 생성이 길어지면 자동으로 용량 최적화 재시도를 수행합니다.
               </p>
             </div>
           )}
@@ -2579,6 +2725,9 @@ export default function Page() {
       <footer className="mt-16 pt-8 border-t text-sm text-slate-500 flex items-center justify-between flex-wrap gap-3">
         <div>© 2026 Note2Card · 노트투카드</div>
         <div className="flex items-center gap-4">
+          <a href="/pricing" className="hover:text-slate-900 hover:underline">
+            요금제
+          </a>
           <a href="/terms" className="hover:text-slate-900 hover:underline">
             이용약관
           </a>

@@ -19,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CurrentUser } from '../auth/auth.guard'
 import type { AuthUser } from '../auth/auth.service'
 import { assertBrandOwnership } from '../auth/ownership'
+import { QuotaService } from '../quota/quota.service'
 import { callGeminiJson } from '../generate/llm-gemini'
 
 export class RecommendIdeasDto {
@@ -36,7 +37,10 @@ export class RecommendIdeasDto {
 export class RecommendController {
   private readonly logger = new Logger('RecommendController')
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private quota: QuotaService,
+  ) {}
 
   @Get('ideas')
   @ApiOperation({ summary: '저장된 카드뉴스 아이디어 목록 (브랜드별)' })
@@ -93,6 +97,7 @@ export class RecommendController {
     const brand = await this.prisma.brandProfile.findUnique({ where: { id: dto.brandId } })
     if (!brand) throw new BadRequestException('brandId 가 유효하지 않습니다')
     await assertBrandOwnership(this.prisma, dto.brandId, user)
+    await this.quota.checkAndIncrement(user, 'ideaGen')
 
     const [docs, images] = await Promise.all([
       this.prisma.brandKnowledgeDoc.findMany({

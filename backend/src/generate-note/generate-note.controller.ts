@@ -5,6 +5,7 @@ import { CurrentUser } from '../auth/auth.guard'
 import type { AuthUser } from '../auth/auth.service'
 import { assertBrandOwnership } from '../auth/ownership'
 import { PrismaService } from '../prisma/prisma.service'
+import { QuotaService } from '../quota/quota.service'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { GenerateNoteService } from './generate-note.service'
 
@@ -14,6 +15,7 @@ export class GenerateNoteController {
   constructor(
     private svc: GenerateNoteService,
     private prisma: PrismaService,
+    private quota: QuotaService,
   ) {}
 
   // RAG 카드 생성 = 텍스트 Gemini + (유저 선택 시) 카드별 이미지 편집 → 최대 10회 이미지 호출
@@ -27,6 +29,7 @@ export class GenerateNoteController {
   })
   async start(@Body() dto: GenerateFromNoteDto, @CurrentUser() user: AuthUser | null) {
     await assertBrandOwnership(this.prisma, dto.brandId, user)
+    await this.quota.checkAndIncrement(user, 'ragJob')
     return this.svc.enqueue(dto)
   }
 

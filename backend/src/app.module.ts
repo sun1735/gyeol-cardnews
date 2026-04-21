@@ -16,6 +16,7 @@ import { ImagesModule } from './images/images.module'
 import { KnowledgeModule } from './knowledge/knowledge.module'
 import { GenerateNoteModule } from './generate-note/generate-note.module'
 import { AuthModule } from './auth/auth.module'
+import { QuotaModule } from './quota/quota.module'
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuthModule } from './auth/auth.module'
     ]),
     PrismaModule,
     AuthModule,
+    QuotaModule,
     HealthModule,
     BrandsModule,
     ProjectsModule,

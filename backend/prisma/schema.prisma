@@ -7,18 +7,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 사용자 — Google OAuth 식별자(이메일)로 로그인. 브랜드 소유·접근 제어 주체.
+// 사용자 — Google OAuth 식별자(이메일)로 로그인. 브랜드 소유·접근 제어 + 플랜 주체.
 model User {
-  id        String         @id @default(cuid())
-  email     String         @unique
-  name      String         @default("")
-  imageUrl  String         @default("")
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  email          String         @unique
+  name           String         @default("")
+  imageUrl       String         @default("")
+  // 플랜: free | pro | team
+  plan           String         @default("free")
+  planStartedAt  DateTime?
+  planExpiresAt  DateTime?      // 정기결제 만료/취소 시점 — 지나면 free 로 복귀
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  brands    BrandProfile[]
+  brands         BrandProfile[]
+  usageCounters  UsageCounter[]
 
   @@map("users")
+}
+
+// 월간 사용량 카운터 — 플랜 한도 체크 및 과금 기반.
+// (userId, yearMonth) 쌍으로 한 달에 한 행.
+model UsageCounter {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  yearMonth     String   // "2026-04" (UTC 기준)
+  imageGenCount Int      @default(0)  // AI 이미지 생성 + 편집 (둘 다 고비용)
+  textGenCount  Int      @default(0)  // 텍스트 카드 생성 (저비용)
+  ragJobCount   Int      @default(0)  // RAG 비동기 잡 (텍스트+이미지 묶음)
+  ideaGenCount  Int      @default(0)  // 아이디어 추천
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, yearMonth])
+  @@index([userId, yearMonth])
+  @@map("usage_counters")
 }
 
 model BrandProfile {

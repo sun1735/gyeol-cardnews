@@ -13,6 +13,7 @@ const BACKEND_API_PATHS = [
   'images',
   'knowledge',
   'reels',
+  'quota',
 ]
 
 const nextConfig = {

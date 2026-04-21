@@ -12,10 +12,10 @@ async function bootstrap() {
   // 첫 업로드까지 404 가 나지 않도록 미리 만들어 둔다.
   mkdirSync(join(process.cwd(), 'public', 'uploads'), { recursive: true })
 
-  // bodyParser: false 로 기본을 끄고, 릴스 base64 PNG 를 담을 수 있도록 50mb 로 올린다.
+  // bodyParser: false 로 기본을 끄고, 릴스 프레임(base64 이미지 최대 10장)을 담을 수 있도록 한도를 늘린다.
   const app = await NestFactory.create(AppModule, { cors: true, bodyParser: false })
-  app.use(json({ limit: '50mb' }))
-  app.use(urlencoded({ extended: true, limit: '50mb' }))
+  app.use(json({ limit: '120mb' }))
+  app.use(urlencoded({ extended: true, limit: '120mb' }))
 
   // Railway·Vercel 등 프록시 뒤에서 실제 클라이언트 IP 를 X-Forwarded-For 로 받기.
   // ThrottlerGuard 의 IP 기반 rate limit 이 엣지 노드별로 분산되지 않도록 필수.

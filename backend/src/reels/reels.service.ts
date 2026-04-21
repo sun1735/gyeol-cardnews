@@ -11,6 +11,7 @@ import { reelFilename } from '../shared/filename'
 import { GenerateReelDto } from './dto/generate-reel.dto'
 
 type Transition = 'fade' | 'slide' | 'zoom'
+type FrameFormat = 'png' | 'jpg' | 'webp'
 
 // xfade 필터 매핑 — zoom 은 zoomin(xfade built-in)
 const XFADE_NAME: Record<Transition, string> = {
@@ -49,12 +50,18 @@ export class ReelsService implements OnModuleInit {
     try {
       // 1) 각 프레임을 PNG로 저장
       const framePaths: string[] = []
+      let totalBytes = 0
       for (let i = 0; i < n; i++) {
-        const b64 = String(frames[i]).replace(/^data:image\/[a-z]+;base64,/, '')
-        const p = join(tmpDir, `f${i}.png`)
-        await writeFile(p, Buffer.from(b64, 'base64'))
+        const parsed = parseBase64Image(frames[i])
+        totalBytes += parsed.bytes.length
+        const ext = parsed.format
+        const p = join(tmpDir, `f${i}.${ext}`)
+        await writeFile(p, parsed.bytes)
         framePaths.push(p)
       }
+      this.logger.log(
+        `릴스 프레임 수신: ${n}장 · 총 ${(totalBytes / (1024 * 1024)).toFixed(1)}MB`,
+      )
 
       // 2) 출력 파일 경로
       const filename = reelFilename(brandName)
@@ -63,7 +70,20 @@ export class ReelsService implements OnModuleInit {
       // 3) ffmpeg 실행
       const args = buildFfmpegArgs(framePaths, outputPath, transition, durationPerCard)
       this.logger.log(`ffmpeg 시작 — frames=${n} transition=${transition} dur=${durationPerCard}s`)
-      await this.runFfmpeg(args)
+      try {
+        await this.runFfmpeg(args, transition)
+      } catch (e: any) {
+        // 일부 런타임에서 xfade 전환(특히 zoom/slide) 지원 이슈가 있어 fade 로 1회 폴백.
+        if (transition !== 'fade') {
+          this.logger.warn(
+            `전환 "${transition}" 렌더 실패 → fade 폴백 재시도: ${e?.message ?? e}`,
+          )
+          const fallbackArgs = buildFfmpegArgs(framePaths, outputPath, 'fade', durationPerCard)
+          await this.runFfmpeg(fallbackArgs, 'fade(fallback)')
+        } else {
+          throw e
+        }
+      }
 
       const duration =
         Math.round((n * durationPerCard - (n - 1) * TRANSITION_SECONDS) * 10) / 10
@@ -82,7 +102,7 @@ export class ReelsService implements OnModuleInit {
     }
   }
 
-  private runFfmpeg(args: string[]): Promise<void> {
+  private runFfmpeg(args: string[], transitionLabel: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
       let stderrTail = ''
@@ -93,7 +113,7 @@ export class ReelsService implements OnModuleInit {
       proc.on('error', (err) => reject(new Error(`ffmpeg 실행 실패: ${err.message}`)))
       proc.on('close', (code) => {
         if (code === 0) resolve()
-        else reject(new Error(`ffmpeg exit ${code}\n${stderrTail.slice(-800)}`))
+        else reject(new Error(`ffmpeg(${transitionLabel}) exit ${code}\n${stderrTail.slice(-800)}`))
       })
     })
   }
@@ -153,8 +173,14 @@ function buildFfmpegArgs(
     '[vout]',
     '-c:v',
     'libx264',
+    '-crf',
+    '21',
     '-preset',
     'veryfast',
+    '-profile:v',
+    'high',
+    '-level',
+    '4.1',
     '-pix_fmt',
     'yuv420p',
     '-r',
@@ -166,4 +192,23 @@ function buildFfmpegArgs(
   )
 
   return args
+}
+
+function parseBase64Image(raw: string): { bytes: Buffer; format: FrameFormat } {
+  const input = String(raw || '').trim()
+  if (!input) throw new Error('빈 프레임 데이터')
+
+  const m = input.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/)
+  const mime = m?.[1]?.toLowerCase() ?? null
+  const b64 = (m?.[2] ?? input).trim()
+  const bytes = Buffer.from(b64, 'base64')
+  if (!bytes.length) throw new Error('프레임 base64 디코딩 실패')
+
+  const format: FrameFormat =
+    mime === 'jpeg' || mime === 'jpg'
+      ? 'jpg'
+      : mime === 'webp'
+        ? 'webp'
+        : 'png'
+  return { bytes, format }
 }
