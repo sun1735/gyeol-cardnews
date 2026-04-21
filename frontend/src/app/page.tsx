@@ -1526,7 +1526,8 @@ export default function Page() {
         <section className="space-y-4">
           {cards.length === 0 ? (
             (() => {
-              const step1Done = !!selectedBrandId
+              const isBrandRequired = mode === 'note-rag'
+              const step1Done = isBrandRequired ? !!selectedBrandId : true
               const step2Done =
                 mode === 'manual'
                   ? manual.some((m) => m.title || m.body || m.subtext || m.cta)
@@ -1570,65 +1571,93 @@ export default function Page() {
                 },
               }
               const activeGuide = modeGuide[mode]
-              const readyCount = Number(step1Done) + Number(step2Done)
-              const nextGuide = !step1Done
-                ? mode === 'note-rag'
-                  ? '지식노트 모드는 브랜드 선택이 필수입니다.'
-                  : '브랜드를 먼저 선택하면 톤이 더 정확해집니다.'
+              const requiredDone = (isBrandRequired ? Number(!!selectedBrandId) : 0) + Number(step2Done)
+              const requiredTotal = isBrandRequired ? 2 : 1
+              const nextGuide = isBrandRequired && !step1Done
+                ? '지식노트 모드는 브랜드 선택이 필수입니다.'
                 : !step2Done
                   ? mode === 'manual'
                     ? '수동 입력칸에 카드 내용 1개 이상 작성하면 준비 완료입니다.'
                     : '프롬프트 한 줄만 입력하면 준비 완료입니다.'
                   : `${activeGuide.label} 모드 준비 완료. 왼쪽 하단의 카드 생성 버튼을 눌러주세요.`
 
-              const stepClass = (done: boolean) =>
+              const modeBadgeClass =
+                mode === 'note-rag'
+                  ? 'bg-violet-100 text-violet-800 border-violet-200'
+                  : mode === 'manual'
+                    ? 'bg-amber-100 text-amber-800 border-amber-200'
+                    : 'bg-slate-100 text-slate-800 border-slate-200'
+              const nextTitle = isBrandRequired && !step1Done
+                ? 'STEP 1 · 브랜드 선택'
+                : !step2Done
+                  ? 'STEP 2 · 입력 작성'
+                  : 'STEP 3 · 카드 생성하기'
+              const step1StateLabel = isBrandRequired ? (step1Done ? '완료' : '필수') : '선택'
+              const stepCardClass = (done: boolean, active: boolean) =>
                 done
-                  ? 'rounded-lg border border-teal-200 bg-teal-50 px-3 py-2.5'
-                  : 'rounded-lg border border-slate-200 bg-white px-3 py-2.5'
+                  ? 'rounded-lg border border-teal-200 bg-teal-50 px-3 py-3'
+                  : active
+                    ? 'rounded-lg border border-teal-300 bg-teal-50/70 ring-1 ring-teal-200 px-3 py-3'
+                    : 'rounded-lg border border-slate-200 bg-white px-3 py-3'
 
               return (
                 <div className="bg-white rounded-xl border p-6 sm:p-8 space-y-4">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <h2 className="text-xl sm:text-2xl font-bold text-slate-900">사용법</h2>
-                      <p className="mt-1 text-sm text-slate-600">
-                        처음 사용자도 아래 순서대로 진행하면 1~2분 안에 첫 카드뉴스를 만들 수 있어요.
-                      </p>
+                      <p className="mt-1 text-sm text-slate-600">3단계로 빠르게 시작할 수 있어요.</p>
                     </div>
-                    <button
-                      onClick={() =>
-                        openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
-                      }
-                      className="px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
-                    >
-                      {selectedBrandId ? '브랜드 관리' : '브랜드 선택'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${modeBadgeClass}`}
+                      >
+                        현재 모드 · {activeGuide.label}
+                      </span>
+                      {isBrandRequired && (
+                        <button
+                          onClick={() =>
+                            openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
+                          }
+                          className="px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
+                        >
+                          {selectedBrandId ? '브랜드 관리' : '브랜드 선택'}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 leading-relaxed">
-                    준비 상태: <strong>{readyCount}/2 완료</strong> · {nextGuide}
+                  <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    준비 상태: <strong>{requiredDone}/{requiredTotal} 완료</strong> · {nextGuide}
                   </div>
 
-                  <div className="text-xs text-slate-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5 leading-relaxed">
-                    현재 생성 방식: <strong>{activeGuide.label}</strong> · {activeGuide.helper}
+                  <div className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2.5">
+                    <div className="text-[11px] font-semibold text-teal-700">지금 할 일</div>
+                    <div className="text-sm font-semibold text-slate-900 mt-0.5">{nextTitle}</div>
+                    <div className="text-xs text-slate-600 mt-1">{activeGuide.helper}</div>
                   </div>
 
-                  <ol className="space-y-2">
-                    <li className={stepClass(step1Done)}>
-                      <div className="text-xs text-teal-700 font-semibold">STEP 1 · 브랜드 설정</div>
-                      <div className="text-sm font-semibold text-slate-900 mt-0.5">브랜드 선택(권장)</div>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        브랜드를 선택하면 톤, 색감, 기본 문구가 자동 반영되어 결과가 더 안정적입니다.
+                  <ol className="grid sm:grid-cols-3 gap-2">
+                    <li className={stepCardClass(isBrandRequired && step1Done, isBrandRequired && !step1Done)}>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-teal-700 font-semibold">STEP 1</div>
+                        <div className="text-xs font-semibold text-teal-700">{step1StateLabel}</div>
+                      </div>
+                      <div className="text-sm font-semibold text-slate-900 mt-1">
+                        브랜드 선택 {isBrandRequired ? '(필수)' : '(선택)'}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {isBrandRequired
+                          ? '지식노트 자료를 쓰려면 브랜드 선택이 필요합니다.'
+                          : '자동/수동에서는 선택사항이며, 선택 시 톤·색감·문구가 자동 반영됩니다.'}
                       </p>
                     </li>
-                    <li className={stepClass(step2Done)}>
-                      <div className="text-xs text-teal-700 font-semibold">STEP 2 · 입력</div>
-                      <div className="text-sm font-semibold text-slate-900 mt-0.5">
-                        {activeGuide.step2Title}
+                    <li className={stepCardClass(step2Done, step1Done && !step2Done)}>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-teal-700 font-semibold">STEP 2</div>
+                        <div className="text-xs font-semibold text-teal-700">{step2Done ? '완료' : '진행'}</div>
                       </div>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        {activeGuide.step2Desc}
-                      </p>
+                      <div className="text-sm font-semibold text-slate-900 mt-1">{activeGuide.step2Title}</div>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{activeGuide.step2Desc}</p>
                       {activeGuide.step2Example && (
                         <button
                           onClick={() => {
@@ -1636,22 +1665,35 @@ export default function Page() {
                             if (mode === 'auto') setCount(5)
                             if (mode === 'note-rag') setCount(6)
                           }}
-                          className="mt-2 px-2.5 py-1 text-xs rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
+                          className="mt-2 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
                         >
-                          예시 문구 자동 입력
+                          예시 입력
                         </button>
                       )}
                     </li>
-                    <li className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-                      <div className="text-xs text-teal-700 font-semibold">STEP 3 · 생성</div>
-                      <div className="text-sm font-semibold text-slate-900 mt-0.5">
-                        왼쪽 하단 `카드 생성하기` 클릭
+                    <li className={stepCardClass(step1Done && step2Done, step1Done && step2Done)}>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-teal-700 font-semibold">STEP 3</div>
+                        <div className="text-xs font-semibold text-teal-700">
+                          {step1Done && step2Done ? '준비 완료' : '대기'}
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        {activeGuide.step3Desc}
-                      </p>
+                      <div className="text-sm font-semibold text-slate-900 mt-1">카드 생성하기 클릭</div>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{activeGuide.step3Desc}</p>
                     </li>
                   </ol>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div className="text-xs font-semibold text-slate-700">브랜드 기능 안내</div>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      브랜드를 설정하면 톤, 색상, 기본 문구, 지식노트(문서/이미지)를 함께 관리할 수 있습니다.
+                    </p>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      {isBrandRequired
+                        ? '현재 지식노트 모드에서는 브랜드 선택이 필수입니다.'
+                        : '현재 모드에서는 브랜드 없이도 생성 가능하며, 선택하면 결과 일관성이 더 좋아집니다.'}
+                    </p>
+                  </div>
                 </div>
               )
             })()

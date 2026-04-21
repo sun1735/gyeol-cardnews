@@ -17,8 +17,8 @@ export class GenerateNoteController {
   ) {}
 
   // RAG 카드 생성 = 텍스트 Gemini + (유저 선택 시) 카드별 이미지 편집 → 최대 10회 이미지 호출
-  // 분당 5회, 시간당 30회로 빡세게
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  // 분당 10회 (e2e 테스트 여유 + 실사용자 연속 재생성 시나리오 수용)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('cards-from-note')
   @ApiOperation({
     summary: '브랜드 지식노트 기반 비동기 카드 생성 시작 (Mode A RAG)',
