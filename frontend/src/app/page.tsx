@@ -284,6 +284,10 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brandId: selectedBrandId, maxIdeas: 5 }),
       })
+      if (r.status === 429) {
+        setIdeasError('요청 빈도 제한에 걸렸습니다 (분당 5회). 1분 후 다시 시도해 주세요.')
+        return
+      }
       const j = await r.json()
       if (!r.ok) {
         setIdeasError(j?.message ?? `HTTP ${r.status}`)
@@ -352,6 +356,10 @@ export default function Page() {
             sizePreset: size,
           }),
         })
+        if (enqRes.status === 429) {
+          setRagError('요청이 너무 자주 들어왔습니다. 1분 후 다시 시도해 주세요.')
+          return
+        }
         if (!enqRes.ok) {
           const j = await enqRes.json().catch(() => ({}))
           setRagError(j?.message ?? `HTTP ${enqRes.status}`)
@@ -501,6 +509,9 @@ export default function Page() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    if (res.status === 429) {
+      throw new Error('요청 빈도 제한에 걸렸습니다 (AI 편집: 분당 3회 · 시간당 30회). 잠시 후 다시 시도해 주세요.')
+    }
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
       throw new Error(j?.message ?? `HTTP ${res.status}`)
@@ -544,6 +555,9 @@ export default function Page() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    if (res.status === 429) {
+      throw new Error('요청 빈도 제한에 걸렸습니다 (AI 생성: 분당 3회 · 시간당 30회). 잠시 후 다시 시도해 주세요.')
+    }
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
       throw new Error(j?.message ?? `HTTP ${res.status}`)

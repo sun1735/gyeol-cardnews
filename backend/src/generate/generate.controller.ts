@@ -1,5 +1,6 @@
 import { Body, Controller, Ip, Post } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { GenerateService } from './generate.service'
 import { GenerateCardsDto } from './dto/generate-cards.dto'
 
@@ -8,6 +9,8 @@ import { GenerateCardsDto } from './dto/generate-cards.dto'
 export class GenerateController {
   constructor(private svc: GenerateService) {}
 
+  // 텍스트 카피 생성 — 분당 10회, 시간당 100회
+  @Throttle({ short: { limit: 10, ttl: 60_000 }, long: { limit: 100, ttl: 3_600_000 } })
   @Post('cards')
   @ApiOperation({
     summary: '프롬프트/수동입력 → 카드 데이터 자동 생성 (DB 저장 없음)',

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import {
   ArrayMaxSize,
   IsArray,
@@ -82,6 +83,8 @@ export class GenerateImageDto {
 export class ImagesController {
   constructor(private prisma: PrismaService) {}
 
+  // 이미지 편집은 호출당 ~$0.04 — IP별 분당 3회, 시간당 30회로 제한
+  @Throttle({ short: { limit: 3, ttl: 60_000 }, long: { limit: 30, ttl: 3_600_000 } })
   @Post('edit')
   @ApiOperation({
     summary: 'AI 이미지 편집 — Gemini 2.5 Flash Image (Mode B)',
@@ -141,6 +144,8 @@ export class ImagesController {
     }
   }
 
+  // 이미지 생성도 호출당 ~$0.04 — 동일 제한
+  @Throttle({ short: { limit: 3, ttl: 60_000 }, long: { limit: 30, ttl: 3_600_000 } })
   @Post('generate')
   @ApiOperation({
     summary: 'AI 이미지 생성 (text-to-image) — Gemini 2.5 Flash Image',
