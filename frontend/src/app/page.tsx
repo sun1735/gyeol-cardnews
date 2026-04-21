@@ -55,10 +55,10 @@ function randId() {
 
 // 단계 7: 파일명 규칙 — 브랜드명_YYYYMMDD_NN.png / 브랜드명_YYYYMMDD.zip
 function safeBrandName(name: string | undefined) {
-  if (!name) return '결'
+  if (!name) return 'Note2Card'
   // Windows·macOS 공통으로 파일명에 부적절한 문자 + 공백 제거
   const cleaned = name.replace(/[\\/:*?"<>|\s]+/g, '')
-  return cleaned || '결'
+  return cleaned || 'Note2Card'
 }
 
 function todayStamp() {
@@ -795,20 +795,19 @@ export default function Page() {
     <main className="mx-auto max-w-7xl px-5 py-6">
       <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          {/* 로고 이니셜 — teal 원에 G, 우측에 워드마크 */}
+          {/* 로고 이니셜 — teal 그라디언트 원에 N2C */}
           <div
-            className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-600 to-teal-800 flex items-center justify-center text-white font-black text-xl shadow-sm tracking-tight"
+            className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-600 to-teal-800 flex items-center justify-center text-white font-black text-sm shadow-sm tracking-tight"
             aria-hidden
           >
-            G
+            N2C
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tight leading-none">
-              GYEOL<span className="text-teal-700">.</span>
+              Note<span className="text-teal-700">2</span>Card
             </h1>
             <p className="mt-1.5 text-slate-500 text-sm">
-              브랜드 톤앤매너 카드뉴스 생성기 ·{' '}
-              <span className="font-mono">{healthStatus}</span>
+              노트투카드 · 브랜드 지식노트 기반 카드뉴스 생성기
             </p>
           </div>
         </div>

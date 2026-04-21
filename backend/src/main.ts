@@ -28,8 +28,8 @@ async function bootstrap() {
 
   // Swagger UI — /docs
   const config = new DocumentBuilder()
-    .setTitle('결 · 카드뉴스 API')
-    .setDescription('단계 3 API 1차 · 프로젝트 CRUD + 카드 업데이트 + 카드 자동 생성')
+    .setTitle('Note2Card API')
+    .setDescription('노트투카드 · 브랜드 지식노트 기반 카드뉴스 생성/편집/이미지 편집 API')
     .setVersion('0.1.0')
     .build()
   const document = SwaggerModule.createDocument(app, config)
