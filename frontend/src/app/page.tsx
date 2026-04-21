@@ -2870,6 +2870,7 @@ function CardItem({
   const [aiEditing, setAiEditing] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [styleOpen, setStyleOpen] = useState(false)
+  const [styleTab, setStyleTab] = useState<'title' | 'body' | 'subtext' | 'cta'>('title')
   const d = resolveSizePx(size, customSize)
   const ratio = d.display / d.w
   const height = Math.round(d.h * ratio)
@@ -2881,25 +2882,44 @@ function CardItem({
   const isCover = card.layout === 'cover'
   const onImage = !!card.imageUrl && isCover
 
-  // 텍스트 스타일 — 사용자가 카드별로 커스터마이징. 미지정 시 layout 기반 기본값.
+  // 텍스트 스타일 — 카드 레벨 + 요소별 오버라이드.
   const ts = card.textStyle ?? {}
-  const sizeScale = Math.max(0.6, Math.min(1.6, ts.sizeScale ?? 1.0))
-  const align = ts.align ?? 'left'
+  const cardScale = Math.max(0.6, Math.min(1.6, ts.sizeScale ?? 1.0))
+  const cardAlign = ts.align ?? 'left'
   const verticalAlign =
     ts.verticalAlign ?? (isCover ? 'bottom' : card.layout === 'cta' ? 'center' : 'center')
-  const titleWeight = ts.titleWeight ?? 800
 
-  const titleSize = Math.round((isCover ? d.display * 0.08 : d.display * 0.062) * sizeScale)
-  const bodySize = Math.round(d.display * 0.042 * sizeScale)
-  const subtextSize = Math.round(d.display * 0.036 * sizeScale)
-  const ctaSize = Math.round(d.display * 0.04 * sizeScale)
+  // 각 요소별 해석 (오버라이드 없으면 카드 레벨로 폴백)
+  const elemScale = (el?: { sizeScale?: number }) =>
+    Math.max(0.5, Math.min(2.0, el?.sizeScale ?? cardScale))
+  const elemAlign = (el?: { align?: 'left' | 'center' | 'right' }) => el?.align ?? cardAlign
+
+  const titleScale = elemScale(ts.title)
+  const bodyScale = elemScale(ts.body)
+  const subtextScale = elemScale(ts.subtext)
+  const ctaScale = elemScale(ts.cta)
+
+  const titleWeight = ts.title?.weight ?? ts.titleWeight ?? 800
+  const bodyWeight = ts.body?.weight ?? 400
+  const subtextWeight = ts.subtext?.weight ?? 500
+  const ctaWeight = ts.cta?.weight ?? 600
+
+  const titleSize = Math.round((isCover ? d.display * 0.08 : d.display * 0.062) * titleScale)
+  const bodySize = Math.round(d.display * 0.042 * bodyScale)
+  const subtextSize = Math.round(d.display * 0.036 * subtextScale)
+  const ctaSize = Math.round(d.display * 0.04 * ctaScale)
   const pad = Math.round(d.display * 0.08)
 
   const justifyContent =
     verticalAlign === 'top' ? 'flex-start' : verticalAlign === 'bottom' ? 'flex-end' : 'center'
-  const textAlignCss: 'left' | 'center' | 'right' = align
-  const ctaAlignSelf =
-    align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
+
+  // 요소별 정렬 (오버라이드 없으면 카드 정렬)
+  const titleAlign = elemAlign(ts.title)
+  const bodyAlign = elemAlign(ts.body)
+  const subtextAlign = elemAlign(ts.subtext)
+  const ctaAlign = elemAlign(ts.cta)
+  const toAlignSelf = (a: 'left' | 'center' | 'right') =>
+    a === 'center' ? 'center' : a === 'right' ? 'flex-end' : 'flex-start'
 
   // 렌더 직전 페이지 번호·순번 흔적 제거 — 이미지에 찍히는 것 방지.
   // 백엔드 (schema.ts stripPageNumber) 와 동일 규칙을 프론트에서도 한 번 더 적용.
@@ -3029,7 +3049,6 @@ function CardItem({
               display: 'flex',
               flexDirection: 'column',
               justifyContent,
-              textAlign: textAlignCss,
               gap: Math.round(d.display * 0.018),
             }}
           >
@@ -3037,9 +3056,10 @@ function CardItem({
               <div
                 style={{
                   fontSize: subtextSize,
-                  fontWeight: 500,
+                  fontWeight: subtextWeight,
                   letterSpacing: '0.04em',
                   color: onImage ? '#e2e8f0' : primary,
+                  textAlign: subtextAlign,
                 }}
               >
                 {renderedSubtext}
@@ -3052,6 +3072,7 @@ function CardItem({
                 color: onImage ? '#ffffff' : text,
                 lineHeight: 1.25,
                 letterSpacing: '-0.02em',
+                textAlign: titleAlign,
               }}
             >
               {card.title || ' '}
@@ -3060,9 +3081,11 @@ function CardItem({
               <div
                 style={{
                   fontSize: bodySize,
+                  fontWeight: bodyWeight,
                   lineHeight: 1.65,
                   color: onImage ? '#f8fafc' : text,
                   whiteSpace: 'pre-wrap',
+                  textAlign: bodyAlign,
                 }}
               >
                 {card.body}
@@ -3071,10 +3094,10 @@ function CardItem({
             {renderedCta && (
               <div
                 style={{
-                  alignSelf: ctaAlignSelf,
+                  alignSelf: toAlignSelf(ctaAlign),
                   marginTop: Math.round(d.display * 0.015),
                   fontSize: ctaSize,
-                  fontWeight: 600,
+                  fontWeight: ctaWeight,
                   color: onImage ? primary : '#ffffff',
                   background: onImage ? '#ffffff' : primary,
                   padding: `${Math.round(d.display * 0.018)}px ${Math.round(d.display * 0.038)}px`,
@@ -3121,54 +3144,25 @@ function CardItem({
         />
       </div>
 
-      {/* 텍스트 스타일 편집 — 접히는 섹션 */}
+      {/* 텍스트 스타일 편집 — 요소별 탭 */}
       <div className="border rounded-md bg-slate-50/50" onClick={stop}>
         <button
           onClick={(e) => { stop(e); setStyleOpen((v) => !v) }}
           className="w-full px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-100 rounded-md"
         >
-          <span className="font-semibold text-slate-700">✏️ 텍스트 스타일</span>
+          <span className="font-semibold text-slate-700">텍스트 스타일</span>
           <span className="text-slate-500">{styleOpen ? '▴' : '▾'}</span>
         </button>
         {styleOpen && (
-          <div className="px-3 pb-3 pt-1 space-y-2.5 border-t">
-            {/* 수평 정렬 */}
+          <div className="px-3 pb-3 pt-1 space-y-3 border-t">
+            {/* 카드 전체 수직 위치 */}
             <div>
-              <div className="text-[11px] font-medium text-slate-600 mb-1">수평 정렬</div>
-              <div className="grid grid-cols-3 gap-1">
-                {(['left', 'center', 'right'] as const).map((a) => {
-                  const active = (ts.align ?? 'left') === a
-                  const label = a === 'left' ? '왼쪽' : a === 'center' ? '중앙' : '오른쪽'
-                  const icon = a === 'left' ? '⇤' : a === 'center' ? '⇔' : '⇥'
-                  return (
-                    <button
-                      key={a}
-                      onClick={(e) => {
-                        stop(e)
-                        onChange({ textStyle: { ...ts, align: a } })
-                      }}
-                      className={`px-2 py-1.5 text-xs rounded border transition ${
-                        active
-                          ? 'bg-slate-900 text-white border-slate-900'
-                          : 'bg-white hover:bg-slate-50'
-                      }`}
-                    >
-                      {icon} {label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* 수직 위치 */}
-            <div>
-              <div className="text-[11px] font-medium text-slate-600 mb-1">수직 위치</div>
+              <div className="text-[11px] font-medium text-slate-600 mb-1">수직 위치 (카드 전체)</div>
               <div className="grid grid-cols-3 gap-1">
                 {(['top', 'center', 'bottom'] as const).map((v) => {
                   const currentDefault = isCover ? 'bottom' : 'center'
                   const active = (ts.verticalAlign ?? currentDefault) === v
                   const label = v === 'top' ? '위' : v === 'center' ? '가운데' : '아래'
-                  const icon = v === 'top' ? '⇡' : v === 'center' ? '⇔' : '⇣'
                   return (
                     <button
                       key={v}
@@ -3182,58 +3176,6 @@ function CardItem({
                           : 'bg-white hover:bg-slate-50'
                       }`}
                     >
-                      {icon} {label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* 글자 크기 */}
-            <div>
-              <div className="text-[11px] font-medium text-slate-600 mb-1 flex items-center justify-between">
-                <span>글자 크기</span>
-                <span className="text-slate-400">{Math.round((ts.sizeScale ?? 1) * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min={0.7}
-                max={1.5}
-                step={0.05}
-                value={ts.sizeScale ?? 1}
-                onChange={(e) =>
-                  onChange({ textStyle: { ...ts, sizeScale: Number(e.target.value) } })
-                }
-                className="w-full accent-indigo-600"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                <span>작게</span>
-                <span>기본</span>
-                <span>크게</span>
-              </div>
-            </div>
-
-            {/* 제목 굵기 */}
-            <div>
-              <div className="text-[11px] font-medium text-slate-600 mb-1">제목 굵기</div>
-              <div className="grid grid-cols-4 gap-1">
-                {([400, 600, 700, 800] as const).map((w) => {
-                  const active = (ts.titleWeight ?? 800) === w
-                  const label = w === 400 ? '가늘게' : w === 600 ? '보통' : w === 700 ? '굵게' : '매우굵게'
-                  return (
-                    <button
-                      key={w}
-                      onClick={(e) => {
-                        stop(e)
-                        onChange({ textStyle: { ...ts, titleWeight: w } })
-                      }}
-                      style={{ fontWeight: w }}
-                      className={`px-1.5 py-1.5 text-xs rounded border transition ${
-                        active
-                          ? 'bg-slate-900 text-white border-slate-900'
-                          : 'bg-white hover:bg-slate-50'
-                      }`}
-                    >
                       {label}
                     </button>
                   )
@@ -3241,7 +3183,137 @@ function CardItem({
               </div>
             </div>
 
-            {/* 초기화 */}
+            {/* 요소 탭 */}
+            <div>
+              <div className="flex border-b border-slate-200">
+                {(
+                  [
+                    { k: 'title', label: '제목' },
+                    { k: 'body', label: '본문' },
+                    { k: 'subtext', label: '보조' },
+                    { k: 'cta', label: 'CTA' },
+                  ] as const
+                ).map((t) => {
+                  const active = styleTab === t.k
+                  return (
+                    <button
+                      key={t.k}
+                      onClick={(e) => { stop(e); setStyleTab(t.k) }}
+                      className={`flex-1 px-2 py-1.5 text-xs font-medium border-b-2 -mb-px transition ${
+                        active
+                          ? 'border-indigo-600 text-indigo-700'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {(() => {
+                const elem = ts[styleTab] ?? {}
+                const defaultWeights = { title: 800, body: 400, subtext: 500, cta: 600 }
+                const currentWeight = elem.weight ?? (styleTab === 'title' ? (ts.titleWeight ?? 800) : defaultWeights[styleTab])
+                const currentSize = elem.sizeScale ?? ts.sizeScale ?? 1
+                const currentAlign = elem.align ?? ts.align ?? 'left'
+                const update = (patch: { sizeScale?: number; weight?: number; align?: 'left' | 'center' | 'right' }) => {
+                  const nextElem = { ...elem, ...patch }
+                  onChange({ textStyle: { ...ts, [styleTab]: nextElem } })
+                }
+
+                return (
+                  <div className="pt-3 space-y-3">
+                    {/* 요소 정렬 */}
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-600 mb-1">정렬</div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['left', 'center', 'right'] as const).map((a) => {
+                          const active = currentAlign === a
+                          const label = a === 'left' ? '왼쪽' : a === 'center' ? '중앙' : '오른쪽'
+                          return (
+                            <button
+                              key={a}
+                              onClick={(e) => { stop(e); update({ align: a }) }}
+                              className={`px-2 py-1.5 text-xs rounded border transition ${
+                                active
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : 'bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 요소 크기 */}
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-600 mb-1 flex items-center justify-between">
+                        <span>글자 크기</span>
+                        <span className="text-slate-400 tabular-nums">{Math.round(currentSize * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={2.0}
+                        step={0.05}
+                        value={currentSize}
+                        onChange={(e) => update({ sizeScale: Number(e.target.value) })}
+                        className="w-full accent-indigo-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                        <span>작게</span>
+                        <span>기본</span>
+                        <span>크게</span>
+                      </div>
+                    </div>
+
+                    {/* 요소 굵기 */}
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-600 mb-1">굵기</div>
+                      <div className="grid grid-cols-5 gap-1">
+                        {([300, 400, 600, 700, 900] as const).map((w) => {
+                          const active = currentWeight === w
+                          const label = w === 300 ? '얇게' : w === 400 ? '기본' : w === 600 ? '중간' : w === 700 ? '굵게' : '진하게'
+                          return (
+                            <button
+                              key={w}
+                              onClick={(e) => { stop(e); update({ weight: w }) }}
+                              style={{ fontWeight: w }}
+                              className={`px-1 py-1.5 text-[11px] rounded border transition ${
+                                active
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : 'bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 요소 초기화 */}
+                    {Object.keys(elem).length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          stop(e)
+                          const { [styleTab]: _, ...rest } = ts
+                          onChange({ textStyle: Object.keys(rest).length > 0 ? rest : undefined })
+                        }}
+                        className="w-full text-[11px] py-1 border rounded bg-white hover:bg-slate-50 text-slate-600"
+                      >
+                        이 요소 초기화
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* 전체 초기화 */}
             {Object.keys(ts).length > 0 && (
               <button
                 onClick={(e) => {
@@ -3250,7 +3322,7 @@ function CardItem({
                 }}
                 className="w-full text-[11px] py-1 border rounded bg-white hover:bg-slate-50 text-slate-600"
               >
-                스타일 기본값으로 초기화
+                전체 스타일 기본값으로 초기화
               </button>
             )}
           </div>

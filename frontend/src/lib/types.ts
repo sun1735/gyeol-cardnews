@@ -1,12 +1,26 @@
 export type SizePreset = '1:1' | '4:5' | '9:16' | 'custom'
 export type Layout = 'cover' | 'content' | 'cta'
 
-// 사용자가 카드별로 조절할 수 있는 텍스트 스타일 — 미지정 시 layout 기반 기본값 사용.
+// 요소별 오버라이드. 미지정 필드는 카드 레벨 값 (sizeScale/align) 이나 기본값 사용.
+export interface ElementStyle {
+  sizeScale?: number // 0.6 ~ 1.8 · 해당 요소에만 적용
+  weight?: 300 | 400 | 500 | 600 | 700 | 800 | 900
+  align?: 'left' | 'center' | 'right' // 해당 요소 정렬 (미지정 시 카드 align)
+}
+
+// 사용자가 카드별로 조절할 수 있는 텍스트 스타일. 요소별로 세밀 조정 가능.
 export interface TextStyle {
-  align?: 'left' | 'center' | 'right' // 수평 정렬
+  // 카드 레벨 (4요소 공통 기본값)
+  align?: 'left' | 'center' | 'right' // 수평 정렬 기본
   verticalAlign?: 'top' | 'center' | 'bottom' // 수직 위치 (기본: cover=bottom, else=center)
-  sizeScale?: number // 0.7 ~ 1.5 · 모든 텍스트 크기 배율
-  titleWeight?: 400 | 600 | 700 | 800 | 900 // 제목 굵기
+  sizeScale?: number // 0.7 ~ 1.5 · 전체 배율
+  titleWeight?: 400 | 600 | 700 | 800 | 900 // 제목 굵기 (레거시, element.title.weight 와 동일 효과)
+
+  // 요소별 오버라이드
+  title?: ElementStyle
+  body?: ElementStyle
+  subtext?: ElementStyle
+  cta?: ElementStyle
 }
 
 // 단계 4 출력 고정 포맷: title / body / subtext / cta (+ layout, imageUrl, id, textStyle)
