@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 
 type PlanKey = 'free' | 'pro' | 'team'
@@ -199,18 +199,18 @@ export default function PricingPage() {
                       바로 사용하기 →
                     </Link>
                   ) : (
-                    <button
-                      onClick={() => signIn('google')}
-                      className="w-full py-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+                    <Link
+                      href="/signin?callbackUrl=/pricing"
+                      className="block text-center w-full py-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold"
                     >
-                      Google 로 시작
-                    </button>
+                      로그인 · 회원가입
+                    </Link>
                   )
                 ) : (
                   <button
                     onClick={() => {
                       if (status !== 'authenticated') {
-                        signIn('google')
+                        window.location.href = '/signin?callbackUrl=/pricing'
                         return
                       }
                       alert(

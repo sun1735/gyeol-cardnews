@@ -1166,12 +1166,12 @@ export default function Page() {
           ) : authStatus === 'loading' ? (
             <div className="text-sm text-slate-400">…</div>
           ) : (
-            <button
-              onClick={() => signIn('google')}
-              className="n2c-btn-primary px-4 py-2 rounded-full text-sm font-medium"
+            <a
+              href="/signin"
+              className="n2c-btn-primary px-4 py-2 rounded-full text-sm font-medium inline-flex items-center"
             >
-              시작하기
-            </button>
+              로그인 · 회원가입
+            </a>
           )}
         </div>
       </header>
