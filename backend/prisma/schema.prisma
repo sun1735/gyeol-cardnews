@@ -7,8 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 사용자 — Google OAuth 식별자(이메일)로 로그인. 브랜드 소유·접근 제어 주체.
+model User {
+  id        String         @id @default(cuid())
+  email     String         @unique
+  name      String         @default("")
+  imageUrl  String         @default("")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  brands    BrandProfile[]
+
+  @@map("users")
+}
+
 model BrandProfile {
   id             String                @id @default(cuid())
+  // ownerId 없으면(null) 레거시·시드 브랜드 — 모든 로그인 유저가 읽기만 가능, 수정·삭제 불가
+  ownerId        String?
+  owner          User?                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name           String                @unique
   tone           String                @default("")
   defaultPhrase  String                @default("")
@@ -25,6 +42,7 @@ model BrandProfile {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
+  @@index([ownerId])
   @@map("brand_profiles")
 }
 

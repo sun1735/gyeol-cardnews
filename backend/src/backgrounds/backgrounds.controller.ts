@@ -1,10 +1,12 @@
 import { Controller, Get } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { DEFAULT_BACKGROUNDS } from './defaults'
+import { Public } from '../auth/auth.guard'
 
 @ApiTags('backgrounds')
 @Controller('api/backgrounds')
 export class BackgroundsController {
+  @Public()
   @Get()
   @ApiOperation({
     summary: '기본 배경 템플릿 목록 (5장)',

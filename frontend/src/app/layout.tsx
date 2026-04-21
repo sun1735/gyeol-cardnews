@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { Providers } from './providers'
 
 export const metadata: Metadata = {
   title: 'Note2Card · 노트투카드',
@@ -9,7 +10,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-slate-50 text-slate-900 min-h-screen">{children}</body>
+      <body className="bg-slate-50 text-slate-900 min-h-screen">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

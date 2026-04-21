@@ -15,6 +15,7 @@ import { ReelsModule } from './reels/reels.module'
 import { ImagesModule } from './images/images.module'
 import { KnowledgeModule } from './knowledge/knowledge.module'
 import { GenerateNoteModule } from './generate-note/generate-note.module'
+import { AuthModule } from './auth/auth.module'
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { GenerateNoteModule } from './generate-note/generate-note.module'
       { name: 'default', ttl: 60_000, limit: 60 },
     ]),
     PrismaModule,
+    AuthModule,
     HealthModule,
     BrandsModule,
     ProjectsModule,

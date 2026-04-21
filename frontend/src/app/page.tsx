@@ -2,7 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
+import { signIn, signOut, useSession } from 'next-auth/react'
 import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset } from '@/lib/types'
+
+// 인증 세션의 API 토큰을 모든 /api/* fetch 에 자동으로 실어 보내는 래퍼.
+// NextAuth session.apiToken 이 있으면 Authorization 헤더에 추가.
+function useAuthedFetch() {
+  const { data: session } = useSession()
+  const apiToken = (session as any)?.apiToken as string | undefined
+  return (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers)
+    if (apiToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${apiToken}`)
+    }
+    return fetch(input, { ...init, headers })
+  }
+}
 
 type ReelTransition = 'fade' | 'slide' | 'zoom'
 
@@ -80,6 +95,9 @@ function zipFilename(brand: string | undefined) {
 type GenMode = 'auto' | 'manual' | 'note-rag'
 
 export default function Page() {
+  const { data: session, status: authStatus } = useSession()
+  const authedFetch = useAuthedFetch()
+  const isLoggedIn = authStatus === 'authenticated'
   const [mode, setMode] = useState<GenMode>('auto')
   const [size, setSize] = useState<SizePreset>('1:1')
   const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
@@ -199,7 +217,7 @@ export default function Page() {
 
   async function loadBrands() {
     try {
-      const r = await fetch('/api/brands').then((r) => r.json())
+      const r = await authedFetch('/api/brands').then((r) => r.json())
       setBrands(r.brands ?? [])
     } catch {
       setBrands([])
@@ -208,7 +226,7 @@ export default function Page() {
 
   async function checkHealth() {
     try {
-      const r = await fetch('/health').then((r) => r.json())
+      const r = await authedFetch('/health').then((r) => r.json())
       setHealthStatus(`${r.status} · DB ${r.db}`)
     } catch {
       setHealthStatus('backend 연결 실패')
@@ -217,7 +235,7 @@ export default function Page() {
 
   async function loadBackgrounds() {
     try {
-      const r = await fetch('/api/backgrounds').then((r) => r.json())
+      const r = await authedFetch('/api/backgrounds').then((r) => r.json())
       setBackgrounds(r.backgrounds ?? [])
     } catch {
       setBackgrounds([])
@@ -227,9 +245,9 @@ export default function Page() {
   async function loadKnowledge(brandId: string) {
     try {
       const [d, i, ideasRes] = await Promise.all([
-        fetch(`/api/knowledge/docs?brandId=${brandId}`).then((r) => r.json()),
-        fetch(`/api/knowledge/images?brandId=${brandId}`).then((r) => r.json()),
-        fetch(`/api/knowledge/ideas?brandId=${brandId}`).then((r) => r.json()),
+        authedFetch(`/api/knowledge/docs?brandId=${brandId}`).then((r) => r.json()),
+        authedFetch(`/api/knowledge/images?brandId=${brandId}`).then((r) => r.json()),
+        authedFetch(`/api/knowledge/ideas?brandId=${brandId}`).then((r) => r.json()),
       ])
       setKnowledgeDocs(d?.docs ?? [])
       setKnowledgeImages(i?.images ?? [])
@@ -245,7 +263,7 @@ export default function Page() {
     if (!selectedBrandId || !newDocTitle.trim() || !newDocText.trim()) return
     setDocSaving(true)
     try {
-      const r = await fetch('/api/knowledge/docs', {
+      const r = await authedFetch('/api/knowledge/docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -281,7 +299,7 @@ export default function Page() {
       variant: 'danger',
     })
     if (!ok) return
-    await fetch(`/api/knowledge/docs/${id}`, { method: 'DELETE' })
+    await authedFetch(`/api/knowledge/docs/${id}`, { method: 'DELETE' })
     await loadKnowledge(selectedBrandId)
   }
 
@@ -293,7 +311,7 @@ export default function Page() {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('consent', 'true')
-      const up = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
+      const up = await authedFetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
       if (!up?.url) {
         await openAlert({
           title: '업로드 실패',
@@ -307,7 +325,7 @@ export default function Page() {
         .split(/[,，\s]+/)
         .map((t) => t.trim())
         .filter(Boolean)
-      const r = await fetch('/api/knowledge/images', {
+      const r = await authedFetch('/api/knowledge/images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -345,7 +363,7 @@ export default function Page() {
       variant: 'danger',
     })
     if (!ok) return
-    await fetch(`/api/knowledge/images/${id}`, { method: 'DELETE' })
+    await authedFetch(`/api/knowledge/images/${id}`, { method: 'DELETE' })
     await loadKnowledge(selectedBrandId)
   }
 
@@ -354,7 +372,7 @@ export default function Page() {
     setIdeasError(null)
     setIdeasLoading(true)
     try {
-      const r = await fetch('/api/knowledge/recommend-ideas', {
+      const r = await authedFetch('/api/knowledge/recommend-ideas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brandId: selectedBrandId, maxIdeas: 5 }),
@@ -379,7 +397,7 @@ export default function Page() {
 
   async function deleteIdea(id: string) {
     if (!selectedBrandId) return
-    await fetch(`/api/knowledge/ideas/${id}`, { method: 'DELETE' })
+    await authedFetch(`/api/knowledge/ideas/${id}`, { method: 'DELETE' })
     setIdeas((prev) => prev.filter((i) => i.id !== id))
   }
 
@@ -392,7 +410,7 @@ export default function Page() {
       variant: 'danger',
     })
     if (!ok) return
-    await fetch(`/api/knowledge/ideas?brandId=${selectedBrandId}`, { method: 'DELETE' })
+    await authedFetch(`/api/knowledge/ideas?brandId=${selectedBrandId}`, { method: 'DELETE' })
     setIdeas([])
   }
 
@@ -426,7 +444,7 @@ export default function Page() {
           return
         }
         setRagProgress(0)
-        const enqRes = await fetch('/api/generate/cards-from-note', {
+        const enqRes = await authedFetch('/api/generate/cards-from-note', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -474,7 +492,7 @@ export default function Page() {
               brandId: selectedBrandId || undefined,
               baseImageUrls: baseImages.length ? baseImages : undefined,
             }
-      const r = await fetch('/api/generate/cards', {
+      const r = await authedFetch('/api/generate/cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -494,7 +512,7 @@ export default function Page() {
   async function pollRagJob(jobId: string, timeoutMs = 180_000): Promise<CardData[]> {
     const t0 = Date.now()
     while (Date.now() - t0 < timeoutMs) {
-      const r = await fetch(`/api/generate/jobs/${jobId}`).then((r) => r.json())
+      const r = await authedFetch(`/api/generate/jobs/${jobId}`).then((r) => r.json())
       setRagProgress(typeof r?.progress === 'number' ? r.progress : 0)
       if (r?.status === 'done' || r?.status === 'partial') {
         return (r.cards ?? []) as CardData[]
@@ -513,7 +531,7 @@ export default function Page() {
 
   function addCard() {
     setCards((prev) => {
-      if (prev.length >= 5) return prev
+      if (prev.length >= 10) return prev
       const layout: Layout = prev.length === 0 ? 'cover' : 'content'
       const newCard: CardData = {
         id: randId(),
@@ -567,7 +585,7 @@ export default function Page() {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('consent', 'true') // 업로드 권리 고지 동의 — 업로드 UI 의 안내 문구로 설명됨
-    const r = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
+    const r = await authedFetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
     if (r.url) updateCard(id, { imageUrl: r.url })
   }
 
@@ -589,7 +607,7 @@ export default function Page() {
       instruction: instruction || undefined,
       refImageUrls: baseImages.length ? baseImages : undefined,
     }
-    const res = await fetch('/api/images/edit', {
+    const res = await authedFetch('/api/images/edit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -637,7 +655,7 @@ export default function Page() {
             : d.w > d.h
               ? '16:9'
               : '4:5'
-      const res = await fetch('/api/images/generate', {
+      const res = await authedFetch('/api/images/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -691,7 +709,7 @@ export default function Page() {
         const fd = new FormData()
         fd.append('file', f)
         fd.append('consent', 'true')
-        const r = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
+        const r = await authedFetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
         if (r?.url) urls.push(r.url)
       }
       if (urls.length) setBaseImages((prev) => [...prev, ...urls].slice(0, 3))
@@ -754,7 +772,7 @@ export default function Page() {
       }
       if (frames.length < 2) throw new Error('프레임 렌더 실패')
 
-      const res = await fetch('/api/reels', {
+      const res = await authedFetch('/api/reels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -835,7 +853,7 @@ export default function Page() {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('consent', 'true') // 업로드 권리 고지 동의
-    const r = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
+    const r = await authedFetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
     if (r.url) {
       setNewBrand((prev) => ({
         ...prev,
@@ -932,7 +950,7 @@ export default function Page() {
       variant: 'danger',
     })
     if (!ok) return
-    await fetch(`/api/brands/${id}`, { method: 'DELETE' })
+    await authedFetch(`/api/brands/${id}`, { method: 'DELETE' })
     if (selectedBrandId === id) {
       setSelectedBrandId('')
       setEditingBrandId(null)
@@ -1000,6 +1018,34 @@ export default function Page() {
                 </option>
               ))}
             </select>
+          )}
+          {/* 로그인·로그아웃 */}
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2">
+              {session?.user?.image && (
+                <img
+                  src={session.user.image}
+                  alt=""
+                  className="w-9 h-9 rounded-full border border-slate-200"
+                />
+              )}
+              <button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm"
+                title={session?.user?.email ?? '로그아웃'}
+              >
+                로그아웃
+              </button>
+            </div>
+          ) : authStatus === 'loading' ? (
+            <div className="text-sm text-slate-400">…</div>
+          ) : (
+            <button
+              onClick={() => signIn('google')}
+              className="px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold shadow-sm"
+            >
+              Google 로그인
+            </button>
           )}
         </div>
       </header>
@@ -1479,188 +1525,49 @@ export default function Page() {
 
         <section className="space-y-4">
           {cards.length === 0 ? (
-            (() => {
-              // 각 단계 완료 판정 — 진행 상황에 따라 체크·강조를 동적으로 그림
-              const step1Done = !!selectedBrandId
-              const step2Done = !!mode // 기본값이 'auto' 라 사실상 항상 완료 — 표시는 참고용
-              const step3Done =
-                mode === 'manual'
-                  ? manual.some((m) => m.title || m.body)
-                  : prompt.trim().length > 0
-              const step4Done = count > 0 && !!size
-              // "다음 할 일"은 첫 번째 미완료 단계 (step 1→5 순)
-              const nextStep = !step1Done
-                ? 1
-                : !step3Done
-                  ? 3
-                  : 5 // 2·4 는 기본값이 있어 유저가 건드릴 필요 없음
-              const steps = [
-                {
-                  n: 1,
-                  title: '브랜드 선택 또는 새로 만들기',
-                  desc: '우측 상단 🏷️ 배지 클릭 → 브랜드 만들기. 톤·색·폰트·지식노트가 여기서 설정됩니다.',
-                  icon: '🏷️',
-                  done: step1Done,
-                  action: (
-                    <button
-                      onClick={() =>
-                        openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
-                      }
-                      className="mt-2 px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
-                    >
-                      {selectedBrandId ? '브랜드 관리 열기 →' : '+ 브랜드 만들기'}
-                    </button>
-                  ),
-                },
-                {
-                  n: 2,
-                  title: '생성 방식 고르기',
-                  desc: '왼쪽 패널에서 ⚡자동 / ✍️수동 / ✨지식노트 중 하나. 처음엔 "자동" 이 쉬워요.',
-                  icon: '⚡',
-                  done: step2Done,
-                },
-                {
-                  n: 3,
-                  title: '프롬프트 쓰거나 예시 선택',
-                  desc: '"유순 제품 5월 1일 판매 시작" 처럼 상황을 한 문장으로. 아래 빠른 시작도 가능.',
-                  icon: '✍️',
-                  done: step3Done,
-                },
-                {
-                  n: 4,
-                  title: '사이즈·카드 수 조정',
-                  desc: '기본 정사각 1:1 · 3장. 인스타 피드는 4:5, 릴스/스토리는 9:16, 자유 비율은 배너 선택.',
-                  icon: '📐',
-                  done: step4Done,
-                },
-                {
-                  n: 5,
-                  title: '"카드 생성하기" 클릭',
-                  desc: '왼쪽 패널 맨 아래 큰 초록 버튼. 5~15초 내에 카드가 이 자리에 뜹니다.',
-                  icon: '✨',
-                  done: false,
-                },
-              ]
-              return (
-                <div className="bg-white rounded-xl border p-6 sm:p-8 space-y-6">
-                  <div>
-                    <div className="text-4xl mb-2">🎴</div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                      사용법 · 5단계로 따라하기
-                    </h2>
-                    <p className="mt-1.5 text-slate-600">
-                      처음이라도 1~2분이면 카드뉴스 한 벌이 완성됩니다. 아래 순서대로 진행해 보세요.
-                    </p>
-                  </div>
-
-                  {/* 5단계 가이드 */}
-                  <ol className="space-y-3">
-                    {steps.map((s) => {
-                      const isNext = s.n === nextStep
-                      return (
-                        <li
-                          key={s.n}
-                          className={`flex gap-3 rounded-xl border p-4 transition ${
-                            s.done
-                              ? 'border-teal-200 bg-teal-50/40'
-                              : isNext
-                                ? 'border-teal-400 bg-white shadow-sm ring-2 ring-teal-100'
-                                : 'border-slate-200 bg-white'
-                          }`}
-                        >
-                          <div
-                            className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold ${
-                              s.done
-                                ? 'bg-teal-600 text-white'
-                                : isNext
-                                  ? 'bg-teal-700 text-white'
-                                  : 'bg-slate-100 text-slate-500'
-                            }`}
-                            aria-hidden
-                          >
-                            {s.done ? '✓' : s.n}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-lg">{s.icon}</span>
-                              <h3 className="font-semibold text-slate-900">{s.title}</h3>
-                              {isNext && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-600 text-white font-semibold">
-                                  지금 할 일
-                                </span>
-                              )}
-                              {s.done && !isNext && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-semibold">
-                                  완료
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-1 text-sm text-slate-600 leading-relaxed">
-                              {s.desc}
-                            </p>
-                            {s.action}
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ol>
-
-                  {/* 빠른 시작 — Step 2~4 자동 */}
-                  <div className="border-t pt-5">
-                    <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-                      <h3 className="text-base font-bold text-slate-900">🚀 빠른 시작</h3>
-                      <span className="text-sm text-slate-500">
-                        클릭 한 번으로 Step 2~4 자동 설정
-                      </span>
-                    </div>
-                    <div className="grid sm:grid-cols-3 gap-2">
-                      {[
-                        {
-                          emoji: '🌿',
-                          label: '시니어 케어 하루',
-                          text: '시니어 돌봄 브랜드의 따뜻한 하루 일과 — 아침 산책, 영양 식단, 정서 프로그램을 가족에게 소개하는 5장',
-                          count: 5,
-                        },
-                        {
-                          emoji: '🍼',
-                          label: '임산부·영유아 케어',
-                          text: '임산부와 영유아를 위한 맞춤 케어 서비스 안내 — 주차별 건강 상담, 영양, 가족 참여 프로그램 4장',
-                          count: 4,
-                        },
-                        {
-                          emoji: '🚀',
-                          label: '신제품 온라인 판매',
-                          text: '브랜드 신제품의 온라인 판매 시작 안내 — 대표 제품, 혜택, 구매 유도까지 6장',
-                          count: 6,
-                        },
-                      ].map((ex) => (
-                        <button
-                          key={ex.label}
-                          onClick={() => {
-                            setMode('auto')
-                            setPrompt(ex.text)
-                            setCount(ex.count)
-                          }}
-                          className="text-left p-3 rounded-lg border border-slate-200 hover:border-teal-400 hover:bg-teal-50/40 transition"
-                        >
-                          <div className="text-2xl">{ex.emoji}</div>
-                          <div className="font-semibold text-slate-800 mt-1">{ex.label}</div>
-                          <div className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                            {ex.text}
-                          </div>
-                          <div className="text-xs text-teal-700 mt-2 font-semibold">
-                            {ex.count}장 · 자동 모드
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-3 leading-relaxed">
-                      클릭 후 왼쪽 패널 하단의 <strong className="text-teal-700">✨ 카드 생성하기</strong> 를 누르면 끝 · 브랜드 선택·사이즈 변경은 생성 전후 언제든 가능
-                    </p>
-                  </div>
+            <div className="bg-white rounded-xl border p-6 sm:p-8 space-y-5">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900">사용법</h2>
+                  <p className="mt-1.5 text-sm text-slate-600">
+                    아래 3단계만 하면 카드뉴스를 바로 만들 수 있어요.
+                  </p>
                 </div>
-              )
-            })()
+                <button
+                  onClick={() =>
+                    openBrandModal(selectedBrandId ? 'edit' : 'create', selectedBrandId || undefined)
+                  }
+                  className="px-3 py-1.5 text-sm rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium"
+                >
+                  {selectedBrandId ? '브랜드 관리' : '브랜드 만들기'}
+                </button>
+              </div>
+
+              <ol className="grid sm:grid-cols-3 gap-2">
+                <li className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
+                  <div className="text-xs font-semibold text-teal-700">STEP 1</div>
+                  <div className="mt-1 font-semibold text-slate-900">생성 방식 선택</div>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    왼쪽에서 자동/수동/지식노트를 고르세요.
+                  </p>
+                </li>
+                <li className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
+                  <div className="text-xs font-semibold text-teal-700">STEP 2</div>
+                  <div className="mt-1 font-semibold text-slate-900">프롬프트 입력</div>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    한 문장으로 목적만 적어도 충분합니다.
+                  </p>
+                </li>
+                <li className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
+                  <div className="text-xs font-semibold text-teal-700">STEP 3</div>
+                  <div className="mt-1 font-semibold text-slate-900">카드 생성 클릭</div>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    왼쪽 하단 버튼을 누르면 결과가 바로 표시됩니다.
+                  </p>
+                </li>
+              </ol>
+
+            </div>
           ) : (
             <>
               {/* 단계 6: 카드 리스트 / 현재 카드 선택 */}
@@ -1702,17 +1609,17 @@ export default function Page() {
                     </span>
                   </button>
                 ))}
-                {cards.length < 5 && (
+                {cards.length < 10 && (
                   <button
                     onClick={addCard}
                     className="flex-shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-slate-300 hover:border-teal-500 hover:text-teal-700 text-slate-400 flex items-center justify-center text-2xl transition"
-                    title="카드 추가 (최대 5장)"
+                    title="카드 추가 (최대 10장)"
                   >
                     ＋
                   </button>
                 )}
                 <span className="ml-auto text-xs text-slate-400 flex-shrink-0 pr-1">
-                  {cards.length} / 5
+                  {cards.length} / 10
                 </span>
               </div>
 
@@ -1747,14 +1654,14 @@ export default function Page() {
                     }}
                   />
                 ))}
-                {cards.length < 5 && (
+                {cards.length < 10 && (
                   <button
                     onClick={addCard}
                     className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 hover:border-teal-500 hover:text-teal-700 transition min-h-[360px]"
                   >
                     <div className="text-5xl mb-2 leading-none">＋</div>
                     <div className="text-sm">카드 추가</div>
-                    <div className="text-xs text-slate-400 mt-1">최대 5장</div>
+                    <div className="text-xs text-slate-400 mt-1">최대 10장</div>
                   </button>
                 )}
               </div>
@@ -2538,6 +2445,19 @@ export default function Page() {
           </div>
         )
       })()}
+
+      {/* 푸터 — 법적 링크 */}
+      <footer className="mt-16 pt-8 border-t text-sm text-slate-500 flex items-center justify-between flex-wrap gap-3">
+        <div>© 2026 Note2Card · 노트투카드</div>
+        <div className="flex items-center gap-4">
+          <a href="/terms" className="hover:text-slate-900 hover:underline">
+            이용약관
+          </a>
+          <a href="/privacy" className="hover:text-slate-900 hover:underline">
+            개인정보처리방침
+          </a>
+        </div>
+      </footer>
     </main>
   )
 }
