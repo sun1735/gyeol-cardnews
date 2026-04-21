@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { PrismaService } from '../prisma/prisma.service'
+import { CurrentUser } from '../auth/auth.guard'
+import type { AuthUser } from '../auth/auth.service'
+import { assertBrandOwnership } from '../auth/ownership'
 import { CreateImageDto } from './dto/create-image.dto'
 
 @ApiTags('knowledge')
@@ -20,9 +23,10 @@ export class KnowledgeImagesController {
 
   @Post()
   @ApiOperation({ summary: '브랜드 이미지 라이브러리 등록 (태그 달린 검색 대상)' })
-  async create(@Body() dto: CreateImageDto) {
+  async create(@Body() dto: CreateImageDto, @CurrentUser() user: AuthUser | null) {
     const brand = await this.prisma.brandProfile.findUnique({ where: { id: dto.brandId } })
     if (!brand) throw new BadRequestException('brandId 가 유효하지 않습니다')
+    await assertBrandOwnership(this.prisma, dto.brandId, user)
 
     const asset = await this.prisma.brandImageAsset.create({
       data: {
@@ -50,12 +54,14 @@ export class KnowledgeImagesController {
 
   @Delete(':id')
   @ApiOperation({ summary: '이미지 에셋 삭제 (디스크 파일은 남겨둠)' })
-  async remove(@Param('id') id: string) {
-    try {
-      await this.prisma.brandImageAsset.delete({ where: { id } })
-    } catch {
-      throw new NotFoundException('이미지를 찾을 수 없습니다')
-    }
+  async remove(@Param('id') id: string, @CurrentUser() user: AuthUser | null) {
+    const img = await this.prisma.brandImageAsset.findUnique({
+      where: { id },
+      select: { brandId: true },
+    })
+    if (!img) throw new NotFoundException('이미지를 찾을 수 없습니다')
+    await assertBrandOwnership(this.prisma, img.brandId, user)
+    await this.prisma.brandImageAsset.delete({ where: { id } })
     return { ok: true }
   }
 }

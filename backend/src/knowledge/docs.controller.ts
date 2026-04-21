@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { PrismaService } from '../prisma/prisma.service'
+import { CurrentUser } from '../auth/auth.guard'
+import type { AuthUser } from '../auth/auth.service'
+import { assertBrandOwnership } from '../auth/ownership'
 import { chunkText } from './chunker'
 import { CreateDocDto } from './dto/create-doc.dto'
 
@@ -21,9 +24,10 @@ export class KnowledgeDocsController {
 
   @Post()
   @ApiOperation({ summary: '브랜드 지식노트 문서 등록 (자동 청킹)' })
-  async create(@Body() dto: CreateDocDto) {
+  async create(@Body() dto: CreateDocDto, @CurrentUser() user: AuthUser | null) {
     const brand = await this.prisma.brandProfile.findUnique({ where: { id: dto.brandId } })
     if (!brand) throw new BadRequestException('brandId 가 유효하지 않습니다')
+    await assertBrandOwnership(this.prisma, dto.brandId, user)
 
     const chunks = chunkText(dto.contentText)
     if (!chunks.length) throw new BadRequestException('contentText 가 비어있습니다')
@@ -81,12 +85,14 @@ export class KnowledgeDocsController {
 
   @Delete(':id')
   @ApiOperation({ summary: '지식노트 문서 삭제 (청크 cascade)' })
-  async remove(@Param('id') id: string) {
-    try {
-      await this.prisma.brandKnowledgeDoc.delete({ where: { id } })
-    } catch {
-      throw new NotFoundException('문서를 찾을 수 없습니다')
-    }
+  async remove(@Param('id') id: string, @CurrentUser() user: AuthUser | null) {
+    const doc = await this.prisma.brandKnowledgeDoc.findUnique({
+      where: { id },
+      select: { brandId: true },
+    })
+    if (!doc) throw new NotFoundException('문서를 찾을 수 없습니다')
+    await assertBrandOwnership(this.prisma, doc.brandId, user)
+    await this.prisma.brandKnowledgeDoc.delete({ where: { id } })
     return { ok: true }
   }
 }

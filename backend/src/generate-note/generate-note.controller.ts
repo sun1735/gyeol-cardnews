@@ -1,13 +1,20 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
+import { CurrentUser } from '../auth/auth.guard'
+import type { AuthUser } from '../auth/auth.service'
+import { assertBrandOwnership } from '../auth/ownership'
+import { PrismaService } from '../prisma/prisma.service'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { GenerateNoteService } from './generate-note.service'
 
 @ApiTags('generate')
 @Controller('api/generate')
 export class GenerateNoteController {
-  constructor(private svc: GenerateNoteService) {}
+  constructor(
+    private svc: GenerateNoteService,
+    private prisma: PrismaService,
+  ) {}
 
   // RAG 카드 생성 = 텍스트 Gemini + (유저 선택 시) 카드별 이미지 편집 → 최대 10회 이미지 호출
   // 분당 5회, 시간당 30회로 빡세게
@@ -18,7 +25,8 @@ export class GenerateNoteController {
     description:
       '요청을 GenerationJob 으로 적재 후 jobId 반환. GET /api/generate/jobs/:id 로 진행 상태 폴링.',
   })
-  async start(@Body() dto: GenerateFromNoteDto) {
+  async start(@Body() dto: GenerateFromNoteDto, @CurrentUser() user: AuthUser | null) {
+    await assertBrandOwnership(this.prisma, dto.brandId, user)
     return this.svc.enqueue(dto)
   }
 

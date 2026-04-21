@@ -16,6 +16,9 @@ import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator'
 import { PrismaService } from '../prisma/prisma.service'
+import { CurrentUser } from '../auth/auth.guard'
+import type { AuthUser } from '../auth/auth.service'
+import { assertBrandOwnership } from '../auth/ownership'
 import { callGeminiJson } from '../generate/llm-gemini'
 
 export class RecommendIdeasDto {
@@ -48,19 +51,25 @@ export class RecommendController {
 
   @Delete('ideas/:id')
   @ApiOperation({ summary: '저장된 아이디어 삭제' })
-  async removeIdea(@Param('id') id: string) {
-    try {
-      await this.prisma.brandIdea.delete({ where: { id } })
-    } catch {
-      throw new NotFoundException('아이디어를 찾을 수 없습니다')
-    }
+  async removeIdea(@Param('id') id: string, @CurrentUser() user: AuthUser | null) {
+    const idea = await this.prisma.brandIdea.findUnique({
+      where: { id },
+      select: { brandId: true },
+    })
+    if (!idea) throw new NotFoundException('아이디어를 찾을 수 없습니다')
+    await assertBrandOwnership(this.prisma, idea.brandId, user)
+    await this.prisma.brandIdea.delete({ where: { id } })
     return { ok: true }
   }
 
   @Delete('ideas')
   @ApiOperation({ summary: '브랜드의 모든 저장 아이디어 일괄 삭제' })
-  async removeAllIdeas(@Query('brandId') brandId?: string) {
+  async removeAllIdeas(
+    @Query('brandId') brandId?: string,
+    @CurrentUser() user?: AuthUser | null,
+  ) {
     if (!brandId) throw new BadRequestException('brandId 쿼리 필수')
+    await assertBrandOwnership(this.prisma, brandId, user)
     const r = await this.prisma.brandIdea.deleteMany({ where: { brandId } })
     return { deleted: r.count }
   }
@@ -73,7 +82,7 @@ export class RecommendController {
     description:
       '브랜드 프로필 + 등록된 모든 지식노트 + 이미지 라이브러리 라벨/태그 를 Gemini 2.5 Flash 에 넘겨 카드뉴스 캠페인 후보를 생성하고, BrandIdea 테이블에 누적 저장한다. 반환 ideas[] 에는 id 가 포함되어 프런트가 바로 삭제 호출 가능.',
   })
-  async recommend(@Body() dto: RecommendIdeasDto) {
+  async recommend(@Body() dto: RecommendIdeasDto, @CurrentUser() user: AuthUser | null) {
     if (!process.env.GEMINI_API_KEY) {
       throw new HttpException(
         '아이디어 추천이 비활성화되어 있습니다 (GEMINI_API_KEY 미설정).',
@@ -83,6 +92,7 @@ export class RecommendController {
 
     const brand = await this.prisma.brandProfile.findUnique({ where: { id: dto.brandId } })
     if (!brand) throw new BadRequestException('brandId 가 유효하지 않습니다')
+    await assertBrandOwnership(this.prisma, dto.brandId, user)
 
     const [docs, images] = await Promise.all([
       this.prisma.brandKnowledgeDoc.findMany({

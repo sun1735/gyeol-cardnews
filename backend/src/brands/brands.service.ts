@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { assertBrandOwnership } from '../auth/ownership'
+import type { AuthUser } from '../auth/auth.service'
 
 @Injectable()
 export class BrandsService {
   constructor(private prisma: PrismaService) {}
 
   list() {
+    // 조회는 현재 전부 공개 — AUTH_MODE=enabled 전환 시점에 ownerId 필터 추가 고려
     return this.prisma.brandProfile.findMany({
       include: { assets: true },
       orderBy: { createdAt: 'desc' },
@@ -21,10 +24,12 @@ export class BrandsService {
     return brand
   }
 
-  create(data: any) {
+  async create(data: any, user: AuthUser | null | undefined) {
     const { assets = [], ...rest } = data ?? {}
     return this.prisma.brandProfile.create({
       data: {
+        // 토큰이 있으면 해당 유저를 owner 로 설정. 없으면 null (레거시)
+        ownerId: user?.id ?? null,
         name: String(rest.name ?? ''),
         tone: String(rest.tone ?? ''),
         defaultPhrase: String(rest.defaultPhrase ?? ''),
@@ -44,7 +49,8 @@ export class BrandsService {
     })
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, user: AuthUser | null | undefined) {
+    await assertBrandOwnership(this.prisma, id, user)
     const { assets, ...rest } = data ?? {}
     const updateData: Record<string, any> = {}
     for (const k of [
@@ -68,7 +74,8 @@ export class BrandsService {
     return this.get(id)
   }
 
-  async remove(id: string) {
+  async remove(id: string, user: AuthUser | null | undefined) {
+    await assertBrandOwnership(this.prisma, id, user)
     await this.prisma.brandProfile.delete({ where: { id } })
     return { ok: true }
   }

@@ -1531,12 +1531,55 @@ export default function Page() {
                 mode === 'manual'
                   ? manual.some((m) => m.title || m.body || m.subtext || m.cta)
                   : prompt.trim().length > 0
+              const modeGuide: Record<
+                GenMode,
+                {
+                  label: string
+                  helper: string
+                  step2Title: string
+                  step2Desc: string
+                  step2Example?: string
+                  step3Desc: string
+                }
+              > = {
+                auto: {
+                  label: '자동',
+                  helper: '한 줄 프롬프트로 카드 초안을 빠르게 만듭니다.',
+                  step2Title: '프롬프트 입력',
+                  step2Desc: '제품/행사/목적을 한 문장으로 입력하면 됩니다.',
+                  step2Example: '유순 제품 5월 1일 온라인 판매 시작, 인스타 피드 카드뉴스 5장',
+                  step3Desc: '생성 후 카드별 텍스트와 이미지를 필요에 맞게 수정해 마무리하세요.',
+                },
+                manual: {
+                  label: '수동',
+                  helper: '카드별 제목·본문을 직접 제어할 수 있습니다.',
+                  step2Title: '카드별 내용 입력',
+                  step2Desc: '왼쪽 수동 입력칸에 카드별 제목·본문·CTA를 입력하세요.',
+                  step3Desc:
+                    '생성 버튼을 누르면 입력한 내용 중심으로 카드가 만들어지고 빈 항목은 자동 보완됩니다.',
+                },
+                'note-rag': {
+                  label: '지식노트',
+                  helper: '브랜드 문서/이미지를 참고해 더 일관된 결과를 만듭니다.',
+                  step2Title: '프롬프트 + 지식노트 기반 입력',
+                  step2Desc:
+                    '브랜드를 선택한 뒤 프롬프트를 입력하면 지식노트 자료를 근거로 내용을 작성합니다.',
+                  step2Example: '유순 5월 프로모션 안내, 기존 브랜드 톤 유지, 인스타 피드 6장',
+                  step3Desc:
+                    '생성 완료까지 약간 더 걸릴 수 있으며, 완료 후 카드와 이미지를 그대로 편집할 수 있습니다.',
+                },
+              }
+              const activeGuide = modeGuide[mode]
               const readyCount = Number(step1Done) + Number(step2Done)
               const nextGuide = !step1Done
-                ? '브랜드를 먼저 선택하면 톤이 더 정확해집니다.'
+                ? mode === 'note-rag'
+                  ? '지식노트 모드는 브랜드 선택이 필수입니다.'
+                  : '브랜드를 먼저 선택하면 톤이 더 정확해집니다.'
                 : !step2Done
-                  ? '프롬프트 한 줄만 입력하면 준비 완료입니다.'
-                  : '왼쪽 하단의 카드 생성 버튼을 눌러주세요.'
+                  ? mode === 'manual'
+                    ? '수동 입력칸에 카드 내용 1개 이상 작성하면 준비 완료입니다.'
+                    : '프롬프트 한 줄만 입력하면 준비 완료입니다.'
+                  : `${activeGuide.label} 모드 준비 완료. 왼쪽 하단의 카드 생성 버튼을 눌러주세요.`
 
               const stepClass = (done: boolean) =>
                 done
@@ -1567,7 +1610,7 @@ export default function Page() {
                   </div>
 
                   <div className="text-xs text-slate-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5 leading-relaxed">
-                    처음에는 <strong>자동 모드 + 1:1 + 5장</strong> 조합을 권장합니다. 생성 후 카드별 텍스트와 이미지는 언제든 수정할 수 있어요.
+                    현재 생성 방식: <strong>{activeGuide.label}</strong> · {activeGuide.helper}
                   </div>
 
                   <ol className="space-y-2">
@@ -1581,23 +1624,23 @@ export default function Page() {
                     <li className={stepClass(step2Done)}>
                       <div className="text-xs text-teal-700 font-semibold">STEP 2 · 입력</div>
                       <div className="text-sm font-semibold text-slate-900 mt-0.5">
-                        생성 방식 선택 후 프롬프트 입력
+                        {activeGuide.step2Title}
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        예: 유순 제품 5월 1일 온라인 판매 시작, 인스타 피드용 카드뉴스 5장
+                        {activeGuide.step2Desc}
                       </p>
-                      <button
-                        onClick={() => {
-                          setMode('auto')
-                          setPrompt(
-                            '유순 제품 5월 1일 온라인 판매 시작, 인스타 피드용 카드뉴스 5장',
-                          )
-                          setCount(5)
-                        }}
-                        className="mt-2 px-2.5 py-1 text-xs rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
-                      >
-                        예시 문구 자동 입력
-                      </button>
+                      {activeGuide.step2Example && (
+                        <button
+                          onClick={() => {
+                            setPrompt(activeGuide.step2Example ?? '')
+                            if (mode === 'auto') setCount(5)
+                            if (mode === 'note-rag') setCount(6)
+                          }}
+                          className="mt-2 px-2.5 py-1 text-xs rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
+                        >
+                          예시 문구 자동 입력
+                        </button>
+                      )}
                     </li>
                     <li className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
                       <div className="text-xs text-teal-700 font-semibold">STEP 3 · 생성</div>
@@ -1605,7 +1648,7 @@ export default function Page() {
                         왼쪽 하단 `카드 생성하기` 클릭
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        생성 후 카드별로 텍스트/이미지 수정, PNG/ZIP/릴스 내보내기가 가능합니다.
+                        {activeGuide.step3Desc}
                       </p>
                     </li>
                   </ol>
