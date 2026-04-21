@@ -101,6 +101,49 @@ export default function Page() {
     error: string | null
   } | null>(null)
 
+  // 공용 다이얼로그 — 네이티브 confirm/alert 대체
+  type DialogVariant = 'default' | 'danger' | 'warning' | 'info' | 'success'
+  type DialogState =
+    | null
+    | {
+        type: 'alert' | 'confirm'
+        title: string
+        message: string
+        variant?: DialogVariant
+        confirmLabel?: string
+        cancelLabel?: string
+        resolve: (ok: boolean) => void
+      }
+  const [dialog, setDialog] = useState<DialogState>(null)
+
+  function openConfirm(opts: {
+    title: string
+    message: string
+    confirmLabel?: string
+    cancelLabel?: string
+    variant?: DialogVariant
+  }): Promise<boolean> {
+    return new Promise((resolve) => {
+      setDialog({ type: 'confirm', ...opts, resolve })
+    })
+  }
+
+  function openAlert(opts: {
+    title: string
+    message: string
+    variant?: DialogVariant
+    confirmLabel?: string
+  }): Promise<void> {
+    return new Promise((resolve) => {
+      setDialog({ type: 'alert', ...opts, resolve: () => resolve() })
+    })
+  }
+
+  function closeDialog(result: boolean) {
+    if (dialog) dialog.resolve(result)
+    setDialog(null)
+  }
+
   // 브랜드 관리 모달 (통합 — 기본정보·지식노트·이미지·아이디어 4탭)
   const [brandModalOpen, setBrandModalOpen] = useState(false)
   const [brandModalTab, setBrandModalTab] = useState<'info' | 'docs' | 'images' | 'ideas'>('info')
@@ -218,7 +261,11 @@ export default function Page() {
         await loadKnowledge(selectedBrandId)
       } else {
         const j = await r.json().catch(() => ({}))
-        alert(`문서 저장 실패: ${j?.message ?? r.status}`)
+        await openAlert({
+          title: '문서 저장 실패',
+          message: j?.message ?? `HTTP ${r.status}`,
+          variant: 'danger',
+        })
       }
     } finally {
       setDocSaving(false)
@@ -227,7 +274,13 @@ export default function Page() {
 
   async function deleteKnowledgeDoc(id: string) {
     if (!selectedBrandId) return
-    if (!confirm('이 문서를 삭제할까요? 관련 청크도 함께 삭제됩니다.')) return
+    const ok = await openConfirm({
+      title: '문서를 삭제할까요?',
+      message: '문서와 함께 관련 청크도 모두 삭제됩니다. 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      variant: 'danger',
+    })
+    if (!ok) return
     await fetch(`/api/knowledge/docs/${id}`, { method: 'DELETE' })
     await loadKnowledge(selectedBrandId)
   }
@@ -242,7 +295,11 @@ export default function Page() {
       fd.append('consent', 'true')
       const up = await fetch('/api/upload', { method: 'POST', body: fd }).then((r) => r.json())
       if (!up?.url) {
-        alert('업로드 실패')
+        await openAlert({
+          title: '업로드 실패',
+          message: '이미지 파일을 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          variant: 'danger',
+        })
         return
       }
       // 2) knowledge 이미지 에셋으로 등록
@@ -268,7 +325,11 @@ export default function Page() {
         await loadKnowledge(selectedBrandId)
       } else {
         const j = await r.json().catch(() => ({}))
-        alert(`이미지 등록 실패: ${j?.message ?? r.status}`)
+        await openAlert({
+          title: '이미지 등록 실패',
+          message: j?.message ?? `HTTP ${r.status}`,
+          variant: 'danger',
+        })
       }
     } finally {
       setImageUploading(false)
@@ -277,7 +338,13 @@ export default function Page() {
 
   async function deleteKnowledgeImage(id: string) {
     if (!selectedBrandId) return
-    if (!confirm('이 이미지 에셋을 라이브러리에서 제거할까요?')) return
+    const ok = await openConfirm({
+      title: '이미지를 제거할까요?',
+      message: '라이브러리에서 이미지를 제거합니다. 원본 파일은 남아있지만 이 브랜드에서는 더 이상 사용되지 않아요.',
+      confirmLabel: '제거',
+      variant: 'danger',
+    })
+    if (!ok) return
     await fetch(`/api/knowledge/images/${id}`, { method: 'DELETE' })
     await loadKnowledge(selectedBrandId)
   }
@@ -318,7 +385,13 @@ export default function Page() {
 
   async function deleteAllIdeas() {
     if (!selectedBrandId) return
-    if (!confirm(`저장된 아이디어 ${ideas.length}개를 모두 삭제할까요?`)) return
+    const ok = await openConfirm({
+      title: '모든 아이디어를 삭제할까요?',
+      message: `저장된 ${ideas.length}개의 아이디어가 모두 지워집니다. 다시 추천받을 수 있지만 같은 결과는 나오지 않을 수 있어요.`,
+      confirmLabel: `${ideas.length}개 전체 삭제`,
+      variant: 'danger',
+    })
+    if (!ok) return
     await fetch(`/api/knowledge/ideas?brandId=${selectedBrandId}`, { method: 'DELETE' })
     setIdeas([])
   }
@@ -502,7 +575,11 @@ export default function Page() {
   // 현재 카드의 imageUrl + 브랜드 스타일 + Mode A 참조 이미지를 근거로 새 배경 생성
   async function handleAiEdit(card: CardData): Promise<void> {
     if (!card.imageUrl) {
-      alert('먼저 이미지를 업로드하거나 배경을 선택해 주세요.')
+      await openAlert({
+        title: '이미지가 필요해요',
+        message: '편집할 원본 이미지가 없습니다. 먼저 이미지를 업로드하거나 배경을 선택해 주세요.',
+        variant: 'warning',
+      })
       return
     }
     const instruction = (card.body || '').slice(0, 200) // 카드 본문을 힌트로 전달 (선택적)
@@ -644,7 +721,11 @@ export default function Page() {
   // 단계 10: 9:16 MP4 릴스 내보내기
   async function exportReel() {
     if (cards.length < 2) {
-      alert('릴스 생성에는 최소 2장의 카드가 필요합니다.')
+      await openAlert({
+        title: '카드가 부족해요',
+        message: '릴스는 최소 2장의 카드가 필요합니다. 카드를 추가한 뒤 다시 시도해 주세요.',
+        variant: 'warning',
+      })
       return
     }
     setIsExportingReel(true)
@@ -695,7 +776,11 @@ export default function Page() {
       a.download = j.filename
       a.click()
     } catch (e: any) {
-      alert(`릴스 생성 실패: ${e?.message ?? e}`)
+      await openAlert({
+        title: '릴스 생성 실패',
+        message: String(e?.message ?? e),
+        variant: 'danger',
+      })
     } finally {
       if (needsSwitch) setSize(previousSize)
       setIsExportingReel(false)
@@ -761,7 +846,11 @@ export default function Page() {
 
   async function saveBrand() {
     if (!newBrand.name.trim()) {
-      alert('브랜드 이름을 입력해 주세요.')
+      await openAlert({
+        title: '브랜드 이름이 비어있어요',
+        message: '브랜드 이름은 필수입니다. 예: "유순", "Note2Card" 처럼 한 줄로 입력해 주세요.',
+        variant: 'warning',
+      })
       return
     }
     const isEdit = !!editingBrandId
@@ -773,7 +862,13 @@ export default function Page() {
       body: JSON.stringify(newBrand),
     })
     if (!res.ok) {
-      alert(isEdit ? '수정 실패' : '저장 실패 (같은 이름이 이미 있을 수 있어요)')
+      await openAlert({
+        title: isEdit ? '수정 실패' : '저장 실패',
+        message: isEdit
+          ? '브랜드 정보를 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+          : '같은 이름의 브랜드가 이미 있을 수 있습니다. 다른 이름으로 저장해 주세요.',
+        variant: 'danger',
+      })
       return
     }
     const j = await res.json().catch(() => ({}))
@@ -829,8 +924,14 @@ export default function Page() {
   }
 
   async function deleteBrand(id: string) {
-    if (!confirm('이 브랜드를 삭제할까요? 관련 지식노트·이미지 라이브러리·아이디어도 함께 삭제됩니다.'))
-      return
+    const ok = await openConfirm({
+      title: '이 브랜드를 영구 삭제할까요?',
+      message:
+        '브랜드와 함께 연결된 지식노트·이미지 라이브러리·아이디어가 모두 삭제됩니다. 되돌릴 수 없어요.',
+      confirmLabel: '영구 삭제',
+      variant: 'danger',
+    })
+    if (!ok) return
     await fetch(`/api/brands/${id}`, { method: 'DELETE' })
     if (selectedBrandId === id) {
       setSelectedBrandId('')
@@ -1635,7 +1736,15 @@ export default function Page() {
                     onDownload={() => downloadPng(c.id, idx)}
                     onMoveUp={() => moveCard(c.id, -1)}
                     onMoveDown={() => moveCard(c.id, 1)}
-                    onDelete={() => deleteCard(c.id)}
+                    onDelete={async () => {
+                      const ok = await openConfirm({
+                        title: '이 카드를 삭제할까요?',
+                        message: '카드 1장이 제거됩니다. 되돌릴 수 없어요.',
+                        confirmLabel: '삭제',
+                        variant: 'danger',
+                      })
+                      if (ok) deleteCard(c.id)
+                    }}
                   />
                 ))}
                 {cards.length < 5 && (
@@ -2210,6 +2319,95 @@ export default function Page() {
         </div>
       )}
 
+      {/* 공용 confirm/alert 다이얼로그 — 네이티브 팝업 대체 */}
+      {dialog && (() => {
+        const variant = dialog.variant ?? 'default'
+        const variantStyles: Record<
+          DialogVariant,
+          { icon: string; accent: string; button: string }
+        > = {
+          default: {
+            icon: '',
+            accent: 'bg-teal-100 text-teal-700',
+            button: 'bg-teal-700 hover:bg-teal-800 text-white',
+          },
+          danger: {
+            icon: '⚠️',
+            accent: 'bg-red-100 text-red-700',
+            button: 'bg-red-600 hover:bg-red-700 text-white',
+          },
+          warning: {
+            icon: '⚠',
+            accent: 'bg-amber-100 text-amber-800',
+            button: 'bg-amber-600 hover:bg-amber-700 text-white',
+          },
+          info: {
+            icon: 'ℹ️',
+            accent: 'bg-sky-100 text-sky-700',
+            button: 'bg-sky-700 hover:bg-sky-800 text-white',
+          },
+          success: {
+            icon: '✓',
+            accent: 'bg-emerald-100 text-emerald-700',
+            button: 'bg-emerald-700 hover:bg-emerald-800 text-white',
+          },
+        }
+        const vs = variantStyles[variant]
+        const isConfirm = dialog.type === 'confirm'
+        return (
+          <div
+            className="fixed inset-0 z-[70] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => isConfirm && closeDialog(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="p-6">
+                <div className="flex items-start gap-3">
+                  {vs.icon && (
+                    <div
+                      className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-xl ${vs.accent}`}
+                      aria-hidden
+                    >
+                      {vs.icon}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-slate-900 leading-tight">
+                      {dialog.title}
+                    </h3>
+                    <p className="mt-1.5 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                      {dialog.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-slate-50 border-t flex justify-end gap-2">
+                {isConfirm && (
+                  <button
+                    onClick={() => closeDialog(false)}
+                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-white"
+                    autoFocus={!isConfirm}
+                  >
+                    {dialog.cancelLabel ?? '취소'}
+                  </button>
+                )}
+                <button
+                  onClick={() => closeDialog(true)}
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold shadow-sm ${vs.button}`}
+                  autoFocus={!isConfirm || variant !== 'danger'}
+                >
+                  {dialog.confirmLabel ?? (isConfirm ? '확인' : '닫기')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* AI 이미지 생성 모달 — 촌스러운 window.prompt 대체 */}
       {aiGenDialog && (() => {
         const card = cards.find((c) => c.id === aiGenDialog.cardId)
@@ -2454,7 +2652,7 @@ function CardItem({
           <button
             onClick={(e) => {
               stop(e)
-              if (confirm('이 카드를 삭제할까요?')) onDelete()
+              onDelete()
             }}
             className="px-1.5 py-0.5 border rounded text-red-600 hover:bg-red-50"
             title="삭제"
