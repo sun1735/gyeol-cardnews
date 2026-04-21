@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, HttpException, HttpStatus, Logger, Post } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ReelsService } from './reels.service'
 import { GenerateReelDto } from './dto/generate-reel.dto'
@@ -6,6 +6,7 @@ import { GenerateReelDto } from './dto/generate-reel.dto'
 @ApiTags('reels')
 @Controller('api/reels')
 export class ReelsController {
+  private readonly logger = new Logger('ReelsController')
   constructor(private svc: ReelsService) {}
 
   @Post()
@@ -18,6 +19,16 @@ export class ReelsController {
     ].join(' '),
   })
   async generate(@Body() body: GenerateReelDto) {
-    return this.svc.generate(body)
+    try {
+      return await this.svc.generate(body)
+    } catch (e: any) {
+      const raw = e?.message ?? String(e)
+      this.logger.error(`릴스 생성 실패: ${raw}`)
+      const snippet = raw.slice(0, 600)
+      throw new HttpException(
+        { message: `릴스 생성 실패: ${snippet}` },
+        HttpStatus.BAD_GATEWAY,
+      )
+    }
   }
 }
