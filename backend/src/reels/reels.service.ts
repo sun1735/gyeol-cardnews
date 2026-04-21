@@ -4,9 +4,10 @@ import { mkdir, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-// 번들된 ffmpeg 바이너리 경로 (시스템 ffmpeg 설치 불필요)
+// ffmpeg-static — FFmpeg 6.x 번들. xfade 등 최신 필터 사용 가능.
+// 기존 @ffmpeg-installer/ffmpeg 은 4.2 버전이라 xfade 미지원 (2020+ 추가됨).
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ffmpegPath: string = require('@ffmpeg-installer/ffmpeg').path
+const ffmpegPath: string = require('ffmpeg-static') as string
 import { reelFilename } from '../shared/filename'
 import { GenerateReelDto } from './dto/generate-reel.dto'
 
@@ -113,7 +114,7 @@ export class ReelsService implements OnModuleInit {
       proc.on('error', (err) => reject(new Error(`ffmpeg 실행 실패: ${err.message}`)))
       proc.on('close', (code) => {
         if (code === 0) resolve()
-        else reject(new Error(`ffmpeg(${transitionLabel}) exit ${code}\n${stderrTail.slice(-800)}`))
+        else reject(new Error(`ffmpeg(${transitionLabel}) exit ${code}\n${stderrTail.slice(-1500)}`))
       })
     })
   }
