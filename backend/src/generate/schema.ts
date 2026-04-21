@@ -50,6 +50,13 @@ export const OPENAI_RESPONSE_FORMAT = {
   },
 }
 
+// "1 / 5", "3/10" 같이 페이지 번호만 있는 값은 깎아서 빈 문자열로.
+// cta/subtext 에 자주 섞여 들어와 이미지 위에 찍히는 걸 방지.
+const PAGE_NUMBER_ONLY = /^\s*\d+\s*\/\s*\d+\s*$/
+function stripPageNumber(s: string): string {
+  return PAGE_NUMBER_ONLY.test(s) ? '' : s
+}
+
 // 파싱 후 카드 1장 검증. 실패 시 null → 상위에서 재시도 또는 템플릿 폴백.
 // 길이 초과는 거절하지 않고 truncate — 모델이 조금 넘기는 게 빈도 높음.
 export function validateCard(raw: unknown): ValidatedCard | null {
@@ -58,8 +65,8 @@ export function validateCard(raw: unknown): ValidatedCard | null {
 
   const title = coerceString(r.title, CARD_LIMITS.title)
   const body = coerceString(r.body, CARD_LIMITS.body)
-  const subtext = coerceString(r.subtext, CARD_LIMITS.subtext) ?? ''
-  const cta = coerceString(r.cta, CARD_LIMITS.cta) ?? ''
+  const subtext = stripPageNumber(coerceString(r.subtext, CARD_LIMITS.subtext) ?? '')
+  const cta = stripPageNumber(coerceString(r.cta, CARD_LIMITS.cta) ?? '')
   const layout = (LAYOUTS as readonly string[]).includes(String(r.layout))
     ? (r.layout as Layout)
     : null

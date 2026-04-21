@@ -68,7 +68,7 @@ async function main() {
             title: '아침 산책',
             body: '햇살 좋은 정원에서 시작하는 느린 산책으로 하루를 엽니다.',
             subtext: '하루의 시작',
-            cta: '2 / 5',
+            cta: '',
             imageUrl: '/uploads/seed/yusoon-morning.svg',
           },
           {
@@ -76,7 +76,7 @@ async function main() {
             title: '영양 식단',
             body: '영양사가 함께 설계한 부드럽고 균형 잡힌 식사를 준비합니다.',
             subtext: '점심 · 저녁',
-            cta: '3 / 5',
+            cta: '',
             imageUrl: '/uploads/seed/yusoon-meal.svg',
           },
           {
@@ -84,7 +84,7 @@ async function main() {
             title: '정서 프로그램',
             body: '노래, 그림, 원예 등 취향에 맞춘 활동으로 오후를 채웁니다.',
             subtext: '오후 활동',
-            cta: '4 / 5',
+            cta: '',
             imageUrl: '/uploads/seed/yusoon-program.svg',
           },
           {

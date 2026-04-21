@@ -517,6 +517,7 @@ export class GenerateService {
       `규칙: 첫 카드 layout=cover, 마지막 layout=cta, 나머지 layout=content.`,
       `길이 상한: title ${CARD_LIMITS.title}자, body ${CARD_LIMITS.body}자, subtext ${CARD_LIMITS.subtext}자, cta ${CARD_LIMITS.cta}자.`,
       'subtext/cta 불필요 시 빈 문자열로 두고 필드는 반드시 포함.',
+      '❌ 절대 금지: cta 나 subtext 에 "1/5", "2/5" 같은 페이지 번호·순번 표시를 넣지 말 것.',
     ].join('\n')
 
     let anyTimedOut = false
@@ -609,6 +610,7 @@ export class GenerateService {
                 `규칙: 첫 카드 layout=cover, 마지막 layout=cta, 나머지 layout=content.`,
                 `길이 상한: title ${CARD_LIMITS.title}자, body ${CARD_LIMITS.body}자, subtext ${CARD_LIMITS.subtext}자, cta ${CARD_LIMITS.cta}자.`,
                 `subtext/cta 가 불필요한 카드는 빈 문자열("")로 두고 필드는 반드시 포함한다.`,
+                `❌ 절대 금지: cta 나 subtext 에 "1/5", "2/5", "3 / 5" 같은 페이지 번호·순번 표시를 넣지 말 것.`,
                 `일관성: 위 스타일 가이드의 팔레트/조명/구도/폰트 분위기를 모든 카드에 동일하게 반영한다.`,
               ].join('\n'),
             },

@@ -2415,6 +2415,12 @@ function CardItem({
   const ctaAlignSelf =
     align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
 
+  // 렌더 직전 페이지 번호 패턴(예: "1/5", "3 / 10") 숨김 — 이미지에 찍히는 것 방지
+  const isJustPageNumber = (s: string | undefined) =>
+    !!s && /^\s*\d+\s*\/\s*\d+\s*$/.test(s)
+  const renderedSubtext = isJustPageNumber(card.subtext) ? '' : card.subtext
+  const renderedCta = isJustPageNumber(card.cta) ? '' : card.cta
+
   const stop = (e: React.MouseEvent) => e.stopPropagation()
 
   return (
@@ -2529,7 +2535,7 @@ function CardItem({
               gap: Math.round(d.display * 0.018),
             }}
           >
-            {card.subtext && (
+            {renderedSubtext && (
               <div
                 style={{
                   fontSize: subtextSize,
@@ -2538,7 +2544,7 @@ function CardItem({
                   color: onImage ? '#e2e8f0' : primary,
                 }}
               >
-                {card.subtext}
+                {renderedSubtext}
               </div>
             )}
             <div
@@ -2564,7 +2570,7 @@ function CardItem({
                 {card.body}
               </div>
             )}
-            {card.cta && (
+            {renderedCta && (
               <div
                 style={{
                   alignSelf: ctaAlignSelf,
@@ -2577,7 +2583,7 @@ function CardItem({
                   borderRadius: Math.round(d.display * 0.015),
                 }}
               >
-                {card.cta}
+                {renderedCta}
               </div>
             )}
           </div>
