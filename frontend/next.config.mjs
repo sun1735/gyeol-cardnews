@@ -24,6 +24,8 @@ const nextConfig = {
       { source: `/api/${p}/:path*`, destination: `${API_ORIGIN}/api/${p}/:path*` },
     ])
     return [
+      // 일부 브라우저가 기본으로 /favicon.ico 를 요청하므로 내부 아이콘으로 매핑.
+      { source: '/favicon.ico', destination: '/icon.svg' },
       ...apiRewrites,
       { source: '/uploads/:path*', destination: `${API_ORIGIN}/uploads/:path*` },
       { source: '/health', destination: `${API_ORIGIN}/health` },

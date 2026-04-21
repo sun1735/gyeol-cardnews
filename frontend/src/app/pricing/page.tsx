@@ -25,7 +25,7 @@ interface PlanInfo {
 
 const PLAN_LABELS: Record<PlanKey, { name: string; sub: string; color: string; cta: string }> = {
   free: { name: 'Free', sub: '감탄하고 시작하기', color: 'slate', cta: '지금 시작' },
-  pro: { name: 'Pro', sub: '개인·소상공인 필수', color: 'teal', cta: 'Pro 업그레이드' },
+  pro: { name: 'Pro', sub: '개인·소상공인 필수', color: 'indigo', cta: 'Pro 업그레이드' },
   team: { name: 'Team', sub: '에이전시·팀 전용', color: 'violet', cta: 'Team 문의하기' },
 }
 
@@ -90,14 +90,14 @@ export default function PricingPage() {
   return (
     <main className="mx-auto max-w-5xl px-5 py-10">
       <div className="mb-6">
-        <Link href="/" className="text-sm text-teal-700 hover:underline">
+        <Link href="/" className="text-sm text-indigo-700 hover:underline">
           ← 홈으로
         </Link>
       </div>
 
       <div className="text-center mb-10">
         <h1 className="text-4xl font-black tracking-tight">
-          필요한 만큼만<span className="text-teal-700">.</span>
+          필요한 만큼만<span className="text-indigo-700">.</span>
         </h1>
         <p className="mt-3 text-slate-600 text-lg">
           카드 1장 만드는 데 드는 비용은 약 53원. 합리적인 가격으로 제공합니다.
@@ -120,7 +120,7 @@ export default function PricingPage() {
             }`}
           >
             연 결제
-            <span className="text-[10px] font-bold bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
               17% 할인
             </span>
           </button>
@@ -141,11 +141,11 @@ export default function PricingPage() {
               <div
                 key={p.key}
                 className={`rounded-2xl border p-6 bg-white flex flex-col ${
-                  isPro ? 'border-teal-400 shadow-lg ring-2 ring-teal-100 relative' : ''
+                  isPro ? 'border-indigo-400 shadow-lg ring-2 ring-indigo-100 relative' : ''
                 }`}
               >
                 {isPro && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-teal-700 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-700 text-white text-xs font-bold px-3 py-1 rounded-full">
                     가장 인기
                   </div>
                 )}
@@ -219,7 +219,7 @@ export default function PricingPage() {
                     }}
                     className={`w-full py-3 rounded-lg font-semibold text-white shadow-sm ${
                       isPro
-                        ? 'bg-teal-700 hover:bg-teal-800'
+                        ? 'bg-indigo-700 hover:bg-indigo-800'
                         : 'bg-violet-700 hover:bg-violet-800'
                     }`}
                   >

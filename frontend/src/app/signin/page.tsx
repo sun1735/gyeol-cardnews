@@ -3,21 +3,39 @@
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
 function SignInInner() {
   const sp = useSearchParams()
   const callbackUrl = sp.get('callbackUrl') ?? '/'
   const error = sp.get('error')
+  const [googleEnabled, setGoogleEnabled] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    fetch('/api/auth/providers')
+      .then((r) => r.json())
+      .then((providers) => {
+        if (!mounted) return
+        setGoogleEnabled(Boolean(providers?.google))
+      })
+      .catch(() => {
+        if (!mounted) return
+        setGoogleEnabled(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-50 px-5">
       <div className="bg-white rounded-2xl shadow-sm border p-8 max-w-sm w-full text-center">
-        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-teal-600 to-teal-800 flex items-center justify-center text-white font-black text-base shadow-sm">
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base shadow-sm">
           N2C
         </div>
         <h1 className="text-2xl font-black tracking-tight">
-          Note<span className="text-teal-700">2</span>Card
+          Note<span className="text-indigo-700">2</span>Card
         </h1>
         <p className="mt-1 text-slate-500 text-sm">로그인 후 카드뉴스를 만들어 보세요</p>
 
@@ -29,7 +47,8 @@ function SignInInner() {
 
         <button
           onClick={() => signIn('google', { callbackUrl })}
-          className="mt-6 w-full flex items-center justify-center gap-3 border border-slate-300 rounded-lg px-4 py-3 bg-white hover:bg-slate-50 font-semibold shadow-sm transition"
+          disabled={!googleEnabled}
+          className="mt-6 w-full flex items-center justify-center gap-3 border border-slate-300 rounded-lg px-4 py-3 bg-white hover:bg-slate-50 font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden>
             <path
@@ -51,14 +70,19 @@ function SignInInner() {
           </svg>
           Google 로 로그인
         </button>
+        {!googleEnabled && (
+          <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+            Google 로그인 설정이 비어 있습니다. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` 값을 확인하세요.
+          </p>
+        )}
 
         <p className="mt-5 text-xs text-slate-500 leading-relaxed">
           로그인 시{' '}
-          <Link href="/terms" className="text-teal-700 hover:underline">
+          <Link href="/terms" className="text-indigo-700 hover:underline">
             이용약관
           </Link>{' '}
           과{' '}
-          <Link href="/privacy" className="text-teal-700 hover:underline">
+          <Link href="/privacy" className="text-indigo-700 hover:underline">
             개인정보처리방침
           </Link>
           에 동의하는 것으로 간주됩니다.

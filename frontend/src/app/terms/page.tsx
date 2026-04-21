@@ -10,7 +10,7 @@ export default function TermsPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 prose prose-slate">
       <div className="mb-6">
-        <Link href="/" className="text-sm text-teal-700 hover:underline">
+        <Link href="/" className="text-sm text-indigo-700 hover:underline">
           ← 홈으로
         </Link>
       </div>
@@ -118,7 +118,7 @@ export default function TermsPage() {
           <h2 className="text-xl font-bold">제11조 (문의)</h2>
           <p>
             약관에 관한 문의는 서비스 운영자에게 문의해 주세요.{' '}
-            <Link href="/privacy" className="text-teal-700 hover:underline">
+            <Link href="/privacy" className="text-indigo-700 hover:underline">
               개인정보처리방침
             </Link>{' '}
             도 함께 확인하실 수 있습니다.

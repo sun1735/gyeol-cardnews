@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 prose prose-slate">
       <div className="mb-6">
-        <Link href="/" className="text-sm text-teal-700 hover:underline">
+        <Link href="/" className="text-sm text-indigo-700 hover:underline">
           ← 홈으로
         </Link>
       </div>
@@ -145,7 +145,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold">8. 개인정보 보호책임자</h2>
           <p>
             서비스 개인정보 보호책임자는 서비스 운영자입니다. 개인정보 관련 문의 및 불만은{' '}
-            <Link href="/terms" className="text-teal-700 hover:underline">
+            <Link href="/terms" className="text-indigo-700 hover:underline">
               이용약관
             </Link>{' '}
             에 명시된 방법으로 접수해 주세요.

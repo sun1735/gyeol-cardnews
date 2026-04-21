@@ -1048,7 +1048,7 @@ export default function Page() {
           {/* 로고 — 미니멀 N2C 마크 */}
           <div
             className="w-9 h-9 rounded-[10px] flex items-center justify-center text-white font-bold text-[11px] tracking-tight"
-            style={{ background: 'linear-gradient(145deg, #0e7c6b 0%, #0b3b35 100%)' }}
+            style={{ background: 'linear-gradient(145deg, #4338ca 0%, #312e81 100%)' }}
             aria-hidden
           >
             N2C
@@ -1314,7 +1314,7 @@ export default function Page() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
                         }}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 mt-1 focus:border-teal-500"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 mt-1 focus:border-indigo-500"
                       />
                     </label>
                   ))}
@@ -1630,7 +1630,7 @@ export default function Page() {
                       onClick={() => setReelImageQuality(q.value)}
                       className={`px-2 py-1.5 rounded-md text-xs border ${
                         reelImageQuality === q.value
-                          ? 'bg-teal-700 text-white border-teal-700'
+                          ? 'bg-indigo-700 text-white border-indigo-700'
                           : 'bg-white hover:bg-slate-50'
                       }`}
                     >
@@ -1671,7 +1671,7 @@ export default function Page() {
               </button>
 
               {reelStatus && (
-                <div className="text-xs text-teal-800 bg-teal-50 border border-teal-200 rounded-md px-3 py-2">
+                <div className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-md px-3 py-2">
                   {reelStatus}
                 </div>
               )}
@@ -1912,7 +1912,7 @@ export default function Page() {
                     }}
                     className={`relative flex-shrink-0 w-14 h-14 rounded-md border-2 overflow-hidden transition ${
                       selectedCardId === c.id
-                        ? 'border-teal-600 ring-2 ring-teal-200'
+                        ? 'border-indigo-600 ring-2 ring-indigo-200'
                         : 'border-slate-200 hover:border-slate-400'
                     }`}
                     title={c.title || `카드 ${i + 1}`}
@@ -1937,7 +1937,7 @@ export default function Page() {
                 {cards.length < 10 && (
                   <button
                     onClick={addCard}
-                    className="flex-shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-slate-300 hover:border-teal-500 hover:text-teal-700 text-slate-400 flex items-center justify-center text-2xl transition"
+                    className="flex-shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-slate-300 hover:border-indigo-500 hover:text-indigo-700 text-slate-400 flex items-center justify-center text-2xl transition"
                     title="카드 추가 (최대 10장)"
                   >
                     ＋
@@ -1982,7 +1982,7 @@ export default function Page() {
                 {cards.length < 10 && (
                   <button
                     onClick={addCard}
-                    className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 hover:border-teal-500 hover:text-teal-700 transition min-h-[360px]"
+                    className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-500 hover:text-indigo-700 transition min-h-[360px]"
                   >
                     <div className="text-5xl mb-2 leading-none">＋</div>
                     <div className="text-sm">카드 추가</div>
@@ -2033,7 +2033,7 @@ export default function Page() {
                 )}
                 <button
                   onClick={() => openBrandModal('create')}
-                  className="px-3 py-2 border border-teal-300 bg-teal-50 text-teal-800 rounded-lg font-medium hover:bg-teal-100 text-sm"
+                  className="px-3 py-2 border border-indigo-300 bg-indigo-50 text-indigo-800 rounded-lg font-medium hover:bg-indigo-100 text-sm"
                   title="새 브랜드 생성 모드"
                 >
                   + 새 브랜드
@@ -2067,7 +2067,7 @@ export default function Page() {
                     disabled={disabled}
                     className={`px-4 py-3 border-b-2 -mb-px transition flex items-center gap-2 shrink-0 ${
                       active
-                        ? 'border-teal-600 text-teal-700 font-semibold'
+                        ? 'border-indigo-600 text-indigo-700 font-semibold'
                         : disabled
                           ? 'border-transparent text-slate-300 cursor-not-allowed'
                           : 'border-transparent text-slate-600 hover:text-slate-900'
@@ -2078,7 +2078,7 @@ export default function Page() {
                     {t.count !== null && t.count > 0 && (
                       <span
                         className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${
-                          active ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-600'
+                          active ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-600'
                         }`}
                       >
                         {t.count}
@@ -2108,7 +2108,7 @@ export default function Page() {
                           브랜드 이름 <span className="text-red-500">*</span>
                         </span>
                         <input
-                          className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-teal-500"
+                          className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-indigo-500"
                           placeholder="예: 유순"
                           value={newBrand.name}
                           onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
@@ -2120,7 +2120,7 @@ export default function Page() {
                           LLM 이 카피 작성 시 참조
                         </span>
                         <input
-                          className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-teal-500"
+                          className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-indigo-500"
                           placeholder="예: 따뜻하고 진솔한 · 시니어·가족을 배려하는 안심감 있는 어조"
                           value={newBrand.tone}
                           onChange={(e) => setNewBrand({ ...newBrand, tone: e.target.value })}
@@ -2132,7 +2132,7 @@ export default function Page() {
                           cover/cta 카드에 자동 삽입
                         </span>
                         <input
-                          className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-teal-500"
+                          className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-indigo-500"
                           placeholder="예: 오늘도 평안한 하루"
                           value={newBrand.defaultPhrase}
                           onChange={(e) =>
@@ -2204,7 +2204,7 @@ export default function Page() {
                         CSS font-family 값
                       </span>
                       <input
-                        className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-teal-500"
+                        className="mt-1.5 w-full border border-slate-300 rounded-lg px-3 py-2.5 focus:border-indigo-500"
                         placeholder="예: Pretendard, Noto Sans KR, sans-serif"
                         value={newBrand.fontFamily}
                         onChange={(e) =>
@@ -2217,7 +2217,7 @@ export default function Page() {
                     <button
                       onClick={saveBrand}
                       disabled={!newBrand.name.trim()}
-                      className="w-full bg-teal-700 hover:bg-teal-800 text-white rounded-lg py-3 font-bold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg py-3 font-bold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {editingBrandId ? '✓ 변경 저장' : '+ 새 브랜드 저장'}
                     </button>
@@ -2293,19 +2293,19 @@ export default function Page() {
                         value={newDocTitle}
                         onChange={(e) => setNewDocTitle(e.target.value)}
                         placeholder="문서 제목 (예: 유순 브랜드 소개서)"
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white focus:border-teal-500"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white focus:border-indigo-500"
                       />
                       <textarea
                         value={newDocText}
                         onChange={(e) => setNewDocText(e.target.value)}
                         rows={6}
                         placeholder="본문 — 제품 설명, FAQ, 보도자료 등&#10;서버에서 자동으로 ~500자 단위 청크로 분할됩니다."
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white resize-y focus:border-teal-500"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white resize-y focus:border-indigo-500"
                       />
                       <button
                         onClick={createKnowledgeDoc}
                         disabled={docSaving || !newDocTitle.trim() || !newDocText.trim()}
-                        className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="px-4 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {docSaving ? '저장 중…' : '+ 문서 추가'}
                       </button>
@@ -2406,13 +2406,13 @@ export default function Page() {
                         value={newImageLabel}
                         onChange={(e) => setNewImageLabel(e.target.value)}
                         placeholder="라벨 (예: 유순 제품 메인컷)"
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white focus:border-teal-500"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white focus:border-indigo-500"
                       />
                       <input
                         value={newImageTags}
                         onChange={(e) => setNewImageTags(e.target.value)}
                         placeholder="태그 (쉼표·공백 구분, 예: 제품, 화이트배경, 패키지)"
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white focus:border-teal-500"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white focus:border-indigo-500"
                       />
                       <label
                         className={`block border-2 border-dashed border-violet-300 rounded-xl p-5 text-center cursor-pointer bg-white hover:bg-violet-50 transition ${
@@ -2535,7 +2535,7 @@ export default function Page() {
                             )}
                             <button
                               onClick={() => applyIdea(idea)}
-                              className="w-full px-3 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-sm font-semibold shadow-sm transition"
+                              className="w-full px-3 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-sm font-semibold shadow-sm transition"
                             >
                               이 아이디어로 카드 생성하기 →
                             </button>
@@ -2560,8 +2560,8 @@ export default function Page() {
         > = {
           default: {
             icon: '',
-            accent: 'bg-teal-100 text-teal-700',
-            button: 'bg-teal-700 hover:bg-teal-800 text-white',
+            accent: 'bg-indigo-100 text-indigo-700',
+            button: 'bg-indigo-700 hover:bg-indigo-800 text-white',
           },
           danger: {
             icon: '⚠️',
@@ -2776,7 +2776,7 @@ export default function Page() {
         <div className="flex items-center gap-2">
           <div
             className="w-5 h-5 rounded-md flex items-center justify-center text-white font-bold text-[8px]"
-            style={{ background: 'linear-gradient(145deg, #0e7c6b, #0b3b35)' }}
+            style={{ background: 'linear-gradient(145deg, #4338ca, #312e81)' }}
             aria-hidden
           >
             N2C
@@ -2883,7 +2883,7 @@ function CardItem({
       id={`card-item-${card.id}`}
       onClick={onSelect}
       className={`border rounded-xl bg-white p-3 space-y-2 transition cursor-pointer ${
-        selected ? 'ring-2 ring-teal-500 border-teal-400' : 'hover:border-slate-300'
+        selected ? 'ring-2 ring-indigo-500 border-indigo-400' : 'hover:border-slate-300'
       }`}
     >
       {/* 헤더: 순서 · 이동/삭제 · 레이아웃 선택 */}
@@ -3177,7 +3177,7 @@ function CardItem({
                 onChange={(e) =>
                   onChange({ textStyle: { ...ts, sizeScale: Number(e.target.value) } })
                 }
-                className="w-full accent-teal-600"
+                className="w-full accent-indigo-600"
               />
               <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
                 <span>작게</span>

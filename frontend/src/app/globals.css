@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* 브랜드 색 — 단일 체계. 기본 teal 계열을 더 깊은 톤으로 */
+  /* 브랜드 색 — 단일 체계. 깊이감 있는 인디고(#4338ca) 사용 */
   --n2c-ink: #0b1220;
   --n2c-ink-muted: #475467;
   --n2c-ink-subtle: #667085;
@@ -11,9 +11,9 @@
   --n2c-surface: #ffffff;
   --n2c-border: #e5e7eb;
   --n2c-border-soft: #eef0f3;
-  --n2c-primary: #0e7c6b;
-  --n2c-primary-hover: #0b6456;
-  --n2c-primary-soft: #e7f5f2;
+  --n2c-primary: #4338ca;
+  --n2c-primary-hover: #3730a3;
+  --n2c-primary-soft: #eef2ff;
 }
 
 html, body {
@@ -37,7 +37,7 @@ h1, h2, h3, h4 {
 
 /* 포커스 링 — 키보드 사용자 */
 :focus-visible {
-  outline: 2px solid rgb(14 124 107 / 0.4);
+  outline: 2px solid rgb(67 56 202 / 0.4);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -45,7 +45,7 @@ button:focus-visible,
 select:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgb(14 124 107 / 0.4);
+  outline: 2px solid rgb(67 56 202 / 0.4);
   outline-offset: 1px;
 }
 
@@ -56,7 +56,7 @@ textarea:focus-visible {
 
 /* 선택 영역 색상 */
 ::selection {
-  background: rgb(14 124 107 / 0.15);
+  background: rgb(67 56 202 / 0.15);
 }
 
 /* 부드러운 스크롤바 */
@@ -68,7 +68,7 @@ textarea:focus-visible {
 *::-webkit-scrollbar-thumb { background: rgb(203 213 225); border-radius: 4px; }
 *::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184); }
 
-/* primary 버튼 — 깊이감 있는 teal */
+/* primary 버튼 — 깊이감 있는 인디고 */
 .n2c-btn-primary {
   background: var(--n2c-primary);
   color: white;
@@ -97,7 +97,7 @@ textarea:focus-visible {
 .n2c-input:focus {
   outline: none;
   border-color: var(--n2c-primary);
-  box-shadow: 0 0 0 3px rgb(14 124 107 / 0.1);
+  box-shadow: 0 0 0 3px rgb(67 56 202 / 0.1);
 }
 
 /* 보조 뱃지 — 색 없이 은은하게 */
