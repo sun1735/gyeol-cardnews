@@ -83,6 +83,9 @@ export default function Page() {
   const [mode, setMode] = useState<GenMode>('auto')
   const [size, setSize] = useState<SizePreset>('1:1')
   const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
+  // 가로·세로 타이핑 드래프트 — 입력 중에는 clamp 하지 않아 숫자를 자유롭게 타이핑할 수 있다.
+  // 커밋(blur 또는 Enter) 시 200~4000 범위로 클램프해서 customSize 에 반영.
+  const [customInput, setCustomInput] = useState<{ w: string; h: string }>({ w: '1080', h: '1080' })
   const [count, setCount] = useState(3)
   const [prompt, setPrompt] = useState('')
   const [baseImages, setBaseImages] = useState<string[]>([]) // Mode A — 공통 참조 이미지 1~3장
@@ -955,40 +958,40 @@ export default function Page() {
               </div>
               {size === 'custom' ? (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="text-xs font-medium text-slate-600">가로 (px)</span>
-                    <input
-                      type="number"
-                      min={200}
-                      max={4000}
-                      value={customSize.w}
-                      onChange={(e) =>
-                        setCustomSize((s) => ({
-                          ...s,
-                          w: Math.max(200, Math.min(4000, Number(e.target.value) || 1080)),
-                        }))
-                      }
-                      className="w-full border rounded-lg px-3 py-2 mt-1"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-medium text-slate-600">세로 (px)</span>
-                    <input
-                      type="number"
-                      min={200}
-                      max={4000}
-                      value={customSize.h}
-                      onChange={(e) =>
-                        setCustomSize((s) => ({
-                          ...s,
-                          h: Math.max(200, Math.min(4000, Number(e.target.value) || 1080)),
-                        }))
-                      }
-                      className="w-full border rounded-lg px-3 py-2 mt-1"
-                    />
-                  </label>
+                  {(
+                    [
+                      { dim: 'w' as const, label: '가로 (px)' },
+                      { dim: 'h' as const, label: '세로 (px)' },
+                    ]
+                  ).map(({ dim, label }) => (
+                    <label key={dim} className="block">
+                      <span className="text-xs font-medium text-slate-600">{label}</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={200}
+                        max={4000}
+                        value={customInput[dim]}
+                        onChange={(e) =>
+                          setCustomInput((p) => ({ ...p, [dim]: e.target.value }))
+                        }
+                        onBlur={(e) => {
+                          const parsed = parseInt(e.target.value, 10)
+                          const clamped = Number.isFinite(parsed)
+                            ? Math.max(200, Math.min(4000, parsed))
+                            : customSize[dim]
+                          setCustomSize((s) => ({ ...s, [dim]: clamped }))
+                          setCustomInput((p) => ({ ...p, [dim]: String(clamped) }))
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                        }}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 mt-1 focus:border-teal-500"
+                      />
+                    </label>
+                  ))}
                   <p className="col-span-2 text-xs text-amber-700 mt-1">
-                    배너/자유 사이즈는 이미지 1장만 생성됩니다.
+                    200~4000px · Enter 또는 바깥 클릭 시 확정됩니다. 배너는 이미지 1장 고정.
                   </p>
                 </div>
               ) : (
