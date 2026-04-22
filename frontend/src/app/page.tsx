@@ -3098,7 +3098,7 @@ function CardItem({
           <div id={`card-${card.id}`}>
             <PromoCard
               title={card.title}
-              subtitle={card.subtext || card.body}
+              subtitle={card.productAd?.subtitle ?? card.subtext ?? card.body}
               discountPercent={card.productAd?.discountPercent}
               deadlineText={card.productAd?.deadlineText}
               ctaLabel={card.productAd?.ctaLabel ?? card.cta}
@@ -3243,22 +3243,52 @@ function CardItem({
         onClick={stop}
         placeholder="본문 (body)"
       />
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          className="border rounded-md px-2 py-1 text-sm"
-          value={card.subtext}
-          onChange={(e) => onChange({ subtext: e.target.value })}
-          onClick={stop}
-          placeholder="서브텍스트 (subtext)"
-        />
-        <input
-          className="border rounded-md px-2 py-1 text-sm"
-          value={card.cta}
-          onChange={(e) => onChange({ cta: e.target.value })}
-          onClick={stop}
-          placeholder="CTA"
-        />
-      </div>
+      {/* subtext·cta — 기본 템플릿은 card.subtext/cta 에 직접 바인딩,
+          상품광고·프로모션은 프리뷰가 productAd.subtitle/ctaLabel 을 우선 참조하므로 그쪽에 바인딩해
+          "인풋을 바꿨는데 프리뷰가 그대로" 같은 UX 혼란을 없앰. */}
+      {card.template === 'product-ad' || card.template === 'promo' ? (
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            className="border rounded-md px-2 py-1 text-sm"
+            value={card.productAd?.subtitle ?? ''}
+            onChange={(e) =>
+              onChange({
+                productAd: { ...(card.productAd ?? {}), subtitle: e.target.value },
+              })
+            }
+            onClick={stop}
+            placeholder="서브타이틀"
+          />
+          <input
+            className="border rounded-md px-2 py-1 text-sm"
+            value={card.productAd?.ctaLabel ?? ''}
+            onChange={(e) =>
+              onChange({
+                productAd: { ...(card.productAd ?? {}), ctaLabel: e.target.value },
+              })
+            }
+            onClick={stop}
+            placeholder="CTA 라벨"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            className="border rounded-md px-2 py-1 text-sm"
+            value={card.subtext}
+            onChange={(e) => onChange({ subtext: e.target.value })}
+            onClick={stop}
+            placeholder="서브텍스트 (subtext)"
+          />
+          <input
+            className="border rounded-md px-2 py-1 text-sm"
+            value={card.cta}
+            onChange={(e) => onChange({ cta: e.target.value })}
+            onClick={stop}
+            placeholder="CTA"
+          />
+        </div>
+      )}
 
       {/* 상품 광고 / 프로모션 전용 필드 인라인 편집 */}
       {(card.template === 'product-ad' || card.template === 'promo') && (
@@ -3269,36 +3299,21 @@ function CardItem({
           <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">
             {card.template === 'promo' ? '프로모션 필드' : '상품 광고 필드'}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="block text-[10px] text-slate-500 mb-0.5">뱃지</span>
-              <input
-                className="w-full border rounded-md px-2 py-1 text-xs"
-                value={card.productAd?.badgeLabel ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    productAd: { ...(card.productAd ?? {}), badgeLabel: e.target.value },
-                  })
-                }
-                placeholder="BEST SELLER"
-                maxLength={20}
-              />
-            </label>
-            <label className="block">
-              <span className="block text-[10px] text-slate-500 mb-0.5">CTA 라벨</span>
-              <input
-                className="w-full border rounded-md px-2 py-1 text-xs"
-                value={card.productAd?.ctaLabel ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    productAd: { ...(card.productAd ?? {}), ctaLabel: e.target.value },
-                  })
-                }
-                placeholder="지금 구매 →"
-                maxLength={20}
-              />
-            </label>
-          </div>
+          {/* 뱃지 — CTA 라벨은 상단 subtext/cta 자리에서 편집 */}
+          <label className="block">
+            <span className="block text-[10px] text-slate-500 mb-0.5">뱃지</span>
+            <input
+              className="w-full border rounded-md px-2 py-1 text-xs"
+              value={card.productAd?.badgeLabel ?? ''}
+              onChange={(e) =>
+                onChange({
+                  productAd: { ...(card.productAd ?? {}), badgeLabel: e.target.value },
+                })
+              }
+              placeholder="BEST SELLER"
+              maxLength={20}
+            />
+          </label>
           <div className="grid grid-cols-3 gap-2">
             <label className="block">
               <span className="block text-[10px] text-slate-500 mb-0.5">원가(₩)</span>
