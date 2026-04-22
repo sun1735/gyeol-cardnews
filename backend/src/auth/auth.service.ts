@@ -6,6 +6,18 @@ export interface AuthUser {
   id: string
   email: string
   name?: string
+  role?: string
+}
+
+// ADMIN_EMAILS 환경변수에 나열된 이메일은 verify 시 자동으로 role='admin' 승격.
+function isAdminEmail(email: string): boolean {
+  const raw = (process.env.ADMIN_EMAILS ?? '').trim()
+  if (!raw) return false
+  return raw
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((s) => s.toLowerCase())
+    .includes(email.toLowerCase())
 }
 
 @Injectable()
@@ -31,12 +43,22 @@ export class AuthService {
       const name = typeof payload.name === 'string' ? payload.name : ''
       const picture = typeof payload.picture === 'string' ? payload.picture : ''
       // upsert (이메일 기준)
+      const shouldBeAdmin = isAdminEmail(email)
       const user = await this.prisma.user.upsert({
         where: { email },
-        update: { name, imageUrl: picture },
-        create: { email, name, imageUrl: picture },
+        update: {
+          name,
+          imageUrl: picture,
+          ...(shouldBeAdmin ? { role: 'admin' } : {}),
+        },
+        create: {
+          email,
+          name,
+          imageUrl: picture,
+          role: shouldBeAdmin ? 'admin' : 'user',
+        },
       })
-      return { id: user.id, email: user.email, name: user.name }
+      return { id: user.id, email: user.email, name: user.name, role: user.role }
     } catch (e: any) {
       this.logger.warn(`JWT 검증 실패: ${e?.message ?? e}`)
       return null

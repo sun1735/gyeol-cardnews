@@ -17,6 +17,7 @@ import { KnowledgeModule } from './knowledge/knowledge.module'
 import { GenerateNoteModule } from './generate-note/generate-note.module'
 import { AuthModule } from './auth/auth.module'
 import { QuotaModule } from './quota/quota.module'
+import { AdminModule } from './admin/admin.module'
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { QuotaModule } from './quota/quota.module'
     ImagesModule,
     KnowledgeModule,
     GenerateNoteModule,
+    AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

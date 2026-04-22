@@ -7,12 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 사용자 — Google OAuth 식별자(이메일)로 로그인. 브랜드 소유·접근 제어 + 플랜 주체.
+// 사용자 — 이메일 + 비밀번호(해시) 또는 소셜 로그인(Google/Kakao/Naver). 브랜드 소유·접근 제어 + 플랜 주체.
 model User {
   id             String         @id @default(cuid())
   email          String         @unique
   name           String         @default("")
   imageUrl       String         @default("")
+  // 비밀번호 해시 (bcrypt). 소셜 로그인 유저는 null.
+  passwordHash   String?
+  // 권한: user | admin
+  role           String         @default("user")
   // 플랜: free | pro | team
   plan           String         @default("free")
   planStartedAt  DateTime?

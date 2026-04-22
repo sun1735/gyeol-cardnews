@@ -5,9 +5,11 @@ import NaverProvider from 'next-auth/providers/naver'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import * as jwt from 'jsonwebtoken'
 
-// NextAuth v4 — Google·Kakao·Naver 간편 로그인.
+// NextAuth v4 — Google·Kakao·Naver 간편 로그인 + 이메일·비밀번호.
 // 세션은 JWT 전략. 백엔드(NestJS) 가 공유 NEXTAUTH_SECRET 으로 검증할 HS256 API 토큰을
 // session.apiToken 으로 노출.
+
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:4000'
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim()
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim()
@@ -23,6 +25,41 @@ const authSecret =
   'note2card-dev-secret-change-in-production'
 
 const providers: NextAuthOptions['providers'] = []
+
+// 이메일·비밀번호 로그인은 항상 활성화. 검증은 백엔드 /api/auth/verify 로 위임.
+providers.push(
+  CredentialsProvider({
+    id: 'credentials',
+    name: '이메일 로그인',
+    credentials: {
+      email: { label: '이메일', type: 'email' },
+      password: { label: '비밀번호', type: 'password' },
+    },
+    async authorize(credentials) {
+      const email = credentials?.email?.trim().toLowerCase()
+      const password = credentials?.password
+      if (!email || !password) return null
+      try {
+        const resp = await fetch(`${API_ORIGIN}/api/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        if (!resp.ok) return null
+        const user = await resp.json()
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name || '',
+          image: user.image || '',
+          role: user.role || 'user',
+        } as any
+      } catch {
+        return null
+      }
+    },
+  }),
+)
 if (googleClientId && googleClientSecret) {
   providers.push(
     GoogleProvider({
@@ -47,20 +84,6 @@ if (naverClientId && naverClientSecret) {
     }),
   )
 }
-if (providers.length === 0) {
-  // OAuth 전부 미설정 시 /api/auth/session 500 방지용 더미
-  providers.push(
-    CredentialsProvider({
-      id: 'disabled',
-      name: 'Login disabled',
-      credentials: {},
-      async authorize() {
-        return null
-      },
-    }),
-  )
-}
-
 export const authOptions: NextAuthOptions = {
   providers,
   secret: authSecret,
@@ -80,8 +103,12 @@ export const authOptions: NextAuthOptions = {
       } else if (user && !token.email) {
         if (user.email) token.email = user.email
         if (user.name) token.name = user.name
-        if (user.image) token.picture = user.image
+        if ((user as any).image) token.picture = (user as any).image
+        // Credentials 로그인 시 provider 기록
+        if (account?.provider) token.authProvider = account.provider
       }
+      // Credentials authorize 가 role 을 넘기면 보존
+      if ((user as any)?.role) (token as any).role = (user as any).role
       return token
     },
     async session({ session, token }) {
@@ -99,6 +126,8 @@ export const authOptions: NextAuthOptions = {
         )
         ;(session as any).apiToken = apiToken
         ;(session as any).provider = (token as any).authProvider
+        // 관리자 여부는 세션에 노출해 프런트 가드/메뉴 판정
+        if ((token as any).role) (session as any).role = (token as any).role
         // user 객체도 정규화 (카카오/네이버의 경우 NextAuth 기본 user 가 미채워질 때 대비)
         if (session.user) {
           if (!session.user.email && typeof token.email === 'string') session.user.email = token.email

@@ -1164,6 +1164,15 @@ export default function Page() {
           {/* 인증 */}
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
+              {(session as any)?.role === 'admin' && (
+                <a
+                  href="/admin"
+                  className="text-[12px] font-medium px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition"
+                  title="관리자"
+                >
+                  관리자
+                </a>
+              )}
               {session?.user?.image && (
                 <img
                   src={session.user.image}
