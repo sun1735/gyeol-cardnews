@@ -109,6 +109,27 @@ export const authOptions: NextAuthOptions = {
       }
       // Credentials authorize 가 role 을 넘기면 보존
       if ((user as any)?.role) (token as any).role = (user as any).role
+
+      // OAuth 로그인 직후 role 이 비면 백엔드 /api/account/me 로 조회.
+      // ADMIN_EMAILS 환경변수가 백엔드에 설정되어 있으면 verifyAndUpsert 가 자동 admin 승격.
+      if (account && token.email && !(token as any).role) {
+        try {
+          const apiToken = jwt.sign(
+            { email: token.email, name: token.name ?? '', picture: token.picture ?? '' },
+            authSecret,
+            { algorithm: 'HS256', expiresIn: '5m' },
+          )
+          const resp = await fetch(`${API_ORIGIN}/api/account/me`, {
+            headers: { Authorization: `Bearer ${apiToken}` },
+          })
+          if (resp.ok) {
+            const me = await resp.json().catch(() => null)
+            if (me?.role) (token as any).role = me.role
+          }
+        } catch {
+          // 실패해도 로그인 자체는 진행. admin 링크만 안 보일 뿐.
+        }
+      }
       return token
     },
     async session({ session, token }) {

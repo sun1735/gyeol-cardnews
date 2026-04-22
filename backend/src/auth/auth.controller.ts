@@ -1,14 +1,17 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpException,
   HttpStatus,
   Post,
+  UnauthorizedException,
 } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
 import { PrismaService } from '../prisma/prisma.service'
-import { Public } from './auth.guard'
+import { CurrentUser, Public } from './auth.guard'
+import { AuthUser } from './auth.service'
 
 // 이메일·비밀번호 인증 엔드포인트.
 // 프론트 Next.js 에서 호출 — CredentialsProvider.authorize() 와 /signup 플로우.
@@ -38,12 +41,13 @@ function isAdminEmail(email: string): boolean {
 }
 
 // 경로가 NextAuth /api/auth/* 와 충돌하지 않도록 account 네임스페이스 사용.
-@Public()
+// register/verify 는 Public, me 는 AuthGuard 필요.
 @Controller('api/account')
 export class AuthController {
   constructor(private prisma: PrismaService) {}
 
   // 회원가입. 비밀번호 해시 후 User 생성. 중복 이메일은 409.
+  @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto) {
@@ -82,6 +86,7 @@ export class AuthController {
 
   // 로그인 검증. CredentialsProvider.authorize() 에서 호출.
   // 성공 시 user 객체 반환, 실패 시 401.
+  @Public()
   @Post('verify')
   @HttpCode(HttpStatus.OK)
   async verify(@Body() dto: VerifyDto) {
@@ -113,5 +118,18 @@ export class AuthController {
       image: user.imageUrl,
       role: user.role,
     }
+  }
+
+  // 현재 로그인 유저의 role·plan 조회. AuthGuard 가 req.user 를 채우고 ADMIN_EMAILS 자동 승격.
+  // NextAuth jwt 콜백이 OAuth 첫 로그인 직후 호출해 role 을 세션에 반영.
+  @Get('me')
+  async me(@CurrentUser() user: AuthUser | null) {
+    if (!user) throw new UnauthorizedException('로그인이 필요합니다')
+    const row = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { email: true, name: true, role: true, plan: true, imageUrl: true },
+    })
+    if (!row) throw new UnauthorizedException()
+    return row
   }
 }
