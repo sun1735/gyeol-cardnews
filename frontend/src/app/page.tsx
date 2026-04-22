@@ -1227,7 +1227,7 @@ export default function Page() {
           <div className="n2c-card p-6 space-y-5">
             {/* 모드 선택 */}
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-3">
+              <div className="text-[13px] font-bold text-slate-700 uppercase tracking-[0.08em] mb-3">
                 생성 방식
               </div>
               <div className="space-y-1.5">
@@ -1250,12 +1250,12 @@ export default function Page() {
                       }`}
                     >
                       <span className="flex-1">
-                        <span className="block text-[14px] font-semibold tracking-[-0.01em]">
+                        <span className="block text-[16px] font-bold tracking-[-0.01em]">
                           {m.title}
                         </span>
                         <span
-                          className={`block text-[12px] mt-0.5 ${
-                            active ? 'text-indigo-700/80' : 'text-slate-500'
+                          className={`block text-[13px] mt-1 font-medium ${
+                            active ? 'text-indigo-700' : 'text-slate-600'
                           }`}
                         >
                           {m.desc}
@@ -1287,7 +1287,7 @@ export default function Page() {
 
             {/* 템플릿 선택 — 기본 / 상품 광고 / 프로모션 */}
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-3">
+              <div className="text-[13px] font-bold text-slate-700 uppercase tracking-[0.08em] mb-3">
                 카드 템플릿
               </div>
               <div className="grid grid-cols-3 gap-1.5">
@@ -1306,12 +1306,12 @@ export default function Page() {
                           : 'text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200'
                       }`}
                     >
-                      <span className="block text-[13px] font-semibold tracking-[-0.01em]">
+                      <span className="block text-[15px] font-bold tracking-[-0.01em]">
                         {t.title}
                       </span>
                       <span
-                        className={`block text-[11px] mt-0.5 ${
-                          active ? 'text-indigo-700/80' : 'text-slate-500'
+                        className={`block text-[12px] mt-0.5 font-medium ${
+                          active ? 'text-indigo-700' : 'text-slate-600'
                         }`}
                       >
                         {desc}
@@ -1321,12 +1321,12 @@ export default function Page() {
                 })}
               </div>
               {template === 'product-ad' && (
-                <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                <p className="mt-2.5 text-[13px] text-slate-600 leading-relaxed">
                   배경은 <b>텍스트 없음</b>으로 생성, 가격·할인·기능 아이콘은 화면 위에서 합성됩니다. 4:5 권장.
                 </p>
               )}
               {template === 'promo' && (
-                <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                <p className="mt-2.5 text-[13px] text-slate-600 leading-relaxed">
                   중앙 대형 할인율 + 기간 문구 중심 레이아웃. 1:1 정사각을 권장합니다.
                 </p>
               )}
@@ -1345,7 +1345,7 @@ export default function Page() {
             )}
 
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-3">
+              <div className="text-[13px] font-bold text-slate-700 uppercase tracking-[0.08em] mb-3">
                 사이즈
               </div>
               <div className="grid grid-cols-2 gap-1.5">
@@ -1366,20 +1366,20 @@ export default function Page() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[14px] font-semibold tabular-nums">
+                        <span className="text-[16px] font-bold tabular-nums">
                           {isCustom ? '배너' : p}
                         </span>
                         <span
-                          className={`text-[11px] tabular-nums ${
-                            active ? 'text-indigo-500' : 'text-slate-400'
+                          className={`text-[12px] tabular-nums font-medium ${
+                            active ? 'text-indigo-600' : 'text-slate-500'
                           }`}
                         >
                           {SIZE_SUBLABELS[p]}
                         </span>
                       </div>
                       <div
-                        className={`text-[11px] mt-0.5 ${
-                          active ? 'text-indigo-700/80' : 'text-slate-500'
+                        className={`text-[13px] mt-1 font-medium ${
+                          active ? 'text-indigo-700' : 'text-slate-600'
                         }`}
                       >
                         {SIZE_LABELS[p]}
@@ -1427,7 +1427,7 @@ export default function Page() {
                   </p>
                 </div>
               ) : (
-                <p className="text-[12px] text-slate-500 mt-2.5">
+                <p className="text-[13px] text-slate-600 mt-3 font-medium">
                   {size === '4:5' && '인스타그램 피드 표준 사이즈'}
                   {size === '9:16' && '인스타 릴스 · 스토리 · 틱톡'}
                   {size === '1:1' && '인스타 정사각 · 모든 SNS 공통'}
@@ -1437,10 +1437,10 @@ export default function Page() {
 
             <div>
               <div className="flex items-baseline justify-between mb-3">
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em]">
+                <div className="text-[13px] font-bold text-slate-700 uppercase tracking-[0.08em]">
                   카드 수
                 </div>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-[13px] text-slate-500 font-medium">
                   {size === 'custom' ? '배너 1장 고정' : '최대 10'}
                 </div>
               </div>
@@ -1480,11 +1480,11 @@ export default function Page() {
             {mode !== 'manual' ? (
               <div>
                 <div className="flex items-baseline justify-between mb-3">
-                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em]">
+                  <div className="text-[13px] font-bold text-slate-700 uppercase tracking-[0.08em]">
                     프롬프트
                   </div>
                   {mode === 'note-rag' && (
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-[13px] text-slate-600 font-medium">
                       지식노트 자동 참조
                     </div>
                   )}
@@ -1498,20 +1498,20 @@ export default function Page() {
                       ? '예) 유순 제품 5월 1일 온라인 판매 시작 — 인스타 피드 6장'
                       : '예) 유순 임산부와 유아를 위한 케어 서비스 안내'
                   }
-                  className="n2c-input w-full resize-none text-[14px]"
+                  className="n2c-input w-full resize-none text-[15px]"
                 />
-                <p className="mt-2 text-[12px] text-slate-500 leading-relaxed">
+                <p className="mt-2.5 text-[13px] text-slate-600 leading-relaxed">
                   과장·의학적 단정 표현은 자동으로 완화됩니다.
                 </p>
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                <p className="text-xs text-slate-500">
+                <p className="text-[13px] text-slate-600">
                   비워둔 필드는 브랜드·레이아웃 기반으로 자동 채워집니다.
                 </p>
                 {Array.from({ length: count }).map((_, i) => (
                   <div key={i} className="border rounded-md p-2 bg-slate-50 space-y-1">
-                    <div className="text-xs text-slate-500">카드 {i + 1}</div>
+                    <div className="text-[12px] text-slate-600 font-semibold">카드 {i + 1}</div>
                     <input
                       className="w-full border rounded-md px-2 py-1 text-sm"
                       placeholder="제목 (title)"
@@ -1546,7 +1546,7 @@ export default function Page() {
 
             <div>
               <div className="flex items-baseline justify-between mb-3">
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em]">
+                <div className="text-[13px] font-bold text-slate-700 uppercase tracking-[0.08em]">
                   참조 이미지
                 </div>
                 <div className="text-[11px] text-slate-400">선택 · 최대 3장</div>
