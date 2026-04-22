@@ -15,6 +15,7 @@ const BACKEND_API_PATHS = [
   'reels',
   'quota',
   'admin',
+  'account',
 ]
 
 const nextConfig = {

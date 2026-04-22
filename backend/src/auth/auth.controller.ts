@@ -37,8 +37,9 @@ function isAdminEmail(email: string): boolean {
     .includes(email.toLowerCase())
 }
 
+// 경로가 NextAuth /api/auth/* 와 충돌하지 않도록 account 네임스페이스 사용.
 @Public()
-@Controller('auth')
+@Controller('account')
 export class AuthController {
   constructor(private prisma: PrismaService) {}
 

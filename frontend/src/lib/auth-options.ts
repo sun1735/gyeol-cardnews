@@ -40,7 +40,7 @@ providers.push(
       const password = credentials?.password
       if (!email || !password) return null
       try {
-        const resp = await fetch(`${API_ORIGIN}/api/auth/verify`, {
+        const resp = await fetch(`${API_ORIGIN}/api/account/verify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
