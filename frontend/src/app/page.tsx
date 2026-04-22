@@ -7,6 +7,7 @@ import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template 
 import { ProductAdCard } from '@/components/templates/ProductAdCard'
 import { PromoCard } from '@/components/templates/PromoCard'
 import { TEMPLATES } from '@/components/templates/registry'
+import { TemplatePreview } from '@/components/templates/TemplatePreview'
 
 // 인증 세션의 API 토큰을 모든 /api/* fetch 에 자동으로 실어 보내는 래퍼.
 // NextAuth session.apiToken 이 있으면 Authorization 헤더에 추가.
@@ -1989,6 +1990,73 @@ export default function Page() {
                       step3State,
                     )}
                   </ol>
+
+                  {/* 템플릿 미리보기 갤러리 — 각 템플릿을 썸네일로 보여주고 클릭 시 즉시 선택.
+                      requiresNoteRag 템플릿(상품광고·프로모션) 은 클릭 시 자동으로 지식노트 모드로 전환. */}
+                  <div className="mt-8 pt-6 border-t border-slate-100">
+                    <div className="flex items-baseline justify-between mb-4">
+                      <h3 className="text-[14px] font-bold tracking-[-0.01em]">카드 템플릿</h3>
+                      <span className="text-[11px] text-slate-500">
+                        클릭하면 바로 선택됩니다
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {TEMPLATES.map((t) => {
+                        const active = template === t.key
+                        const selectTemplate = () => {
+                          if (t.disabled) return
+                          // 노트-RAG 전용 템플릿이면 모드도 함께 전환
+                          if (t.requiresNoteRag && mode !== 'note-rag') setMode('note-rag')
+                          setTemplate(t.key)
+                          // 권장 비율도 자동 반영 (1:1 / 4:5 등)
+                          if (t.recommendedAspect === '4:5') setSize('4:5')
+                          else if (t.recommendedAspect === '1:1') setSize('1:1')
+                        }
+                        const primary = selectedBrand?.primaryColor ?? undefined
+                        return (
+                          <button
+                            key={t.key}
+                            onClick={selectTemplate}
+                            disabled={t.disabled}
+                            className={`group flex flex-col gap-2 p-2 rounded-[12px] transition text-left ${
+                              active
+                                ? 'ring-2 ring-indigo-500 bg-indigo-50/40'
+                                : 'ring-1 ring-slate-200 hover:ring-slate-300 hover:bg-slate-50'
+                            } disabled:opacity-40 disabled:cursor-not-allowed`}
+                          >
+                            <div className="flex items-center justify-center overflow-hidden rounded-[10px]">
+                              <TemplatePreview
+                                template={t.key}
+                                displayWidth={160}
+                                primaryColor={primary}
+                              />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[13px] font-semibold tracking-[-0.01em]">
+                                  {t.title}
+                                </span>
+                                {active && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white font-medium">
+                                    선택됨
+                                  </span>
+                                )}
+                                {t.requiresNoteRag && !active && (
+                                  <span className="text-[10px] text-slate-400">지식노트</span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">
+                                {t.description}
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="mt-3 text-[11px] text-slate-500 leading-relaxed">
+                      · 상품 광고 / 프로모션 템플릿은 지식노트 모드에서 가격·할인율·기능 아이콘까지 자동 생성됩니다
+                    </p>
+                  </div>
 
                   <div className="mt-6 pt-6 border-t border-slate-100 text-[12px] text-slate-500 leading-relaxed">
                     브랜드를 만들어두면 톤·색상·기본 문구·지식노트 문서·이미지 라이브러리를 함께 관리할 수 있습니다.
