@@ -1,20 +1,20 @@
 'use client'
 
-// 프로모션(이벤트·세일) 카드 템플릿.
-// 레이아웃: 배경 이미지 + 중앙 대형 할인율 텍스트 + 상단 EVENT 뱃지 + 하단 기간/CTA.
-// product-ad 가 "제품 중심(좌측 정보 레이어)" 이라면, promo 는 "할인율 중심" — 큰 숫자와 기간이 주인공.
-// 한글 폰트 Pretendard, 텍스트는 전부 DOM.
+// 프로모션 카드 템플릿 v2 — 드라마틱한 세일 포스터 감각.
+// 레이아웃: 어두운 배경 + 상단 리본 뱃지 + 중앙 거대한 그라디언트 숫자 + 좌우 장식선 +
+//   하단 타이틀 블록(솔리드 박스) + CTA 바.
+// 가독성: 중앙 숫자는 strokeText 느낌으로 외곽선 + 그라디언트 필. 타이틀은 솔리드 박스 위.
 
 import type { CSSProperties } from 'react'
 
 export interface PromoCardProps {
-  title: string // 행사명 ("봄맞이 대세일")
-  subtitle?: string // 카피 ("모든 상품 최대 할인")
-  discountPercent?: number // 중앙 대형 숫자
-  discountLabel?: string // 할인율 대체 라벨 (퍼센트 없이 "1+1" 같은 경우)
-  deadlineText?: string // "5월 5일 23:59 마감"
+  title: string
+  subtitle?: string
+  discountPercent?: number
+  discountLabel?: string
+  deadlineText?: string
   ctaLabel?: string
-  badgeLabel?: string // "EVENT", "SALE", "한정 수량"
+  badgeLabel?: string
   backgroundImageUrl?: string
   displayWidth: number
   aspectRatio: '1:1' | '4:5' | '9:16'
@@ -45,20 +45,25 @@ export function PromoCard({
     height: displayHeight,
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: 12 * s,
+    borderRadius: 16 * s,
     fontFamily: 'Pretendard, ui-sans-serif, system-ui, -apple-system, sans-serif',
     fontFeatureSettings: '"palt"',
-    background: backgroundImageUrl ? '#0f172a' : '#1f2937',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+    background: '#0b0b14',
+    boxShadow: '0 8px 28px rgba(0,0,0,0.18)',
     color: '#fff',
     letterSpacing: '-0.01em',
   }
 
-  const bigNumber = typeof discountPercent === 'number' ? `${discountPercent}%` : discountLabel
+  const bigNumber = typeof discountPercent === 'number' ? `${discountPercent}` : discountLabel
+  const showPercentSign = typeof discountPercent === 'number'
+  const ctaHeight = ctaLabel ? 110 * s : 0
+
+  // 브랜드 컬러 그라디언트 — 중앙 숫자용
+  const numberGradient = `linear-gradient(180deg, #fff 0%, ${primaryColor} 100%)`
 
   return (
     <div ref={innerRef} style={containerStyle}>
-      {/* 배경 이미지 */}
+      {/* 배경 이미지 — 블러·암전 처리로 숫자에 집중 */}
       {backgroundImageUrl && (
         <img
           src={backgroundImageUrl}
@@ -71,131 +76,207 @@ export function PromoCard({
             height: '100%',
             objectFit: 'cover',
             objectPosition: 'center',
-            opacity: 0.55, // 배경을 어둡게 — 중앙 숫자가 주인공
+            opacity: 0.42,
+            filter: 'saturate(1.15) contrast(1.05)',
           }}
           draggable={false}
         />
       )}
-      {/* 짙은 비네트 + 상하 그라디언트 */}
+      {/* 전체 비네트 + 라디얼 스포트라이트 — 중앙 숫자가 떠오르게 */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background:
-            'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0.65) 100%)',
+          background: `radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.92) 100%)`,
+        }}
+      />
+      {/* 브랜드 컬러 라이트 리크 — 위에서 아래로 은근한 글로우 */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `linear-gradient(180deg, ${primaryColor}22 0%, rgba(0,0,0,0) 40%)`,
+          pointerEvents: 'none',
         }}
       />
 
-      {/* 상단 뱃지 */}
+      {/* 상단 장식 — 카드 폭 전체 가로줄 + 사이드 라벨 */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 48 * s,
+          left: 60 * s,
+          right: 60 * s,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14 * s,
+        }}
+      >
+        <div style={{ flex: 1, height: 2 * s, background: 'rgba(255,255,255,0.35)' }} />
+        <span
+          style={{
+            fontSize: 14 * s,
+            fontWeight: 800,
+            letterSpacing: 4 * s,
+            color: 'rgba(255,255,255,0.85)',
+          }}
+        >
+          LIMITED TIME
+        </span>
+        <div style={{ flex: 1, height: 2 * s, background: 'rgba(255,255,255,0.35)' }} />
+      </div>
+
+      {/* 상단 리본 뱃지 — 상단 장식 줄 아래 */}
       {badgeLabel && (
         <div
           style={{
             position: 'absolute',
-            top: 48 * s,
+            top: 90 * s,
             left: '50%',
             transform: 'translateX(-50%)',
-            padding: `${10 * s}px ${24 * s}px`,
-            borderRadius: 999,
+            padding: `${12 * s}px ${36 * s}px`,
             background: primaryColor,
             color: '#fff',
-            fontSize: 22 * s,
-            fontWeight: 800,
-            letterSpacing: 3 * s,
+            fontSize: 28 * s,
+            fontWeight: 900,
+            letterSpacing: 5 * s,
             textTransform: 'uppercase',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+            boxShadow: `0 8px 20px ${primaryColor}88, 0 2px 6px rgba(0,0,0,0.35)`,
+            clipPath:
+              'polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%)',
           }}
         >
           {badgeLabel}
         </div>
       )}
 
-      {/* 중앙 타이틀 + 대형 숫자 */}
+      {/* 중앙 숫자 영역 */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
+          paddingTop: badgeLabel ? 180 * s : 120 * s,
+          paddingBottom: ctaHeight + 40 * s,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 48 * s,
-          textAlign: 'center',
         }}
       >
-        <h2
-          style={{
-            fontSize: 48 * s,
-            fontWeight: 800,
-            margin: 0,
-            lineHeight: 1.2,
-            textShadow: '0 2px 12px rgba(0,0,0,0.45)',
-          }}
-        >
-          {title}
-        </h2>
-        {subtitle && (
-          <p
-            style={{
-              fontSize: 26 * s,
-              fontWeight: 500,
-              margin: `${12 * s}px 0 ${32 * s}px 0`,
-              opacity: 0.92,
-              textShadow: '0 1px 6px rgba(0,0,0,0.35)',
-              maxWidth: '80%',
-            }}
-          >
-            {subtitle}
-          </p>
-        )}
         {bigNumber && (
           <div
             style={{
               display: 'inline-flex',
-              alignItems: 'baseline',
+              alignItems: 'flex-start',
               gap: 8 * s,
-              margin: `${16 * s}px 0`,
+              filter: `drop-shadow(0 8px 24px ${primaryColor}88) drop-shadow(0 2px 4px rgba(0,0,0,0.5))`,
             }}
           >
             <span
               style={{
-                fontSize: 240 * s,
+                fontSize: 340 * s,
                 fontWeight: 900,
-                lineHeight: 1,
-                color: '#fff',
-                textShadow: `0 6px 24px ${primaryColor}aa, 0 2px 8px rgba(0,0,0,0.5)`,
+                lineHeight: 0.82,
+                letterSpacing: '-0.06em',
+                backgroundImage: numberGradient,
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent',
+                WebkitTextStroke: `${2 * s}px rgba(255,255,255,0.15)`,
                 fontFeatureSettings: '"tnum"',
               }}
             >
               {bigNumber}
             </span>
-            {typeof discountPercent === 'number' && (
+            {showPercentSign && (
               <span
                 style={{
-                  fontSize: 40 * s,
-                  fontWeight: 800,
-                  letterSpacing: 4 * s,
+                  fontSize: 140 * s,
+                  fontWeight: 900,
+                  lineHeight: 1,
+                  marginTop: 20 * s,
                   color: '#fff',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.45)',
+                  letterSpacing: '-0.04em',
                 }}
               >
-                OFF
+                %
               </span>
             )}
           </div>
         )}
+        {showPercentSign && (
+          <div
+            style={{
+              marginTop: -20 * s,
+              fontSize: 44 * s,
+              fontWeight: 900,
+              letterSpacing: 10 * s,
+              color: primaryColor,
+              textTransform: 'uppercase',
+            }}
+          >
+            O F F
+          </div>
+        )}
+
+        {/* 타이틀 블록 — 솔리드 다크 박스 위에서 읽힘 */}
+        <div
+          style={{
+            marginTop: 30 * s,
+            padding: `${16 * s}px ${28 * s}px`,
+            background: 'rgba(255,255,255,0.08)',
+            border: `${1 * s}px solid rgba(255,255,255,0.18)`,
+            backdropFilter: 'blur(8px)',
+            borderRadius: 12 * s,
+            textAlign: 'center',
+            maxWidth: '82%',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 38 * s,
+              fontWeight: 900,
+              lineHeight: 1.12,
+              color: '#fff',
+              letterSpacing: '-0.015em',
+            }}
+          >
+            {title}
+          </div>
+          {subtitle && (
+            <div
+              style={{
+                fontSize: 22 * s,
+                fontWeight: 500,
+                lineHeight: 1.4,
+                marginTop: 8 * s,
+                color: 'rgba(255,255,255,0.85)',
+              }}
+            >
+              {subtitle}
+            </div>
+          )}
+        </div>
+
         {deadlineText && (
           <div
             style={{
-              marginTop: 20 * s,
-              fontSize: 24 * s,
-              fontWeight: 700,
-              padding: `${8 * s}px ${20 * s}px`,
-              border: `${2 * s}px solid rgba(255,255,255,0.9)`,
+              marginTop: 22 * s,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10 * s,
+              padding: `${10 * s}px ${22 * s}px`,
+              border: `${2 * s}px solid #fff`,
               borderRadius: 999,
+              fontSize: 22 * s,
+              fontWeight: 700,
               letterSpacing: 1 * s,
+              color: '#fff',
+              background: 'rgba(0,0,0,0.35)',
             }}
           >
-            ⏰ {deadlineText}
+            <span style={{ fontSize: 22 * s }}>⏰</span>
+            <span>{deadlineText}</span>
           </div>
         )}
       </div>
@@ -208,21 +289,49 @@ export function PromoCard({
             left: 0,
             right: 0,
             bottom: 0,
-            height: 96 * s,
-            background: primaryColor,
+            height: ctaHeight,
+            background: `linear-gradient(90deg, ${primaryColor} 0%, ${shiftColor(
+              primaryColor,
+              -18,
+            )} 100%)`,
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 30 * s,
+            gap: 14 * s,
+            fontSize: 32 * s,
             fontWeight: 800,
-            letterSpacing: 0.4 * s,
+            letterSpacing: '-0.005em',
           }}
         >
-          {ctaLabel}
-          <span style={{ marginLeft: 12 * s, fontSize: 28 * s }}>→</span>
+          <span>{ctaLabel}</span>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 44 * s,
+              height: 44 * s,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.25)',
+              fontSize: 24 * s,
+              fontWeight: 900,
+            }}
+          >
+            →
+          </span>
         </div>
       )}
     </div>
   )
+}
+
+function shiftColor(hex: string, amount: number): string {
+  const clean = hex.replace('#', '')
+  if (clean.length !== 6) return hex
+  const n = parseInt(clean, 16)
+  const r = Math.max(0, Math.min(255, ((n >> 16) & 0xff) + amount))
+  const g = Math.max(0, Math.min(255, ((n >> 8) & 0xff) + amount))
+  const b = Math.max(0, Math.min(255, (n & 0xff) + amount))
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
 }

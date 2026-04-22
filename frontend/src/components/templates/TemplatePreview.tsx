@@ -64,47 +64,111 @@ export function TemplatePreview({
     )
   }
   // basic — 실제 basic 렌더는 page.tsx CardItem 에 얽혀있어 별도 BasicCard 가 없음.
-  // 미리보기용 간이 레이아웃을 직접 작성 (실 렌더와 "톤" 만 맞추면 충분).
+  // 미리보기용 간이 레이아웃. 그라디언트 + 하단 블러 오버레이로 가독성 확보.
   const s = displayWidth / 1080
+  const pc = primaryColor ?? '#4338ca'
   return (
     <div
       style={{
         width: displayWidth,
         height: displayWidth, // 1:1
-        borderRadius: 12 * s,
+        borderRadius: 16 * s,
         overflow: 'hidden',
         position: 'relative',
-        background: `linear-gradient(135deg, ${primaryColor ?? '#4338ca'}22, ${
-          primaryColor ?? '#4338ca'
-        }99)`,
+        background: `linear-gradient(135deg, ${pc} 0%, ${shiftHex(pc, -32)} 100%)`,
         color: '#fff',
         fontFamily: 'Pretendard, ui-sans-serif, system-ui, sans-serif',
-        padding: 48 * s,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-end',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
       }}
     >
-      <div style={{ fontSize: 56 * s, fontWeight: 800, lineHeight: 1.15 }}>카드 제목</div>
-      <div style={{ fontSize: 26 * s, fontWeight: 400, marginTop: 14 * s, opacity: 0.9 }}>
-        본문 텍스트가 이 자리에 들어가고 브랜드 톤에 맞춰 자동 생성됩니다.
-      </div>
+      {/* 텍스처 느낌의 얇은 라인 */}
       <div
         style={{
-          display: 'inline-flex',
-          alignSelf: 'flex-start',
-          marginTop: 20 * s,
-          padding: `${12 * s}px ${22 * s}px`,
-          background: '#fff',
-          color: primaryColor ?? '#4338ca',
-          fontSize: 22 * s,
-          fontWeight: 700,
-          borderRadius: 8 * s,
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.05) 75%)`,
+          backgroundSize: `${24 * s}px ${24 * s}px`,
+          opacity: 0.5,
+        }}
+      />
+      {/* 하단 어두운 오버레이 — 텍스트 가독성 */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.5) 100%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: 48 * s,
+          right: 48 * s,
+          bottom: 48 * s,
         }}
       >
-        자세히 보기 →
+        <div
+          style={{
+            fontSize: 14 * s,
+            fontWeight: 800,
+            letterSpacing: 3 * s,
+            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.85)',
+            marginBottom: 10 * s,
+          }}
+        >
+          BRAND
+        </div>
+        <div
+          style={{
+            fontSize: 64 * s,
+            fontWeight: 900,
+            lineHeight: 1.02,
+            letterSpacing: '-0.03em',
+            textShadow: '0 2px 8px rgba(0,0,0,0.35)',
+          }}
+        >
+          카드 제목
+        </div>
+        <div
+          style={{
+            fontSize: 22 * s,
+            fontWeight: 500,
+            lineHeight: 1.55,
+            marginTop: 12 * s,
+            opacity: 0.92,
+            textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+          }}
+        >
+          본문이 여기에 들어갑니다.
+        </div>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8 * s,
+            marginTop: 20 * s,
+            padding: `${10 * s}px ${20 * s}px`,
+            background: '#fff',
+            color: pc,
+            fontSize: 20 * s,
+            fontWeight: 800,
+            borderRadius: 8 * s,
+          }}
+        >
+          자세히 보기 <span>→</span>
+        </div>
       </div>
     </div>
   )
+}
+
+function shiftHex(hex: string, amount: number): string {
+  const clean = hex.replace('#', '')
+  if (clean.length !== 6) return hex
+  const n = parseInt(clean, 16)
+  const r = Math.max(0, Math.min(255, ((n >> 16) & 0xff) + amount))
+  const g = Math.max(0, Math.min(255, ((n >> 8) & 0xff) + amount))
+  const b = Math.max(0, Math.min(255, (n & 0xff) + amount))
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
 }
