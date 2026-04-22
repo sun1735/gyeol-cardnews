@@ -23,7 +23,7 @@ interface UpdateUserDto {
 }
 
 @UseGuards(AdminGuard)
-@Controller('admin')
+@Controller('api/admin')
 export class AdminController {
   constructor(private prisma: PrismaService) {}
 
