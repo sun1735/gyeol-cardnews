@@ -27,16 +27,17 @@ export const TEMPLATES: TemplateMeta[] = [
   {
     key: 'product-ad',
     title: '상품 광고',
-    description: '가격·할인·스펙',
-    requiresNoteRag: true,
+    description: 'AI 구도·가격·스펙',
+    // 모든 모드(auto/manual/note-rag)에서 사용 가능. note-rag 면 지식노트 근거까지 활용.
+    requiresNoteRag: false,
     recommendedAspect: '4:5',
     disabled: false,
   },
   {
     key: 'promo',
     title: '프로모션',
-    description: '이벤트·대형 할인',
-    requiresNoteRag: true,
+    description: 'AI 구도·이벤트 감성',
+    requiresNoteRag: false,
     recommendedAspect: '1:1',
     disabled: false,
   },

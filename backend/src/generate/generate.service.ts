@@ -3,10 +3,21 @@ import { createHash } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { sanitizeText } from './sanitize'
 import { BG_URLS } from '../backgrounds/defaults'
-import { OPENAI_RESPONSE_FORMAT, validateCard, CARD_LIMITS, ValidatedCard } from './schema'
+import {
+  OPENAI_RESPONSE_FORMAT,
+  validateCard,
+  CARD_LIMITS,
+  ValidatedCard,
+  validateDynamicDesign,
+  ValidatedDynamicDesign,
+} from './schema'
 import { buildStyleRecipe, recipeAsPromptBlock } from './style'
 import { checkSafety } from './safety'
-import { callGeminiJson, cardArraySchema } from './llm-gemini'
+import {
+  callGeminiJson,
+  cardArraySchema,
+  dynamicDesignArraySchema,
+} from './llm-gemini'
 
 type CardSource = 'llm' | 'template'
 
@@ -48,6 +59,23 @@ interface GenInput {
   cards?: ManualCardInput[]
   baseImageUrls?: string[] // Mode A — 프롬프트에 공통 첨부된 참조 이미지 1~3장
   clientIp?: string // 운영 로그 식별용 — DTO 가 아니라 컨트롤러에서 주입
+  template?: 'basic' | 'product-ad' | 'promo'
+}
+
+interface DesignOut {
+  layout: 'split-dark-left' | 'image-top-card-bottom' | 'fullbleed-center-glass'
+  palette: { dominant: string; accent: string; textOnDominant: string }
+  title: string
+  subtitle: string
+  body: string
+  badgeLabel: string
+  ctaLabel: string
+  features: { icon: string; label: string }[]
+  priceOriginal?: number
+  priceSale?: number
+  discountPercent?: number
+  deadlineText: string
+  decorations: string[]
 }
 
 interface CardOut {
@@ -58,6 +86,8 @@ interface CardOut {
   cta: string
   imageUrl?: string
   layout: Layout
+  template?: 'basic' | 'product-ad' | 'promo'
+  design?: DesignOut
 }
 
 // ============ 콘텐츠 프레임 (프롬프트 키워드 → 제목/본문/기본배경) ============
@@ -260,11 +290,41 @@ export class GenerateService {
     const baseImages = (input.baseImageUrls ?? []).filter(
       (u): u is string => typeof u === 'string' && !!u.trim(),
     )
+    // product-ad / promo 는 1장씩만 생성 (AI 구도 탐색용)
+    const template = input.template ?? 'basic'
+    const effectiveCount =
+      template === 'product-ad' || template === 'promo' ? 1 : input.count ?? 3
     try {
       const built =
         input.mode === 'manual'
           ? this.wrapManual(input.cards ?? [], brand, baseImages)
-          : await this.fromPrompt(input.prompt ?? '', input.count ?? 3, brand, baseImages)
+          : await this.fromPrompt(input.prompt ?? '', effectiveCount, brand, baseImages)
+
+      // AI 동적 디자인(DynamicDesign) 합성 — product-ad/promo 일 때 LLM 에게 구도·컬러까지 생성시킴.
+      if (template === 'product-ad' || template === 'promo') {
+        const designs = await this.generateDynamicDesigns(
+          input.prompt ?? built.cards[0]?.title ?? '',
+          built.cards.length,
+          brand,
+          template,
+        )
+        built.cards = built.cards.map((c, i) => {
+          const d = designs[i]
+          const next: CardOut = { ...c, template }
+          if (d) {
+            next.design = d
+            // basic 필드도 design 값으로 덮어써 일관성 유지
+            next.title = d.title || c.title
+            next.body = d.body || c.body
+            next.subtext = d.subtitle || c.subtext
+            next.cta = d.ctaLabel || c.cta
+          }
+          return next
+        })
+      } else {
+        built.cards = built.cards.map((c) => ({ ...c, template: 'basic' as const }))
+      }
+
       const meta: GenMeta = { ...built.meta, durationMs: Date.now() - t0 }
       const outcome: 'success' | 'partial' =
         meta.source === 'template' && input.mode === 'auto' && process.env.OPENAI_API_KEY
@@ -651,6 +711,71 @@ export class GenerateService {
       return { cards: null, timedOut: false }
     } finally {
       clearTimeout(timeoutId)
+    }
+  }
+
+  // AI 가 layout·palette·decorations 까지 결정하는 DynamicDesign 카드 생성.
+  // auto/manual 모드에서 product-ad/promo 템플릿 선택 시 호출 — RAG 없이 프롬프트+브랜드톤으로 생성.
+  private async generateDynamicDesigns(
+    prompt: string,
+    n: number,
+    brand: any,
+    template: 'product-ad' | 'promo',
+  ): Promise<(ValidatedDynamicDesign | null)[]> {
+    const logger = new Logger('GenerateService')
+    if (!process.env.GEMINI_API_KEY) {
+      logger.warn(`GEMINI_API_KEY 없음 — DynamicDesign 스킵`)
+      return Array(n).fill(null)
+    }
+    const recipe = brand ? buildStyleRecipe(brand) : null
+    const brandPrimary = typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
+
+    const layoutHint =
+      template === 'promo'
+        ? '이벤트·세일은 fullbleed-center-glass 또는 image-top-card-bottom 권장.'
+        : '상품 광고는 split-dark-left 또는 image-top-card-bottom 권장.'
+
+    const sys = [
+      '한국 SNS 카드뉴스 AI 디자이너. 단순한 카피라이터가 아니라 구도·컬러·장식까지 스스로 정한다.',
+      '출력은 layout/palette/title/subtitle/body/badgeLabel/ctaLabel/features/priceOriginal/priceSale/discountPercent/deadlineText/decorations/cardLayout.',
+      'layout 중 하나를 고르세요:',
+      '  · split-dark-left: 좌측 어두운 패널 + 우측 이미지',
+      '  · image-top-card-bottom: 상단 이미지 + 하단 솔리드 카드',
+      '  · fullbleed-center-glass: 풀블리드 + 중앙 프로스티드 박스 + 큰 숫자',
+      layoutHint,
+      'palette.dominant = 주 배경 HEX (어두운 톤 권장). palette.accent = 뱃지·CTA 강조색. palette.textOnDominant = dominant 위 글자색.',
+      '매 생성마다 layout·palette·decorations 조합을 다르게.',
+      'discountPercent 를 포함하면 decorations 에 "discount-circle" 또는 "big-number" 반드시 추가.',
+      'icon 은 단일 이모지. 과장·의학적 단정·페이지 번호 금지.',
+    ].join(' ')
+
+    const userText = [
+      recipe ? recipeAsPromptBlock(recipe) : '',
+      '',
+      `주제: ${prompt}`,
+      `브랜드: ${brand?.name ?? '미지정'} (primary ${brandPrimary})`,
+      `카드 수: ${n}`,
+      `템플릿 방향: ${template === 'promo' ? '이벤트·세일 (긴장감·대담)' : '상품 광고 (정보 밀집·신뢰)'}`,
+      `길이 상한: title ${CARD_LIMITS.title}, body ${CARD_LIMITS.body}, cta ${CARD_LIMITS.cta}`,
+    ].filter(Boolean).join('\n')
+
+    try {
+      const parsed = await callGeminiJson<{ cards: unknown[] }>({
+        systemInstruction: sys,
+        userText,
+        schema: dynamicDesignArraySchema(n),
+        timeoutMs: LLM_TIMEOUT_MS,
+        temperature: 0.9,
+      })
+      if (!parsed || !Array.isArray(parsed.cards)) return Array(n).fill(null)
+      const out: (ValidatedDynamicDesign | null)[] = []
+      for (let i = 0; i < n; i++) {
+        out.push(validateDynamicDesign(parsed.cards[i]))
+      }
+      return out
+    } catch (e: any) {
+      logger.warn(`Gemini DynamicDesign 실패 — null 폴백: ${e?.message ?? e}`)
+      return Array(n).fill(null)
     }
   }
 }
