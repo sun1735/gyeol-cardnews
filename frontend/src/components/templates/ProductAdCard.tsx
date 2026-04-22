@@ -84,11 +84,12 @@ export function ProductAdCard({
 
   return (
     <div ref={innerRef} style={containerStyle}>
-      {/* 배경 이미지 */}
+      {/* 배경 이미지 — crossOrigin 은 html-to-image PNG/릴스 export 의 tainted canvas 방지용 */}
       {backgroundImageUrl && (
         <img
           src={backgroundImageUrl}
           alt=""
+          crossOrigin="anonymous"
           style={{
             position: 'absolute',
             inset: 0,

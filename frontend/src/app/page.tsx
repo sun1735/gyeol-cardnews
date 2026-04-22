@@ -119,6 +119,10 @@ export default function Page() {
   const [mode, setMode] = useState<GenMode>('auto')
   // 카드 템플릿 — basic(기본) / product-ad(상품 광고) / promo(프로모션, 추후).
   const [template, setTemplate] = useState<Template>('basic')
+  // product-ad 는 note-rag 경로에서만 구조화 카피가 생성되므로 모드가 바뀌면 자동으로 basic 복귀.
+  useEffect(() => {
+    if (template === 'product-ad' && mode !== 'note-rag') setTemplate('basic')
+  }, [mode, template])
   const [size, setSize] = useState<SizePreset>('1:1')
   const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
   // 가로·세로 타이핑 드래프트 — 입력 중에는 clamp 하지 않아 숫자를 자유롭게 타이핑할 수 있다.
@@ -1286,7 +1290,14 @@ export default function Page() {
                 {(
                   [
                     { k: 'basic' as Template, title: '기본', desc: '제목·본문·CTA', disabled: false },
-                    { k: 'product-ad' as Template, title: '상품 광고', desc: '가격·할인·스펙', disabled: false },
+                    {
+                      k: 'product-ad' as Template,
+                      title: '상품 광고',
+                      desc:
+                        mode === 'note-rag' ? '가격·할인·스펙' : '지식노트 모드 전용',
+                      // product-ad 풀 구조(가격·features 등) 생성은 note-rag 경로에서만 동작 — auto/manual 은 텍스트만 채워짐.
+                      disabled: mode !== 'note-rag',
+                    },
                     { k: 'promo' as Template, title: '프로모션', desc: '준비 중', disabled: true },
                   ]
                 ).map((t) => {
@@ -3238,7 +3249,8 @@ function CardItem({
         />
       </div>
 
-      {/* 텍스트 스타일 편집 — 요소별 탭 */}
+      {/* 텍스트 스타일 편집 — product-ad 카드는 고정 디자인이라 표시하지 않음 */}
+      {card.template !== 'product-ad' && (
       <div className="border rounded-md bg-slate-50/50" onClick={stop}>
         <button
           onClick={(e) => { stop(e); setStyleOpen((v) => !v) }}
@@ -3422,6 +3434,7 @@ function CardItem({
           </div>
         )}
       </div>
+      )}
 
       <div className="flex gap-2 items-center flex-wrap">
         <label
