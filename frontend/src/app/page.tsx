@@ -1181,7 +1181,11 @@ export default function Page() {
                 />
               )}
               <button
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={async () => {
+                  // NEXTAUTH_URL 오설정으로 localhost 로 튀는 문제 방어 — 수동 리다이렉트
+                  await signOut({ redirect: false })
+                  window.location.assign('/')
+                }}
                 className="text-sm text-slate-500 hover:text-slate-900 px-2 py-1 transition"
                 title={session?.user?.email ?? '로그아웃'}
               >

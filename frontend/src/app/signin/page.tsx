@@ -75,7 +75,9 @@ function SignInInner() {
       } else if (res.error) {
         setFormError('이메일 또는 비밀번호가 올바르지 않습니다')
       } else if (res.ok) {
-        router.push(res.url ?? callbackUrl)
+        // NEXTAUTH_URL 가 localhost 로 설정되어 있으면 res.url 이 localhost 절대경로가 되므로
+        // callbackUrl(상대경로) 로 명시적으로 이동해 현재 호스트를 유지.
+        router.push(callbackUrl)
       }
     } catch {
       setFormError('로그인 중 오류가 발생했습니다')

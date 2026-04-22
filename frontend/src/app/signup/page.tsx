@@ -55,7 +55,7 @@ function SignUpInner() {
         callbackUrl,
       })
       if (login?.ok) {
-        router.push(login.url ?? callbackUrl)
+        router.push(callbackUrl)
       } else {
         // 로그인 실패 시 signin 페이지로
         router.push('/signin')
