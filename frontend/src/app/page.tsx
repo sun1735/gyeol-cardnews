@@ -6,6 +6,7 @@ import { signIn, signOut, useSession } from 'next-auth/react'
 import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template } from '@/lib/types'
 import { ProductAdCard } from '@/components/templates/ProductAdCard'
 import { PromoCard } from '@/components/templates/PromoCard'
+import { DynamicCard } from '@/components/templates/DynamicCard'
 import { TEMPLATES } from '@/components/templates/registry'
 import { TemplatePreview } from '@/components/templates/TemplatePreview'
 import { Landing } from '@/components/Landing'
@@ -131,12 +132,19 @@ export default function Page() {
     const meta = TEMPLATES.find((t) => t.key === template)
     if (meta?.requiresNoteRag && mode !== 'note-rag') setTemplate('basic')
   }, [mode, template])
+
+  // product-ad / promo 는 AI 가 구도까지 설계하므로 카드 수를 1장으로 강제.
+  const forceSingleCard = template === 'product-ad' || template === 'promo'
   const [size, setSize] = useState<SizePreset>('1:1')
   const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
   // 가로·세로 타이핑 드래프트 — 입력 중에는 clamp 하지 않아 숫자를 자유롭게 타이핑할 수 있다.
   // 커밋(blur 또는 Enter) 시 200~4000 범위로 클램프해서 customSize 에 반영.
   const [customInput, setCustomInput] = useState<{ w: string; h: string }>({ w: '1080', h: '1080' })
   const [count, setCount] = useState(3)
+  // forceSingleCard 일 때 count=1 로 강제 (선언 위로 뺄 수 없어 여기서 처리)
+  useEffect(() => {
+    if (forceSingleCard && count !== 1) setCount(1)
+  }, [forceSingleCard, count])
   const [prompt, setPrompt] = useState('')
   const [baseImages, setBaseImages] = useState<string[]>([]) // Mode A — 공통 참조 이미지 1~3장
   const [baseUploading, setBaseUploading] = useState(false)
@@ -1348,12 +1356,14 @@ export default function Page() {
               </div>
               {template === 'product-ad' && (
                 <p className="mt-2.5 text-[13px] text-slate-600 leading-relaxed">
-                  배경은 <b>텍스트 없음</b>으로 생성, 가격·할인·기능 아이콘은 화면 위에서 합성됩니다. 4:5 권장.
+                  AI 가 <b>구도·컬러·장식까지</b> 결정합니다. 매 생성마다 다른 결과 —
+                  마음에 들 때까지 "다시 만들기". 1장씩 생성, 수정도 가능합니다.
                 </p>
               )}
               {template === 'promo' && (
                 <p className="mt-2.5 text-[13px] text-slate-600 leading-relaxed">
-                  중앙 대형 할인율 + 기간 문구 중심 레이아웃. 1:1 정사각을 권장합니다.
+                  이벤트·세일 감성으로 AI 가 레이아웃을 새로 짭니다. 매번 다른 구도 ·
+                  1장씩 생성, 대형 할인율·기간 문구 중심.
                 </p>
               )}
             </div>
@@ -1467,14 +1477,18 @@ export default function Page() {
                   카드 수
                 </div>
                 <div className="text-[13px] text-slate-500 font-medium">
-                  {size === 'custom' ? '배너 1장 고정' : '최대 10'}
+                  {size === 'custom'
+                    ? '배너 1장 고정'
+                    : forceSingleCard
+                      ? 'AI 구도 생성 · 1장 고정'
+                      : '최대 10'}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setCount((c) => Math.max(1, c - 1))}
-                  disabled={size === 'custom' || count <= 1}
+                  disabled={size === 'custom' || forceSingleCard || count <= 1}
                   className="w-10 h-10 rounded-[10px] border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 text-lg text-slate-600"
                   aria-label="카드 수 감소"
                 >
@@ -1485,7 +1499,7 @@ export default function Page() {
                   min={1}
                   max={10}
                   value={count}
-                  disabled={size === 'custom'}
+                  disabled={size === 'custom' || forceSingleCard}
                   onChange={(e) =>
                     setCount(Math.max(1, Math.min(10, Number(e.target.value) || 1)))
                   }
@@ -1494,7 +1508,7 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => setCount((c) => Math.min(10, c + 1))}
-                  disabled={size === 'custom' || count >= 10}
+                  disabled={size === 'custom' || forceSingleCard || count >= 10}
                   className="w-10 h-10 rounded-[10px] border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 text-lg text-slate-600"
                   aria-label="카드 수 증가"
                 >
@@ -3174,41 +3188,14 @@ function CardItem({
 
       {/* 카드 프리뷰 (렌더 대상) */}
       <div className="flex justify-center">
-        {card.template === 'product-ad' ? (
+        {(card.template === 'product-ad' || card.template === 'promo') && card.design ? (
           <div id={`card-${card.id}`}>
-            <ProductAdCard
-              title={card.title}
-              subtitle={card.productAd?.subtitle ?? card.subtext}
-              body={card.body}
-              badgeLabel={card.productAd?.badgeLabel}
-              features={card.productAd?.features ?? []}
-              colors={card.productAd?.colors ?? []}
-              priceOriginal={card.productAd?.priceOriginal}
-              priceSale={card.productAd?.priceSale}
-              discountPercent={card.productAd?.discountPercent}
-              deadlineText={card.productAd?.deadlineText}
-              ctaLabel={card.productAd?.ctaLabel ?? card.cta}
-              backgroundImageUrl={card.imageUrl}
-              displayWidth={d.display}
-              aspectRatio={
-                size === '4:5' ? '4:5' : size === '9:16' ? '9:16' : '1:1'
-              }
-              primaryColor={primary}
-            />
-          </div>
-        ) : card.template === 'promo' ? (
-          <div id={`card-${card.id}`}>
-            <PromoCard
-              title={card.title}
-              subtitle={card.productAd?.subtitle ?? card.subtext ?? card.body}
-              discountPercent={card.productAd?.discountPercent}
-              deadlineText={card.productAd?.deadlineText}
-              ctaLabel={card.productAd?.ctaLabel ?? card.cta}
-              badgeLabel={card.productAd?.badgeLabel ?? 'EVENT'}
+            {/* AI 가 layout·palette·decorations 을 결정한 DynamicCard — 매번 다른 구도 */}
+            <DynamicCard
+              design={card.design}
               backgroundImageUrl={card.imageUrl}
               displayWidth={d.display}
               aspectRatio={size === '4:5' ? '4:5' : size === '9:16' ? '9:16' : '1:1'}
-              primaryColor={primary}
             />
           </div>
         ) : (

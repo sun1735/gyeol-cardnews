@@ -87,6 +87,79 @@ export function cardArraySchema(maxCount: number) {
   }
 }
 
+// AI 가 구도·컬러·장식까지 결정하는 DynamicDesign 스키마.
+// product-ad / promo 에서 공통 사용. 매 생성마다 다른 layout/palette 가 나오도록 설계.
+export function dynamicDesignArraySchema(maxCount: number) {
+  return {
+    type: 'object',
+    properties: {
+      cards: {
+        type: 'array',
+        maxItems: maxCount,
+        items: {
+          type: 'object',
+          properties: {
+            layout: {
+              type: 'string',
+              enum: ['split-dark-left', 'image-top-card-bottom', 'fullbleed-center-glass'],
+            },
+            palette: {
+              type: 'object',
+              properties: {
+                dominant: { type: 'string' }, // #1a1a2e 처럼 HEX
+                accent: { type: 'string' },
+                textOnDominant: { type: 'string' },
+              },
+              required: ['dominant', 'accent', 'textOnDominant'],
+            },
+            title: { type: 'string' },
+            subtitle: { type: 'string' },
+            body: { type: 'string' },
+            badgeLabel: { type: 'string' },
+            ctaLabel: { type: 'string' },
+            features: {
+              type: 'array',
+              maxItems: 4,
+              items: {
+                type: 'object',
+                properties: {
+                  icon: { type: 'string' },
+                  label: { type: 'string' },
+                },
+                required: ['icon', 'label'],
+              },
+            },
+            priceOriginal: { type: 'number' },
+            priceSale: { type: 'number' },
+            discountPercent: { type: 'number' },
+            deadlineText: { type: 'string' },
+            decorations: {
+              type: 'array',
+              maxItems: 4,
+              items: { type: 'string' }, // 'discount-circle' | 'corner-accent' | 'big-number'
+            },
+            cardLayout: { type: 'string', enum: ['cover', 'content', 'cta'] },
+          },
+          required: [
+            'layout',
+            'palette',
+            'title',
+            'subtitle',
+            'body',
+            'badgeLabel',
+            'ctaLabel',
+            'features',
+            'deadlineText',
+            'decorations',
+            'cardLayout',
+          ],
+        },
+      },
+    },
+    required: ['cards'],
+  }
+}
+
 // product-ad 템플릿 전용 스키마 — 구조화된 광고 필드를 강제.
 // features 는 정확히 4개 권장(UI 아이콘 자리), colors 는 HEX 배열(스와치).
 export function productAdArraySchema(maxCount: number) {

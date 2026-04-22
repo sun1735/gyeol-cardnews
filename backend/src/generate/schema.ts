@@ -201,3 +201,106 @@ function coerceNumber(v: unknown): number | null {
   }
   return null
 }
+
+// DynamicDesign — AI 가 결정한 layout·palette·decorations 검증.
+export type DynamicLayout = 'split-dark-left' | 'image-top-card-bottom' | 'fullbleed-center-glass'
+const DYNAMIC_LAYOUTS: readonly DynamicLayout[] = [
+  'split-dark-left',
+  'image-top-card-bottom',
+  'fullbleed-center-glass',
+]
+const HEX_COLOR_RE = /^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/
+
+export interface ValidatedDynamicDesign {
+  layout: DynamicLayout
+  palette: { dominant: string; accent: string; textOnDominant: string }
+  title: string
+  subtitle: string
+  body: string
+  badgeLabel: string
+  ctaLabel: string
+  features: { icon: string; label: string }[]
+  priceOriginal: number | null
+  priceSale: number | null
+  discountPercent: number | null
+  deadlineText: string
+  decorations: string[]
+  cardLayout: Layout
+}
+
+function normHex(v: unknown, fallback: string): string {
+  if (typeof v !== 'string') return fallback
+  const t = v.trim()
+  if (!HEX_COLOR_RE.test(t)) return fallback
+  return t.startsWith('#') ? t : `#${t}`
+}
+
+export function validateDynamicDesign(raw: unknown): ValidatedDynamicDesign | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+
+  const layout = (DYNAMIC_LAYOUTS as readonly string[]).includes(String(r.layout))
+    ? (r.layout as DynamicLayout)
+    : null
+  if (!layout) return null
+
+  const paletteRaw = (r.palette ?? {}) as Record<string, unknown>
+  const palette = {
+    dominant: normHex(paletteRaw.dominant, '#1a1a2e'),
+    accent: normHex(paletteRaw.accent, '#e94560'),
+    textOnDominant: normHex(paletteRaw.textOnDominant, '#ffffff'),
+  }
+
+  const title = coerceString(r.title, 24)
+  const subtitle = coerceString(r.subtitle, 40) ?? ''
+  const body = coerceString(r.body, 120)
+  const badgeLabel = coerceString(r.badgeLabel, 14) ?? ''
+  const ctaLabel = coerceString(r.ctaLabel, 16)
+  const deadlineText = coerceString(r.deadlineText, 20) ?? ''
+
+  const featuresRaw = Array.isArray(r.features) ? r.features : []
+  const features: { icon: string; label: string }[] = []
+  for (const f of featuresRaw.slice(0, 4)) {
+    if (!f || typeof f !== 'object') continue
+    const fo = f as Record<string, unknown>
+    const icon = typeof fo.icon === 'string' ? fo.icon.trim().slice(0, 4) : ''
+    const label = coerceString(fo.label, 12) ?? ''
+    if (icon && label) features.push({ icon, label })
+  }
+
+  const priceOriginal = coerceNumber(r.priceOriginal)
+  const priceSale = coerceNumber(r.priceSale)
+  const discountPercent = (() => {
+    const n = coerceNumber(r.discountPercent)
+    return n === null ? null : Math.max(1, Math.min(99, Math.round(n)))
+  })()
+
+  const decorationsRaw = Array.isArray(r.decorations) ? r.decorations : []
+  const decorations = decorationsRaw
+    .filter((d): d is string => typeof d === 'string')
+    .map((d) => d.trim())
+    .filter((d) => d.length > 0 && d.length < 40)
+    .slice(0, 4)
+
+  const cardLayout = (LAYOUTS as readonly string[]).includes(String(r.cardLayout))
+    ? (r.cardLayout as Layout)
+    : 'cover'
+
+  if (!title || !body || !ctaLabel) return null
+  return {
+    layout,
+    palette,
+    title,
+    subtitle,
+    body,
+    badgeLabel,
+    ctaLabel,
+    features,
+    priceOriginal,
+    priceSale,
+    discountPercent,
+    deadlineText,
+    decorations,
+    cardLayout,
+  }
+}

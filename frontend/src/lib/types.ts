@@ -41,8 +41,37 @@ export interface TextStyle {
   cta?: ElementStyle
 }
 
+// AI 가 결정하는 카드 구도. product-ad / promo 템플릿 선택 시 LLM 이 이 스펙을 생성.
+// 매 생성마다 layout/palette/decorations 가 달라져 같은 템플릿이라도 전혀 다른 결과가 나옴.
+export type DynamicLayout =
+  | 'split-dark-left' // 좌측 다크 패널 + 우측 이미지 (상품·정보 밀집)
+  | 'image-top-card-bottom' // 상단 이미지 + 하단 솔리드 카드 (잡지 스타일)
+  | 'fullbleed-center-glass' // 풀블리드 이미지 + 중앙 프로스티드 글라스 박스 (드라마틱·이벤트)
+
+export interface DynamicPalette {
+  dominant: string // 주 패널/오버레이 배경 HEX
+  accent: string // 뱃지·CTA·강조 HEX
+  textOnDominant: string // dominant 위에 쓸 텍스트 색 (#fff / #000 / ...)
+}
+
+export interface DynamicDesign {
+  layout: DynamicLayout
+  palette: DynamicPalette
+  title: string
+  subtitle: string
+  body: string
+  badgeLabel: string
+  ctaLabel: string
+  features: ProductAdFeature[] // 선택 — 비어있을 수 있음
+  priceOriginal?: number
+  priceSale?: number
+  discountPercent?: number
+  deadlineText: string
+  decorations: string[] // 'discount-circle' | 'corner-accent' | 'big-number' | 'divider-lines'
+}
+
 // 단계 4 출력 고정 포맷: title / body / subtext / cta (+ layout, imageUrl, id, textStyle)
-// template 이 'product-ad' 일 때 productAd 필드에 상품 광고 전용 데이터가 들어온다.
+// template 이 'product-ad' / 'promo' 일 때 design 필드에 AI 생성 스펙이 들어옴.
 export interface CardData {
   id: string
   title: string
@@ -53,7 +82,8 @@ export interface CardData {
   layout: Layout
   textStyle?: TextStyle
   template?: Template
-  productAd?: ProductAdData
+  productAd?: ProductAdData // 레거시 — 차후 design 으로 통합
+  design?: DynamicDesign
 }
 
 export interface BrandAsset {

@@ -19,10 +19,17 @@ import {
   validateProductAdCard,
   ValidatedProductAdCard,
   PRODUCT_AD_LIMITS,
+  validateDynamicDesign,
+  ValidatedDynamicDesign,
 } from '../generate/schema'
 import { buildStyleRecipe, recipeAsPromptBlock, StyleRecipe } from '../generate/style'
 import { checkSafety } from '../generate/safety'
-import { callGeminiJson, cardArraySchema, productAdArraySchema } from '../generate/llm-gemini'
+import {
+  callGeminiJson,
+  cardArraySchema,
+  productAdArraySchema,
+  dynamicDesignArraySchema,
+} from '../generate/llm-gemini'
 import { editImageWithGemini, saveEditedImage } from '../images/editor'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { KnowledgeSearchService, RetrievedChunk } from './knowledge-search.service'
@@ -39,16 +46,21 @@ interface CardOut {
   cta: string
   imageUrl?: string
   template?: 'basic' | 'product-ad' | 'promo'
-  productAd?: {
-    subtitle?: string
-    badgeLabel?: string
-    features?: { icon: string; label: string }[]
-    colors?: string[]
+  // AI 가 결정한 동적 디자인 스펙 (product-ad / promo 템플릿에서 생성)
+  design?: {
+    layout: 'split-dark-left' | 'image-top-card-bottom' | 'fullbleed-center-glass'
+    palette: { dominant: string; accent: string; textOnDominant: string }
+    title: string
+    subtitle: string
+    body: string
+    badgeLabel: string
+    ctaLabel: string
+    features: { icon: string; label: string }[]
     priceOriginal?: number
     priceSale?: number
     discountPercent?: number
-    deadlineText?: string
-    ctaLabel?: string
+    deadlineText: string
+    decorations: string[]
   }
 }
 
@@ -108,19 +120,21 @@ export class Orchestrator {
 
     const template = dto.template ?? 'basic'
 
-    // 5) LLM 카피 생성 — template 에 따라 다른 스키마/프롬프트.
-    //    product-ad / promo 는 구조화된 광고 필드를 생성.
-    const copyResult = await this.generateCopyByTemplate(
+    // 5) LLM 카피 생성
+    //    - basic: 기존 cardArraySchema
+    //    - product-ad / promo: DynamicDesign (layout·palette·decorations 을 AI 가 결정)
+    const copies: ValidatedCard[] = await this.generateCopy(
       dto.prompt,
       n,
       layouts,
       brand,
       recipe,
       chunks,
-      template,
     )
-    const copies: ValidatedCard[] = copyResult.basic
-    const productAdCopies: (ValidatedProductAdCard | null)[] = copyResult.productAd
+    const designCopies: (ValidatedDynamicDesign | null)[] =
+      template === 'product-ad' || template === 'promo'
+        ? await this.generateDynamicDesigns(dto.prompt, n, layouts, brand, recipe, chunks, template)
+        : Array(n).fill(null)
     await setProgress(55)
 
     // 6) 이미지 후보 랭킹 (template 무관 — basic 카피 기준)
@@ -135,33 +149,34 @@ export class Orchestrator {
     const editFailed = editResults.filter((r) => r.status === 'failed').length
     await setProgress(90)
 
-    // 8) 최종 카드 조립 (sanitize 포함) — product-ad 데이터가 있으면 함께 실어 보냄.
+    // 8) 최종 카드 조립 (sanitize 포함) — AI 생성 design 이 있으면 함께 실어 보냄.
     const cards: CardOut[] = copies.map((c, i) => {
-      const pa = productAdCopies[i]
+      const d = designCopies[i]
       const base: CardOut = {
         id: randId(),
         layout: layouts[i],
-        title: sanitizeText(pa?.title ?? c.title),
-        body: sanitizeText(pa?.body ?? c.body),
-        subtext: sanitizeText(pa?.subtitle ?? c.subtext),
-        cta: sanitizeText(pa?.ctaLabel ?? c.cta),
+        title: sanitizeText(d?.title ?? c.title),
+        body: sanitizeText(d?.body ?? c.body),
+        subtext: sanitizeText(d?.subtitle ?? c.subtext),
+        cta: sanitizeText(d?.ctaLabel ?? c.cta),
         imageUrl: editResults[i].url ?? undefined,
         template,
       }
-      if (pa && template === 'product-ad') {
-        base.productAd = {
-          subtitle: sanitizeText(pa.subtitle),
-          badgeLabel: sanitizeText(pa.badgeLabel),
-          features: pa.features.map((f) => ({
-            icon: f.icon,
-            label: sanitizeText(f.label),
-          })),
-          colors: pa.colors,
-          priceOriginal: pa.priceOriginal ?? undefined,
-          priceSale: pa.priceSale ?? undefined,
-          discountPercent: pa.discountPercent ?? undefined,
-          deadlineText: sanitizeText(pa.deadlineText),
-          ctaLabel: sanitizeText(pa.ctaLabel),
+      if (d) {
+        base.design = {
+          layout: d.layout,
+          palette: d.palette,
+          title: sanitizeText(d.title),
+          subtitle: sanitizeText(d.subtitle),
+          body: sanitizeText(d.body),
+          badgeLabel: sanitizeText(d.badgeLabel),
+          ctaLabel: sanitizeText(d.ctaLabel),
+          features: d.features.map((f) => ({ icon: f.icon, label: sanitizeText(f.label) })),
+          priceOriginal: d.priceOriginal ?? undefined,
+          priceSale: d.priceSale ?? undefined,
+          discountPercent: d.discountPercent ?? undefined,
+          deadlineText: sanitizeText(d.deadlineText),
+          decorations: d.decorations,
         }
       }
       return base
@@ -179,6 +194,83 @@ export class Orchestrator {
         durationMs: Date.now() - t0,
         partial,
       },
+    }
+  }
+
+  // AI 가 layout·palette·decorations 까지 결정하는 DynamicDesign 카드 생성.
+  // product-ad / promo 템플릿에서 호출. 실패 시 null 배열 — basic 카피로 폴백.
+  private async generateDynamicDesigns(
+    prompt: string,
+    n: number,
+    layouts: Layout[],
+    brand: any,
+    recipe: StyleRecipe,
+    chunks: RetrievedChunk[],
+    template: 'product-ad' | 'promo',
+  ): Promise<(ValidatedDynamicDesign | null)[]> {
+    if (!process.env.GEMINI_API_KEY) {
+      this.logger.warn(`GEMINI_API_KEY 없음 — ${template} DynamicDesign 폴백`)
+      return Array(n).fill(null)
+    }
+    const contextBlock = chunks.length
+      ? chunks.map((c, i) => `[${i + 1}] ${c.docTitle}: ${c.text}`).join('\n---\n')
+      : '(브랜드 지식노트 비어 있음)'
+
+    const brandPrimary =
+      typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
+
+    const layoutPool =
+      template === 'promo'
+        ? '이벤트·세일은 fullbleed-center-glass 또는 image-top-card-bottom 권장.'
+        : '상품 광고는 split-dark-left 또는 image-top-card-bottom 권장.'
+
+    const sys = [
+      '한국 SNS 카드뉴스 AI 디자이너. 단순한 카피라이터가 아니라 "구도·컬러·장식"까지 스스로 정한다.',
+      '출력은 layout/palette/title/subtitle/body/badgeLabel/ctaLabel/features/priceOriginal/priceSale/discountPercent/deadlineText/decorations/cardLayout 필드.',
+      'layout 중 하나를 고르세요:',
+      '  · split-dark-left: 좌측 어두운 패널 + 우측 이미지 (상품 상세페이지 감성)',
+      '  · image-top-card-bottom: 상단 이미지 + 하단 솔리드 컬러 카드 (잡지·뉴스 감성)',
+      '  · fullbleed-center-glass: 풀블리드 이미지 + 중앙 프로스티드 박스 + 큰 숫자 (이벤트·세일)',
+      layoutPool,
+      'palette.dominant = 좌측 패널/하단 카드/오버레이 배경. 어두운 HEX 권장(#1a1a2e 같은). promo 성향이면 더 대담한 컬러(#0b0b14, #dc2626 등) 가능.',
+      'palette.accent = 뱃지·CTA·강조선. 브랜드 primaryColor 와 대비되거나 조화되는 컬러. 같은 화면에서 반복 사용.',
+      'palette.textOnDominant = dominant 위 본문 컬러. 보통 #ffffff, 밝은 dominant 면 #111111.',
+      '매 생성마다 layout·palette·decorations 조합을 다르게 해서 같은 주제도 신선하게.',
+      'decorations 에는 "discount-circle" / "corner-accent" / "big-number" 등 표시하고 싶은 장식을 넣어.',
+      'discountPercent 를 포함하면 decorations 에 "discount-circle" 또는 "big-number" 를 반드시 추가.',
+      'icon 은 단일 이모지. 과장·의학적 단정·페이지 번호 금지.',
+    ].join(' ')
+
+    const userText = [
+      recipeAsPromptBlock(recipe),
+      '',
+      '[브랜드 지식노트]',
+      contextBlock,
+      '',
+      `주제: ${prompt}`,
+      `브랜드: ${brand?.name ?? '미지정'} (primary ${brandPrimary})`,
+      `카드 수: ${n} · 레이아웃 순서(cardLayout): ${layouts.join(', ')}`,
+      `템플릿 방향: ${template === 'promo' ? '이벤트·세일 (긴장감·대담함)' : '상품 광고 (정보 밀집·신뢰)'}`,
+      `길이 상한: title ${PRODUCT_AD_LIMITS.title}, subtitle ${PRODUCT_AD_LIMITS.subtitle}, body ${PRODUCT_AD_LIMITS.body}, ctaLabel ${PRODUCT_AD_LIMITS.ctaLabel}`,
+    ].join('\n')
+
+    try {
+      const parsed = await callGeminiJson<{ cards: unknown[] }>({
+        systemInstruction: sys,
+        userText,
+        schema: dynamicDesignArraySchema(n),
+        timeoutMs: LLM_TIMEOUT_MS,
+        temperature: 0.9, // 다양성 위해 기본(0.7) 보다 높게
+      })
+      if (!parsed || !Array.isArray(parsed.cards)) return Array(n).fill(null)
+      const out: (ValidatedDynamicDesign | null)[] = []
+      for (let i = 0; i < n; i++) {
+        out.push(validateDynamicDesign(parsed.cards[i]))
+      }
+      return out
+    } catch (e: any) {
+      this.logger.warn(`Gemini DynamicDesign 예외 — 폴백: ${e?.message ?? e}`)
+      return Array(n).fill(null)
     }
   }
 
