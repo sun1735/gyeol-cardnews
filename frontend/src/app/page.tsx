@@ -3320,67 +3320,101 @@ function CardItem({
         )}
       </div>
 
-      {/* 인라인 텍스트 편집 — 입력 즉시 프리뷰 반영 */}
-      <input
-        className="w-full border rounded-md px-2 py-1 text-sm"
-        value={card.title}
-        onChange={(e) => onChange({ title: e.target.value })}
-        onClick={stop}
-        placeholder="제목 (title)"
-      />
-      <textarea
-        rows={3}
-        className="w-full border rounded-md px-2 py-1 text-sm"
-        value={card.body}
-        onChange={(e) => onChange({ body: e.target.value })}
-        onClick={stop}
-        placeholder="본문 (body)"
-      />
-      {/* subtext·cta — 기본 템플릿은 card.subtext/cta 에 직접 바인딩,
-          상품광고·프로모션은 프리뷰가 productAd.subtitle/ctaLabel 을 우선 참조하므로 그쪽에 바인딩해
-          "인풋을 바꿨는데 프리뷰가 그대로" 같은 UX 혼란을 없앰. */}
+      {/* 인라인 텍스트 편집 — 입력 즉시 프리뷰 반영.
+          product-ad / promo 는 DynamicCard 가 card.design.* 를 렌더하므로
+          모든 텍스트 인풋을 design.* 로 바인딩해 즉시 프리뷰에 반영되게 한다. */}
       {card.template === 'product-ad' || card.template === 'promo' ? (
-        <div className="grid grid-cols-2 gap-2">
+        <>
           <input
-            className="border rounded-md px-2 py-1 text-sm"
-            value={card.productAd?.subtitle ?? ''}
+            className="w-full border rounded-md px-2 py-1 text-sm"
+            value={card.design?.title ?? card.title}
             onChange={(e) =>
               onChange({
-                productAd: { ...(card.productAd ?? {}), subtitle: e.target.value },
+                title: e.target.value,
+                design: card.design ? { ...card.design, title: e.target.value } : undefined,
               })
             }
             onClick={stop}
-            placeholder="서브타이틀"
+            placeholder="제목 (title)"
           />
-          <input
-            className="border rounded-md px-2 py-1 text-sm"
-            value={card.productAd?.ctaLabel ?? ''}
+          <textarea
+            rows={3}
+            className="w-full border rounded-md px-2 py-1 text-sm"
+            value={card.design?.body ?? card.body}
             onChange={(e) =>
               onChange({
-                productAd: { ...(card.productAd ?? {}), ctaLabel: e.target.value },
+                body: e.target.value,
+                design: card.design ? { ...card.design, body: e.target.value } : undefined,
               })
             }
             onClick={stop}
-            placeholder="CTA 라벨"
+            placeholder="본문 (body)"
           />
-        </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              className="border rounded-md px-2 py-1 text-sm"
+              value={card.design?.subtitle ?? card.subtext}
+              onChange={(e) =>
+                onChange({
+                  subtext: e.target.value,
+                  design: card.design
+                    ? { ...card.design, subtitle: e.target.value }
+                    : undefined,
+                })
+              }
+              onClick={stop}
+              placeholder="서브타이틀"
+            />
+            <input
+              className="border rounded-md px-2 py-1 text-sm"
+              value={card.design?.ctaLabel ?? card.cta}
+              onChange={(e) =>
+                onChange({
+                  cta: e.target.value,
+                  design: card.design
+                    ? { ...card.design, ctaLabel: e.target.value }
+                    : undefined,
+                })
+              }
+              onClick={stop}
+              placeholder="CTA 라벨"
+            />
+          </div>
+        </>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <>
           <input
-            className="border rounded-md px-2 py-1 text-sm"
-            value={card.subtext}
-            onChange={(e) => onChange({ subtext: e.target.value })}
+            className="w-full border rounded-md px-2 py-1 text-sm"
+            value={card.title}
+            onChange={(e) => onChange({ title: e.target.value })}
             onClick={stop}
-            placeholder="서브텍스트 (subtext)"
+            placeholder="제목 (title)"
           />
-          <input
-            className="border rounded-md px-2 py-1 text-sm"
-            value={card.cta}
-            onChange={(e) => onChange({ cta: e.target.value })}
+          <textarea
+            rows={3}
+            className="w-full border rounded-md px-2 py-1 text-sm"
+            value={card.body}
+            onChange={(e) => onChange({ body: e.target.value })}
             onClick={stop}
-            placeholder="CTA"
+            placeholder="본문 (body)"
           />
-        </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              className="border rounded-md px-2 py-1 text-sm"
+              value={card.subtext}
+              onChange={(e) => onChange({ subtext: e.target.value })}
+              onClick={stop}
+              placeholder="서브텍스트 (subtext)"
+            />
+            <input
+              className="border rounded-md px-2 py-1 text-sm"
+              value={card.cta}
+              onChange={(e) => onChange({ cta: e.target.value })}
+              onClick={stop}
+              placeholder="CTA"
+            />
+          </div>
+        </>
       )}
 
       {/* 상품 광고 / 프로모션 전용 필드 인라인 편집 */}
@@ -3455,10 +3489,11 @@ function CardItem({
             <span className="block text-[10px] text-slate-500 mb-0.5">뱃지</span>
             <input
               className="w-full border rounded-md px-2 py-1 text-xs"
-              value={card.productAd?.badgeLabel ?? ''}
+              value={card.design?.badgeLabel ?? ''}
               onChange={(e) =>
+                card.design &&
                 onChange({
-                  productAd: { ...(card.productAd ?? {}), badgeLabel: e.target.value },
+                  design: { ...card.design, badgeLabel: e.target.value },
                 })
               }
               placeholder="BEST SELLER"
@@ -3471,11 +3506,12 @@ function CardItem({
               <input
                 type="number"
                 className="w-full border rounded-md px-2 py-1 text-xs tabular-nums"
-                value={card.productAd?.priceOriginal ?? ''}
+                value={card.design?.priceOriginal ?? ''}
                 onChange={(e) =>
+                  card.design &&
                   onChange({
-                    productAd: {
-                      ...(card.productAd ?? {}),
+                    design: {
+                      ...card.design,
                       priceOriginal: e.target.value ? Number(e.target.value) : undefined,
                     },
                   })
@@ -3488,11 +3524,12 @@ function CardItem({
               <input
                 type="number"
                 className="w-full border rounded-md px-2 py-1 text-xs tabular-nums"
-                value={card.productAd?.priceSale ?? ''}
+                value={card.design?.priceSale ?? ''}
                 onChange={(e) =>
+                  card.design &&
                   onChange({
-                    productAd: {
-                      ...(card.productAd ?? {}),
+                    design: {
+                      ...card.design,
                       priceSale: e.target.value ? Number(e.target.value) : undefined,
                     },
                   })
@@ -3507,13 +3544,14 @@ function CardItem({
                 min={1}
                 max={99}
                 className="w-full border rounded-md px-2 py-1 text-xs tabular-nums"
-                value={card.productAd?.discountPercent ?? ''}
+                value={card.design?.discountPercent ?? ''}
                 onChange={(e) => {
+                  if (!card.design) return
                   const v = e.target.value ? Number(e.target.value) : undefined
                   const clamped =
                     typeof v === 'number' ? Math.max(1, Math.min(99, v)) : undefined
                   onChange({
-                    productAd: { ...(card.productAd ?? {}), discountPercent: clamped },
+                    design: { ...card.design, discountPercent: clamped },
                   })
                 }}
                 placeholder="20"
@@ -3524,10 +3562,11 @@ function CardItem({
             <span className="block text-[10px] text-slate-500 mb-0.5">마감 문구</span>
             <input
               className="w-full border rounded-md px-2 py-1 text-xs"
-              value={card.productAd?.deadlineText ?? ''}
+              value={card.design?.deadlineText ?? ''}
               onChange={(e) =>
+                card.design &&
                 onChange({
-                  productAd: { ...(card.productAd ?? {}), deadlineText: e.target.value },
+                  design: { ...card.design, deadlineText: e.target.value },
                 })
               }
               placeholder="5월 5일까지"
