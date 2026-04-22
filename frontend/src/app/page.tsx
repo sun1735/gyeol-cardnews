@@ -2057,7 +2057,7 @@ export default function Page() {
                                 primaryColor={primary}
                                 // basic 은 실제 생성 예시(YOOSUN) 를 사용해 "진짜 이렇게 나옵니다" 어필.
                                 sampleImageUrl={t.key === 'basic' ? '/samples/yoosun-basic.png' : undefined}
-                                sampleAspect="1:1"
+                                sampleAspect="4:5"
                               />
                             </div>
                             <div>

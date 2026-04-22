@@ -124,7 +124,7 @@ export function Landing() {
                   template="basic"
                   displayWidth={260}
                   sampleImageUrl="/samples/yoosun-basic.png"
-                  sampleAspect="1:1"
+                  sampleAspect="4:5"
                 />
               </div>
             </div>
@@ -244,7 +244,7 @@ export function Landing() {
                   displayWidth={260}
                   primaryColor={t.primary}
                   sampleImageUrl={t.sample}
-                  sampleAspect="1:1"
+                  sampleAspect="4:5"
                 />
                 <div className="text-center">
                   <h3 className="text-[20px] font-bold tracking-[-0.015em]">{t.title}</h3>
