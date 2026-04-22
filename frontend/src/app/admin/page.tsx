@@ -90,6 +90,13 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [me, setMe] = useState<{
+    email?: string
+    role?: string
+    plan?: string
+    name?: string
+  } | null>(null)
+  const [meError, setMeError] = useState<string | null>(null)
 
   async function loadStats() {
     setLoading(true)
@@ -152,8 +159,26 @@ export default function AdminPage() {
     }
   }
 
+  // 진단: 백엔드에서 본 현재 유저의 role/plan 을 실시간 확인.
+  async function loadMe() {
+    setMeError(null)
+    try {
+      const r = await api.call<{
+        email: string
+        role: string
+        plan: string
+        name: string
+      }>('/api/account/me')
+      setMe(r)
+    } catch (e: any) {
+      setMe(null)
+      setMeError(String(e?.message ?? e))
+    }
+  }
+
   useEffect(() => {
     if (status !== 'authenticated') return
+    void loadMe()
     if (tab === 'stats') void loadStats()
     else if (tab === 'users') void loadUsers(userQuery)
     else if (tab === 'brands') void loadBrands()
@@ -203,7 +228,34 @@ export default function AdminPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-10">
         <h1 className="text-2xl font-bold">접근 불가</h1>
-        <p className="text-slate-500">{authError}</p>
+        <p className="text-slate-600 text-sm">{authError}</p>
+        {/* 진단 정보 — 백엔드가 본 내 role 을 그대로 표시 */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-sm space-y-1 min-w-[320px]">
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-2">
+            진단 정보
+          </div>
+          <Diag label="세션 이메일" value={session?.user?.email ?? '(없음)'} />
+          <Diag label="세션 role" value={role ?? '(없음)'} />
+          <Diag
+            label="API 토큰"
+            value={apiToken ? apiToken.slice(0, 16) + '…' : '(없음)'}
+          />
+          <Diag label="백엔드 me.email" value={me?.email ?? '(없음)'} />
+          <Diag label="백엔드 me.role" value={me?.role ?? '(없음)'} />
+          {meError && (
+            <div className="text-[11px] text-red-600 break-all pt-1 border-t border-slate-100 mt-2">
+              /me 에러: {meError}
+            </div>
+          )}
+          {me && me.role !== 'admin' && (
+            <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-2 leading-relaxed">
+              Railway 백엔드 서비스의 <code>ADMIN_EMAILS</code> 환경변수에
+              <br />
+              <b>{me.email}</b> 이(가) 포함되어 있는지 확인하세요. 설정 후 재배포 →
+              로그아웃·재로그인 필요.
+            </div>
+          )}
+        </div>
         <Link href="/" className="px-4 py-2 rounded-md bg-slate-100 text-sm font-medium">
           홈으로
         </Link>
@@ -343,6 +395,15 @@ function Row({ label, value }: { label: string; value: number }) {
     <div className="flex justify-between text-sm">
       <span className="text-slate-600">{label}</span>
       <span className="font-semibold tabular-nums">{value.toLocaleString()}</span>
+    </div>
+  )
+}
+
+function Diag({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 text-[12px]">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-mono text-slate-800 break-all text-right">{value}</span>
     </div>
   )
 }
