@@ -30,14 +30,15 @@ interface VerifyDto {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const BCRYPT_ROUNDS = 10
 
+// 관리자 이메일 — 코드 레벨 고정 목록 + ADMIN_EMAILS 환경변수 병합.
+const HARDCODED_ADMIN_EMAILS = ['sun17351735@gmail.com']
+
 function isAdminEmail(email: string): boolean {
-  const raw = (process.env.ADMIN_EMAILS ?? '').trim()
-  if (!raw) return false
-  return raw
+  const envList = (process.env.ADMIN_EMAILS ?? '')
     .split(/[,\s]+/)
     .filter(Boolean)
-    .map((s) => s.toLowerCase())
-    .includes(email.toLowerCase())
+  const all = [...HARDCODED_ADMIN_EMAILS, ...envList].map((s) => s.toLowerCase())
+  return all.includes(email.toLowerCase())
 }
 
 // 경로가 NextAuth /api/auth/* 와 충돌하지 않도록 account 네임스페이스 사용.
