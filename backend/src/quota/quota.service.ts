@@ -19,12 +19,14 @@ export class QuotaService {
 
   // 액션 수행 전 호출. 한도 초과 시 402 Payment Required throw.
   // user 가 null 이면(비로그인) 통과 — AUTH_MODE off 에서 레거시 호환.
+  // 관리자(role='admin') 는 한도 무시 — 사용량은 계속 기록해 분석용 데이터만 남김.
   async checkAndIncrement(
     user: AuthUser | null | undefined,
     action: QuotaAction,
   ): Promise<{ plan: PlanKey; current: number; limit: number }> {
     if (!user) return { plan: 'free', current: 0, limit: 0 }
 
+    const isAdmin = user.role === 'admin'
     const plan = await this.getUserPlan(user.id)
     const limit = PLAN_LIMITS[plan][action] as number
     const yearMonth = currentYearMonth()
@@ -37,7 +39,7 @@ export class QuotaService {
 
     // imageGen 은 크레딧 팩으로도 보충 가능. 플랜 한도 소진 후 크레딧 잔량이 있으면 크레딧에서 차감.
     const isImage = action === 'imageGen'
-    if (currentCount >= limit) {
+    if (!isAdmin && currentCount >= limit) {
       if (isImage) {
         const pack = await this.findActiveCreditPack(user.id)
         if (pack) {
@@ -61,7 +63,7 @@ export class QuotaService {
       )
     }
 
-    // upsert + 증가
+    // upsert + 증가 (관리자도 기록은 함 — 사용량 분석)
     await this.prisma.usageCounter.upsert({
       where: { userId_yearMonth: { userId: user.id, yearMonth } },
       create: {
@@ -74,7 +76,8 @@ export class QuotaService {
       },
     })
 
-    return { plan, current: currentCount + 1, limit }
+    // 관리자 응답의 limit 은 -1(무제한) 로 표기 — 프런트 UI 에서 "∞" 로 표시.
+    return { plan, current: currentCount + 1, limit: isAdmin ? -1 : limit }
   }
 
   // 남은 크레딧(이미지) 합계 — 만료 전·미소진 팩들만 카운트.
@@ -108,9 +111,11 @@ export class QuotaService {
     }).then((pack) => (pack && pack.creditsUsed < pack.creditsTotal ? pack : null))
   }
 
-  // 프런트 사용량 메터용 현재값 조회
+  // 프런트 사용량 메터용 현재값 조회. 관리자면 isUnlimited=true 로 UI 가 ∞ 표시.
   async getUsage(userId: string): Promise<{
     plan: PlanKey
+    role: string
+    isUnlimited: boolean
     limits: typeof PLAN_LIMITS.free
     counts: {
       imageGen: number
@@ -123,14 +128,18 @@ export class QuotaService {
   }> {
     const plan = await this.getUserPlan(userId)
     const yearMonth = currentYearMonth()
-    const [counter, credits] = await Promise.all([
+    const [counter, credits, roleRow] = await Promise.all([
       this.prisma.usageCounter.findUnique({
         where: { userId_yearMonth: { userId, yearMonth } },
       }),
       this.getCreditBalance(userId),
+      this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
     ])
+    const role = roleRow?.role ?? 'user'
     return {
       plan,
+      role,
+      isUnlimited: role === 'admin',
       limits: PLAN_LIMITS[plan],
       counts: {
         imageGen: counter?.imageGenCount ?? 0,

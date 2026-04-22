@@ -104,9 +104,12 @@ export default function Page() {
   const authedFetch = useAuthedFetch()
   const isLoggedIn = authStatus === 'authenticated'
 
-  // 사용량 메터 — 로그인 시 /api/quota/me 로 이번 달 카운트 조회
+  // 사용량 메터 — 로그인 시 /api/quota/me 로 이번 달 카운트 조회.
+  // 관리자는 isUnlimited=true → UI 에서 ∞ 표시.
   const [quotaUsage, setQuotaUsage] = useState<{
     plan: string
+    role?: string
+    isUnlimited?: boolean
     limits: { imageGen: number; textGen: number; ragJob: number; ideaGen: number }
     counts: { imageGen: number; textGen: number; ragJob: number; ideaGen: number }
   } | null>(null)
@@ -1158,25 +1161,39 @@ export default function Page() {
               ))}
             </select>
           )}
-          {/* 사용량 · 요금제 */}
+          {/* 사용량 · 요금제 — 관리자는 '무제한' 표시 */}
           {isLoggedIn && quotaUsage ? (
             <a
-              href="/pricing"
+              href={quotaUsage.isUnlimited ? '/admin' : '/pricing'}
               className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-slate-200 bg-white hover:border-slate-300 text-sm transition"
-              title={`AI 이미지 ${quotaUsage.counts.imageGen}/${quotaUsage.limits.imageGen} · 텍스트 ${quotaUsage.counts.textGen}/${quotaUsage.limits.textGen}`}
+              title={
+                quotaUsage.isUnlimited
+                  ? `관리자 · 사용량 무제한 (이번 달 이미지 ${quotaUsage.counts.imageGen}장)`
+                  : `AI 이미지 ${quotaUsage.counts.imageGen}/${quotaUsage.limits.imageGen} · 텍스트 ${quotaUsage.counts.textGen}/${quotaUsage.limits.textGen}`
+              }
             >
               <span
                 className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
                 style={{
-                  background: quotaUsage.plan === 'free' ? '#f1f5f9' : 'var(--n2c-primary-soft)',
-                  color: quotaUsage.plan === 'free' ? '#64748b' : 'var(--n2c-primary)',
+                  background: quotaUsage.isUnlimited
+                    ? '#4338ca'
+                    : quotaUsage.plan === 'free'
+                      ? '#f1f5f9'
+                      : 'var(--n2c-primary-soft)',
+                  color: quotaUsage.isUnlimited
+                    ? '#ffffff'
+                    : quotaUsage.plan === 'free'
+                      ? '#64748b'
+                      : 'var(--n2c-primary)',
                 }}
               >
-                {quotaUsage.plan}
+                {quotaUsage.isUnlimited ? 'ADMIN' : quotaUsage.plan}
               </span>
               <span className="text-slate-600 text-[13px] tabular-nums">
                 {quotaUsage.counts.imageGen}
-                <span className="text-slate-400">/{quotaUsage.limits.imageGen}</span>
+                <span className="text-slate-400">
+                  /{quotaUsage.isUnlimited ? '∞' : quotaUsage.limits.imageGen}
+                </span>
               </span>
             </a>
           ) : (
