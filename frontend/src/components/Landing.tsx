@@ -113,14 +113,19 @@ export function Landing() {
             </p>
           </div>
 
-          {/* 우측 미리보기 콜라주 */}
+          {/* 우측 미리보기 콜라주 — 실제 생성된 샘플 + 다른 템플릿 미리보기 */}
           <div className="relative h-[440px] hidden lg:block">
             <div
               className="absolute"
               style={{ top: 0, right: 40, transform: 'rotate(-4deg)' }}
             >
               <div className="rounded-[20px] overflow-hidden shadow-2xl">
-                <TemplatePreview template="product-ad" displayWidth={260} primaryColor="#4338ca" />
+                <TemplatePreview
+                  template="basic"
+                  displayWidth={260}
+                  sampleImageUrl="/samples/yoosun-basic.png"
+                  sampleAspect="1:1"
+                />
               </div>
             </div>
             <div
@@ -136,7 +141,7 @@ export function Landing() {
               style={{ bottom: 0, right: 10, transform: 'rotate(2deg)' }}
             >
               <div className="rounded-[20px] overflow-hidden shadow-2xl">
-                <TemplatePreview template="basic" displayWidth={200} primaryColor="#0f766e" />
+                <TemplatePreview template="product-ad" displayWidth={200} primaryColor="#4338ca" />
               </div>
             </div>
           </div>
@@ -202,27 +207,45 @@ export function Landing() {
               {
                 key: 'basic' as const,
                 title: '기본',
-                desc: '콘텐츠·공지·스토리텔링 카드뉴스. 6장 시리즈로 서사 전개.',
+                desc: '콘텐츠·공지·스토리텔링 카드뉴스. 실제 생성 예시 ↓',
                 primary: '#4338ca',
+                sample: '/samples/yoosun-basic.png',
+                badge: '실제 생성 예시',
               },
               {
                 key: 'product-ad' as const,
                 title: '상품 광고',
                 desc: '가격·할인율·기능 아이콘까지. 쇼핑몰 상세페이지 감성.',
                 primary: '#4338ca',
+                sample: undefined,
               },
               {
                 key: 'promo' as const,
                 title: '프로모션',
                 desc: '이벤트·세일·한정. 중앙 대형 할인율이 주인공.',
                 primary: '#dc2626',
+                sample: undefined,
               },
             ].map((t) => (
               <div
                 key={t.key}
-                className="flex flex-col items-center gap-5 p-6 bg-white rounded-[20px] border border-slate-200 hover:shadow-lg transition"
+                className="flex flex-col items-center gap-5 p-6 bg-white rounded-[20px] border border-slate-200 hover:shadow-lg transition relative"
               >
-                <TemplatePreview template={t.key} displayWidth={260} primaryColor={t.primary} />
+                {t.badge && (
+                  <div
+                    className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full text-white text-[10px] font-bold tracking-wider uppercase"
+                    style={{ background: '#4338ca' }}
+                  >
+                    {t.badge}
+                  </div>
+                )}
+                <TemplatePreview
+                  template={t.key}
+                  displayWidth={260}
+                  primaryColor={t.primary}
+                  sampleImageUrl={t.sample}
+                  sampleAspect="1:1"
+                />
                 <div className="text-center">
                   <h3 className="text-[20px] font-bold tracking-[-0.015em]">{t.title}</h3>
                   <p className="mt-1.5 text-[14px] text-slate-600 font-medium leading-relaxed">

@@ -2038,23 +2038,31 @@ export default function Page() {
                                 template={t.key}
                                 displayWidth={160}
                                 primaryColor={primary}
+                                // basic 은 실제 생성 예시(YOOSUN) 를 사용해 "진짜 이렇게 나옵니다" 어필.
+                                sampleImageUrl={t.key === 'basic' ? '/samples/yoosun-basic.png' : undefined}
+                                sampleAspect="1:1"
                               />
                             </div>
                             <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[13px] font-semibold tracking-[-0.01em]">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[15px] font-bold tracking-[-0.01em]">
                                   {t.title}
                                 </span>
                                 {active && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white font-medium">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white font-bold">
                                     선택됨
                                   </span>
                                 )}
+                                {t.key === 'basic' && !active && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-white font-bold">
+                                    실제 예시
+                                  </span>
+                                )}
                                 {t.requiresNoteRag && !active && (
-                                  <span className="text-[10px] text-slate-400">지식노트</span>
+                                  <span className="text-[10px] text-slate-500 font-medium">지식노트</span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">
+                              <div className="text-[12px] text-slate-600 mt-1 leading-snug font-medium">
                                 {t.description}
                               </div>
                             </div>

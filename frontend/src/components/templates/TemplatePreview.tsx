@@ -13,6 +13,10 @@ export interface TemplatePreviewProps {
   primaryColor?: string
   // 배경 이미지 — /icon.svg 같은 로컬 에셋을 쓸 수 있으나, 미제공 시 그라디언트 배경.
   backgroundImageUrl?: string
+  // 실제 생성된 카드 샘플 이미지. 제공되면 합성 미리보기 대신 이미지 그대로 표시.
+  sampleImageUrl?: string
+  // 샘플 이미지의 비율. 기본 1:1.
+  sampleAspect?: '1:1' | '4:5' | '9:16'
 }
 
 export function TemplatePreview({
@@ -20,7 +24,39 @@ export function TemplatePreview({
   displayWidth = 180,
   primaryColor,
   backgroundImageUrl,
+  sampleImageUrl,
+  sampleAspect = '1:1',
 }: TemplatePreviewProps) {
+  // 실제 샘플 이미지가 있으면 합성 렌더 대신 이미지만 그대로 (가장 진짜같음).
+  if (sampleImageUrl) {
+    const ratioH = sampleAspect === '1:1' ? 1 : sampleAspect === '4:5' ? 1.25 : 16 / 9
+    const displayHeight = Math.round(displayWidth * ratioH)
+    return (
+      <div
+        style={{
+          width: displayWidth,
+          height: displayHeight,
+          borderRadius: Math.max(12, displayWidth * 0.04),
+          overflow: 'hidden',
+          background: '#f1f5f9',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+        }}
+      >
+        <img
+          src={sampleImageUrl}
+          alt=""
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+          draggable={false}
+        />
+      </div>
+    )
+  }
+
   if (template === 'product-ad') {
     return (
       <ProductAdCard
