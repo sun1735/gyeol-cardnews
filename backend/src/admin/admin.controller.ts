@@ -8,11 +8,13 @@ import {
   HttpStatus,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AdminGuard } from '../auth/admin.guard'
+import { CREDIT_PACKS, isCreditPackKey } from '../quota/plans'
 
 // 관리자 전용 엔드포인트. AuthGuard + AdminGuard 로 보호.
 // 기본 통계, 유저 목록, 브랜드 목록, 플랜·역할 수동 조정.
@@ -163,6 +165,42 @@ export class AdminController {
         ownerId: true,
         owner: { select: { email: true, name: true } },
       },
+    })
+    return { items }
+  }
+
+  // 크레딧 팩 수동 부여 — 오프라인 결제 처리용.
+  // body: { packType: 'starter'|'standard'|'premium', note?: string }
+  @Post('users/:id/credits')
+  async grantCredits(
+    @Param('id') userId: string,
+    @Body() dto: { packType?: string; note?: string },
+  ) {
+    if (!isCreditPackKey(dto.packType)) {
+      throw new HttpException('packType 은 starter|standard|premium 중 하나', HttpStatus.BAD_REQUEST)
+    }
+    const spec = CREDIT_PACKS[dto.packType]
+    const expiresAt = new Date(Date.now() + spec.expiresInDays * 24 * 60 * 60 * 1000)
+    const pack = await this.prisma.creditPack.create({
+      data: {
+        userId,
+        packType: spec.key,
+        creditsTotal: spec.credits,
+        priceKrw: spec.priceKrw,
+        source: 'manual',
+        paymentRef: dto.note?.slice(0, 120) ?? null,
+        expiresAt,
+      },
+    })
+    return pack
+  }
+
+  // 유저 크레딧 팩 이력
+  @Get('users/:id/credits')
+  async listCredits(@Param('id') userId: string) {
+    const items = await this.prisma.creditPack.findMany({
+      where: { userId },
+      orderBy: { purchasedAt: 'desc' },
     })
     return { items }
   }

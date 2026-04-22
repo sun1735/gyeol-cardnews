@@ -34,10 +34,24 @@ export class QuotaService {
       where: { userId_yearMonth: { userId: user.id, yearMonth } },
     })
     const currentCount = counter ? counter[fieldForAction(action)] : 0
+
+    // imageGen 은 크레딧 팩으로도 보충 가능. 플랜 한도 소진 후 크레딧 잔량이 있으면 크레딧에서 차감.
+    const isImage = action === 'imageGen'
     if (currentCount >= limit) {
+      if (isImage) {
+        const pack = await this.findActiveCreditPack(user.id)
+        if (pack) {
+          // 크레딧 1 소진 — usageCounter 는 증가하지 않음 (플랜 한도 보호)
+          await this.prisma.creditPack.update({
+            where: { id: pack.id },
+            data: { creditsUsed: { increment: 1 } },
+          })
+          return { plan, current: currentCount, limit }
+        }
+      }
       throw new HttpException(
         {
-          message: `이번 달 ${labelFor(action)} 한도(${limit}회)에 도달했습니다. 플랜을 업그레이드해 주세요.`,
+          message: `이번 달 ${labelFor(action)} 한도(${limit}회)에 도달했습니다. 플랜 업그레이드 또는 1회권 구매로 이용하세요.`,
           action,
           current: currentCount,
           limit,
@@ -63,6 +77,37 @@ export class QuotaService {
     return { plan, current: currentCount + 1, limit }
   }
 
+  // 남은 크레딧(이미지) 합계 — 만료 전·미소진 팩들만 카운트.
+  async getCreditBalance(userId: string): Promise<{ remaining: number; packs: number }> {
+    const now = new Date()
+    const packs = await this.prisma.creditPack.findMany({
+      where: {
+        userId,
+        expiresAt: { gt: now },
+      },
+      select: { creditsTotal: true, creditsUsed: true },
+    })
+    const remaining = packs.reduce(
+      (acc, p) => acc + Math.max(0, p.creditsTotal - p.creditsUsed),
+      0,
+    )
+    return { remaining, packs: packs.length }
+  }
+
+  // 가장 먼저 만료될 유효 팩부터 소진 (FIFO by expiresAt).
+  private async findActiveCreditPack(userId: string) {
+    const now = new Date()
+    return this.prisma.creditPack.findFirst({
+      where: {
+        userId,
+        expiresAt: { gt: now },
+      },
+      orderBy: { expiresAt: 'asc' },
+      // creditsUsed < creditsTotal 필터: Prisma 는 두 컬럼 비교 직접 지원 안 해서 findMany 후 필터가 안전하나,
+      // 단일 로우만 필요하므로 raw 없이 findFirst 후 코드에서 체크.
+    }).then((pack) => (pack && pack.creditsUsed < pack.creditsTotal ? pack : null))
+  }
+
   // 프런트 사용량 메터용 현재값 조회
   async getUsage(userId: string): Promise<{
     plan: PlanKey
@@ -73,13 +118,17 @@ export class QuotaService {
       ragJob: number
       ideaGen: number
     }
+    credits: { remaining: number; packs: number }
     yearMonth: string
   }> {
     const plan = await this.getUserPlan(userId)
     const yearMonth = currentYearMonth()
-    const counter = await this.prisma.usageCounter.findUnique({
-      where: { userId_yearMonth: { userId, yearMonth } },
-    })
+    const [counter, credits] = await Promise.all([
+      this.prisma.usageCounter.findUnique({
+        where: { userId_yearMonth: { userId, yearMonth } },
+      }),
+      this.getCreditBalance(userId),
+    ])
     return {
       plan,
       limits: PLAN_LIMITS[plan],
@@ -89,6 +138,7 @@ export class QuotaService {
         ragJob: counter?.ragJobCount ?? 0,
         ideaGen: counter?.ideaGenCount ?? 0,
       },
+      credits,
       yearMonth,
     }
   }

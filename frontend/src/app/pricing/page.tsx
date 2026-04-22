@@ -58,17 +58,29 @@ function formatKRW(n: number) {
   return n.toLocaleString('ko-KR') + '원'
 }
 
+interface CreditPackInfo {
+  key: 'starter' | 'standard' | 'premium'
+  name: string
+  credits: number
+  priceKrw: number
+  expiresInDays: number
+}
+
 export default function PricingPage() {
   const { data: session, status } = useSession()
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [plans, setPlans] = useState<PlanInfo[]>([])
+  const [creditPacks, setCreditPacks] = useState<CreditPackInfo[]>([])
   const [currentPlan, setCurrentPlan] = useState<PlanKey>('free')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch('/api/quota/plans')
       .then((r) => r.json())
-      .then((d) => setPlans(d?.plans ?? []))
+      .then((d) => {
+        setPlans(d?.plans ?? [])
+        setCreditPacks(d?.creditPacks ?? [])
+      })
       .catch(() => setPlans([]))
       .finally(() => setLoading(false))
   }, [])
@@ -232,7 +244,78 @@ export default function PricingPage() {
         </div>
       )}
 
-      <div className="mt-10 text-center text-sm text-slate-500 leading-relaxed">
+      {/* ─────────── 1회권 (크레딧 팩) ─────────── */}
+      {creditPacks.length > 0 && (
+        <section className="mt-16">
+          <div className="text-center mb-8">
+            <h2 className="text-[28px] sm:text-[32px] font-black tracking-[-0.025em]">
+              자동결제가 부담되시나요?
+            </h2>
+            <p className="mt-2.5 text-slate-600 text-[15px] font-medium">
+              월 구독 대신 <b>1회권</b>으로 필요한 만큼만 결제하세요. 구매 후 30일 유효.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {creditPacks.map((p, i) => {
+              const perUnit = Math.round(p.priceKrw / p.credits)
+              const isStandard = p.key === 'standard'
+              return (
+                <div
+                  key={p.key}
+                  className={`p-7 rounded-[18px] bg-white transition relative ${
+                    isStandard
+                      ? 'ring-2 ring-indigo-500 shadow-xl'
+                      : 'border border-slate-200'
+                  }`}
+                >
+                  {isStandard && (
+                    <div
+                      className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-white text-[11px] font-bold tracking-wider uppercase"
+                      style={{ background: '#4338ca' }}
+                    >
+                      인기
+                    </div>
+                  )}
+                  <h3 className="text-[19px] font-bold tracking-[-0.015em]">{p.name}</h3>
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="text-[34px] font-black tracking-[-0.03em]">
+                      {formatKRW(p.priceKrw)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[13px] text-slate-500 font-medium">
+                    이미지 {p.credits}장 · 장당 {perUnit}원
+                  </p>
+                  <ul className="mt-5 space-y-2 text-[13px] text-slate-700 font-medium">
+                    <li className="flex items-start gap-2">
+                      <span className="text-indigo-600 mt-0.5">✓</span>
+                      <span>결제 후 {p.expiresInDays}일 유효</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-indigo-600 mt-0.5">✓</span>
+                      <span>플랜 한도 소진 후 자동으로 차감</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-indigo-600 mt-0.5">✓</span>
+                      <span>자동결제 없음 · 1회 결제</span>
+                    </li>
+                  </ul>
+                  <a
+                    href={`mailto:sun17351735@gmail.com?subject=Note2Card ${p.name} 1회권 구매 문의&body=안녕하세요, ${p.name} (${p.credits}장 / ${formatKRW(p.priceKrw)}) 1회권을 구매하고 싶습니다.%0A%0A가입 이메일: ${session?.user?.email ?? '(기재)'}`}
+                    className="block mt-6 w-full py-3 rounded-lg font-bold text-center text-[14px] transition bg-slate-900 text-white hover:bg-slate-800"
+                  >
+                    구매 문의
+                  </a>
+                </div>
+              )
+            })}
+          </div>
+          <p className="mt-6 text-center text-[12px] text-slate-500 font-medium">
+            임시로 이메일 문의로 진행합니다. 자동 결제는 곧 도입 예정 (토스페이먼츠).
+          </p>
+        </section>
+      )}
+
+      <div className="mt-16 text-center text-sm text-slate-500 leading-relaxed">
         모든 플랜은 언제든 해지·변경 가능 · 결제는{' '}
         <a href="https://tosspayments.com" target="_blank" rel="noopener" className="underline">
           토스페이먼츠

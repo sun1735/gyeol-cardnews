@@ -26,8 +26,29 @@ model User {
 
   brands         BrandProfile[]
   usageCounters  UsageCounter[]
+  creditPacks    CreditPack[]
 
   @@map("users")
+}
+
+// 1회권(크레딧 팩) — 월 구독 외 추가 이미지 생성 한도 구매.
+// 결제 완료 시 생성, expiresAt 이후엔 쿼터 계산에서 제외.
+// remaining 이 0 이 되면 "소진", 0 > 0 일 때만 유효 카운트.
+model CreditPack {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packType      String   // 'starter' | 'standard' | 'premium'
+  creditsTotal  Int      // 최초 부여된 이미지 생성 수량
+  creditsUsed   Int      @default(0)
+  priceKrw      Int      // 결제 금액 (감사·환불 참조)
+  source        String   @default("manual") // manual | stripe | toss | kakao
+  paymentRef    String?  // 외부 결제 시스템 참조 ID
+  purchasedAt   DateTime @default(now())
+  expiresAt     DateTime // 구매 + 30일 기본
+
+  @@index([userId, expiresAt])
+  @@map("credit_packs")
 }
 
 // 월간 사용량 카운터 — 플랜 한도 체크 및 과금 기반.

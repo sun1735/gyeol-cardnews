@@ -67,3 +67,30 @@ export function normalizePlan(v: string | null | undefined): PlanKey {
   if (v === 'pro' || v === 'team') return v
   return 'free'
 }
+
+// ──────────────────────────────────────────────────────────────
+// 1회권 (크레딧 팩) 카탈로그
+// ──────────────────────────────────────────────────────────────
+// 자동결제 부담 없이 한 번만 결제해서 N 장 이미지 생성 권한을 얻는 옵션.
+// 플랜 한도를 모두 소진한 뒤에만 크레딧이 차감되도록 quota.service 에서 처리.
+// 유효기간 30일 — 이월 정책 단순화·방치 방지.
+
+export type CreditPackKey = 'starter' | 'standard' | 'premium'
+
+export interface CreditPackSpec {
+  key: CreditPackKey
+  name: string
+  credits: number // 이 팩이 부여하는 이미지 생성 수량
+  priceKrw: number
+  expiresInDays: number
+}
+
+export const CREDIT_PACKS: Record<CreditPackKey, CreditPackSpec> = {
+  starter: { key: 'starter', name: '스타터', credits: 10, priceKrw: 2900, expiresInDays: 30 },
+  standard: { key: 'standard', name: '스탠다드', credits: 50, priceKrw: 9900, expiresInDays: 30 },
+  premium: { key: 'premium', name: '프리미엄', credits: 120, priceKrw: 19900, expiresInDays: 30 },
+}
+
+export function isCreditPackKey(v: unknown): v is CreditPackKey {
+  return v === 'starter' || v === 'standard' || v === 'premium'
+}

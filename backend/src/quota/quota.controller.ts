@@ -3,7 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { CurrentUser, Public } from '../auth/auth.guard'
 import type { AuthUser } from '../auth/auth.service'
 import { QuotaService } from './quota.service'
-import { PLAN_LIMITS, PLAN_PRICE_KRW } from './plans'
+import { CREDIT_PACKS, PLAN_LIMITS, PLAN_PRICE_KRW } from './plans'
 
 @ApiTags('quota')
 @Controller('api/quota')
@@ -27,6 +27,7 @@ export class QuotaController {
         price: PLAN_PRICE_KRW[k],
         limits: PLAN_LIMITS[k],
       })),
+      creditPacks: (['starter', 'standard', 'premium'] as const).map((k) => CREDIT_PACKS[k]),
     }
   }
 }

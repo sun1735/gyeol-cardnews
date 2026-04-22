@@ -206,6 +206,28 @@ export default function AdminPage() {
       alert('삭제 실패: ' + (e?.message ?? e))
     }
   }
+  // 크레딧 팩 수동 부여 (오프라인 결제 처리).
+  async function grantCredits(id: string, email: string) {
+    const packType = prompt(
+      `${email} 에게 부여할 크레딧 팩 종류를 입력하세요.\n\nstarter = 10장 / ₩2,900\nstandard = 50장 / ₩9,900\npremium = 120장 / ₩19,900`,
+      'standard',
+    )
+    if (!packType) return
+    if (!['starter', 'standard', 'premium'].includes(packType)) {
+      alert('starter | standard | premium 중 하나여야 합니다')
+      return
+    }
+    const note = prompt('결제 참고 메모 (영수증 번호 등, 선택)', '') ?? ''
+    try {
+      await api.call(`/api/admin/users/${id}/credits`, {
+        method: 'POST',
+        body: JSON.stringify({ packType, note }),
+      })
+      alert(`${email} 에게 ${packType} 팩을 부여했습니다. 30일 유효.`)
+    } catch (e: any) {
+      alert('부여 실패: ' + (e?.message ?? e))
+    }
+  }
 
   if (status === 'loading') {
     return <main className="p-10 text-center text-slate-400">로딩…</main>
@@ -325,6 +347,7 @@ export default function AdminPage() {
             onSearch={() => loadUsers(userQuery)}
             onUpdate={updateUser}
             onDelete={deleteUser}
+            onGrantCredits={grantCredits}
           />
         )}
 
@@ -416,6 +439,7 @@ function UsersPanel({
   onSearch,
   onUpdate,
   onDelete,
+  onGrantCredits,
 }: {
   users: UserRow[]
   loading: boolean
@@ -424,6 +448,7 @@ function UsersPanel({
   onSearch: () => void
   onUpdate: (id: string, patch: { role?: string; plan?: string }) => void
   onDelete: (id: string, email: string) => void
+  onGrantCredits: (id: string, email: string) => void
 }) {
   return (
     <div className="space-y-3">
@@ -504,7 +529,14 @@ function UsersPanel({
                 <td className="px-3 py-2 text-[12px] text-slate-500">
                   {new Date(u.createdAt).toLocaleDateString('ko-KR')}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-2 text-right whitespace-nowrap">
+                  <button
+                    onClick={() => onGrantCredits(u.id, u.email)}
+                    className="text-[11px] text-indigo-700 hover:underline mr-3"
+                    title="1회권 수동 부여"
+                  >
+                    크레딧
+                  </button>
                   <button
                     onClick={() => onDelete(u.id, u.email)}
                     className="text-[11px] text-red-600 hover:underline"

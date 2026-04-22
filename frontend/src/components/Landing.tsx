@@ -371,6 +371,20 @@ export function Landing() {
           <p className="mt-10 text-center text-[13px] text-slate-500 font-medium">
             연 결제 시 17% 할인 · 언제든 플랜 변경·취소 가능
           </p>
+
+          {/* 1회권 안내 */}
+          <div className="mt-10 max-w-3xl mx-auto p-6 rounded-[16px] bg-indigo-50/60 border border-indigo-100 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-indigo-200 text-indigo-700 text-[12px] font-bold mb-3">
+              NEW · 자동결제 부담 없이
+            </div>
+            <h3 className="text-[20px] font-bold tracking-[-0.015em]">1회권도 있습니다</h3>
+            <p className="mt-2 text-[14px] text-slate-600 font-medium leading-relaxed">
+              스타터 ₩2,900 (10장) · 스탠다드 ₩9,900 (50장) · 프리미엄 ₩19,900 (120장).
+              <br />
+              구매 후 30일 유효, 플랜 한도 소진 후 자동으로 차감됩니다.
+            </p>
+          </div>
+
           <div className="mt-6 text-center">
             <Link
               href="/pricing"
