@@ -1,5 +1,23 @@
 export type SizePreset = '1:1' | '4:5' | '9:16' | 'custom'
 export type Layout = 'cover' | 'content' | 'cta'
+export type Template = 'basic' | 'product-ad' | 'promo'
+
+// 상품 광고 템플릿 전용 데이터. 기능 아이콘 4개·컬러 스와치·원가/할인가 등.
+export interface ProductAdFeature {
+  icon: string // 이모지 1자 권장 (예: '🧴')
+  label: string // 10자 이내 짧은 키워드
+}
+export interface ProductAdData {
+  subtitle?: string
+  features?: ProductAdFeature[] // 4개 권장
+  colors?: string[] // HEX 코드 배열, 스와치 표시용
+  priceOriginal?: number // 원가
+  priceSale?: number // 할인가
+  discountPercent?: number // 1~99 (원형 뱃지에 표시)
+  deadlineText?: string // 예: "5월 5일까지"
+  ctaLabel?: string // CTA 바 라벨 (cta 필드와 별도 — 디자인 차별화)
+  badgeLabel?: string // BEST SELLER 같은 상단 뱃지
+}
 
 // 요소별 오버라이드. 미지정 필드는 카드 레벨 값 (sizeScale/align) 이나 기본값 사용.
 export interface ElementStyle {
@@ -24,6 +42,7 @@ export interface TextStyle {
 }
 
 // 단계 4 출력 고정 포맷: title / body / subtext / cta (+ layout, imageUrl, id, textStyle)
+// template 이 'product-ad' 일 때 productAd 필드에 상품 광고 전용 데이터가 들어온다.
 export interface CardData {
   id: string
   title: string
@@ -33,6 +52,8 @@ export interface CardData {
   imageUrl?: string
   layout: Layout
   textStyle?: TextStyle
+  template?: Template
+  productAd?: ProductAdData
 }
 
 export interface BrandAsset {

@@ -16,6 +16,8 @@ export interface EditImageInput {
   refPaths?: string[] // Mode A 참조 이미지 (선택, 최대 3)
   recipe?: StyleRecipe // 스타일 가이드 (brand 에서 도출)
   instruction?: string // 사용자 추가 지시 (선택)
+  template?: 'basic' | 'product-ad' | 'promo' // 템플릿 힌트 (프롬프트 분기)
+  aspectRatio?: '1:1' | '4:5' | '9:16' // 출력 비율 힌트
 }
 
 export interface GenerateImageInput {
@@ -50,7 +52,13 @@ export async function editImageWithGemini(input: EditImageInput): Promise<ImageR
     }
   }
 
-  const promptText = buildPrompt(input.recipe, input.instruction, refs.length > 0)
+  const promptText = buildPrompt(
+    input.recipe,
+    input.instruction,
+    refs.length > 0,
+    input.template,
+    input.aspectRatio,
+  )
 
   const body = {
     contents: [
@@ -113,14 +121,29 @@ function guessMime(path: string): string {
 }
 
 // 편집 지시문. 한국어 카드뉴스 브랜드 맥락 + 스타일 레시피 + 텍스트는 "이미지 안에 넣지 말 것" 강제.
-function buildPrompt(recipe: StyleRecipe | undefined, instruction: string | undefined, hasRefs: boolean): string {
+function buildPrompt(
+  recipe: StyleRecipe | undefined,
+  instruction: string | undefined,
+  hasRefs: boolean,
+  template?: 'basic' | 'product-ad' | 'promo',
+  aspectRatio?: '1:1' | '4:5' | '9:16',
+): string {
   const lines: string[] = []
+  const ratio = aspectRatio ?? (template === 'product-ad' ? '4:5' : '1:1')
   lines.push(
-    '다음 제품/레퍼런스 이미지를 기반으로, 인스타그램 카드뉴스 1:1 배경으로 쓸 새로운 이미지를 만드세요.',
+    `다음 제품/레퍼런스 이미지를 기반으로, 인스타그램 카드뉴스 ${ratio} 배경으로 쓸 새로운 이미지를 만드세요.`,
   )
   lines.push(
-    '중요: 이미지 안에 어떤 글자나 텍스트도 넣지 마세요. 텍스트는 프론트엔드에서 CSS 로 따로 얹힙니다.',
+    '중요: 이미지 안에 어떤 글자·한글·영문·숫자·캡션·워터마크도 넣지 마세요. 텍스트 렌더는 프론트엔드가 담당합니다.',
   )
+  if (template === 'product-ad') {
+    lines.push('')
+    lines.push('[촬영 스타일 — 한국 쇼핑몰 상품컷]')
+    lines.push('· 자연광 혹은 소프트 스튜디오 라이팅. 그림자 은은함.')
+    lines.push('· 제품 또는 모델이 중앙~우측에 배치, 좌측에 텍스트를 얹을 여백을 충분히 확보.')
+    lines.push('· 배경은 깔끔하고 절제된 톤. 산만한 소품 지양.')
+    lines.push('· 실제 쇼핑몰 상세페이지에서 바로 쓸 수 있을 정도의 제품 포커스·색재현.')
+  }
   if (hasRefs) {
     lines.push('추가로 첨부된 레퍼런스 이미지들의 분위기·색감·구도를 참고해 통일된 시리즈 감각을 유지하세요.')
   }
@@ -138,7 +161,8 @@ function buildPrompt(recipe: StyleRecipe | undefined, instruction: string | unde
     lines.push(instruction.trim())
   }
   lines.push('')
-  lines.push('출력: 1080×1080 비율 제품·배경 합성 이미지 1장. 워터마크·로고·캡션 없음.')
+  const dims = ratio === '4:5' ? '1080×1350' : ratio === '9:16' ? '1080×1920' : '1080×1080'
+  lines.push(`출력: ${dims} 비율 이미지 1장. 워터마크·로고·캡션 없음.`)
   return lines.join('\n')
 }
 

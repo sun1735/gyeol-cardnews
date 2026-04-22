@@ -12,10 +12,17 @@ import { Injectable, Logger } from '@nestjs/common'
 import { join, normalize } from 'path'
 import { PrismaService } from '../prisma/prisma.service'
 import { sanitizeText } from '../generate/sanitize'
-import { validateCard, CARD_LIMITS, ValidatedCard } from '../generate/schema'
+import {
+  validateCard,
+  CARD_LIMITS,
+  ValidatedCard,
+  validateProductAdCard,
+  ValidatedProductAdCard,
+  PRODUCT_AD_LIMITS,
+} from '../generate/schema'
 import { buildStyleRecipe, recipeAsPromptBlock, StyleRecipe } from '../generate/style'
 import { checkSafety } from '../generate/safety'
-import { callGeminiJson, cardArraySchema } from '../generate/llm-gemini'
+import { callGeminiJson, cardArraySchema, productAdArraySchema } from '../generate/llm-gemini'
 import { editImageWithGemini, saveEditedImage } from '../images/editor'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { KnowledgeSearchService, RetrievedChunk } from './knowledge-search.service'
@@ -31,6 +38,18 @@ interface CardOut {
   subtext: string
   cta: string
   imageUrl?: string
+  template?: 'basic' | 'product-ad' | 'promo'
+  productAd?: {
+    subtitle?: string
+    badgeLabel?: string
+    features?: { icon: string; label: string }[]
+    colors?: string[]
+    priceOriginal?: number
+    priceSale?: number
+    discountPercent?: number
+    deadlineText?: string
+    ctaLabel?: string
+  }
 }
 
 export interface OrchestratorResult {
@@ -87,32 +106,66 @@ export class Orchestrator {
     const n = dto.count
     const layouts = buildLayouts(n)
 
-    // 5) LLM 카피 생성 (컨텍스트 주입, 실패 시 템플릿 폴백)
-    const copies = await this.generateCopy(dto.prompt, n, layouts, brand, recipe, chunks)
+    const template = dto.template ?? 'basic'
+
+    // 5) LLM 카피 생성 — template 에 따라 다른 스키마/프롬프트.
+    //    product-ad 는 구조화된 광고 필드를 생성.
+    const copyResult = await this.generateCopyByTemplate(
+      dto.prompt,
+      n,
+      layouts,
+      brand,
+      recipe,
+      chunks,
+      template,
+    )
+    const copies: ValidatedCard[] = copyResult.basic
+    const productAdCopies: (ValidatedProductAdCard | null)[] = copyResult.productAd
     await setProgress(55)
 
-    // 6) 이미지 후보 랭킹
+    // 6) 이미지 후보 랭킹 (template 무관 — basic 카피 기준)
     const ranked = await this.ranker.rankForCards(dto.brandId, dto.prompt, copies)
     const imagesRanked = ranked.filter((r) => !!r).length
     await setProgress(65)
 
-    // 7) 병렬 이미지 편집
+    // 7) 병렬 이미지 편집 — template 전달(프롬프트 힌트 차별화)
     const refs = (dto.baseImageUrls ?? []).filter((u) => u?.startsWith('/uploads/'))
-    const editResults = await this.parallelEdit(copies, ranked, refs, recipe)
+    const editResults = await this.parallelEdit(copies, ranked, refs, recipe, template)
     const editedCount = editResults.filter((r) => r.status === 'edited').length
     const editFailed = editResults.filter((r) => r.status === 'failed').length
     await setProgress(90)
 
-    // 8) 최종 카드 조립 (sanitize 포함)
-    const cards: CardOut[] = copies.map((c, i) => ({
-      id: randId(),
-      layout: layouts[i],
-      title: sanitizeText(c.title),
-      body: sanitizeText(c.body),
-      subtext: sanitizeText(c.subtext),
-      cta: sanitizeText(c.cta),
-      imageUrl: editResults[i].url ?? undefined,
-    }))
+    // 8) 최종 카드 조립 (sanitize 포함) — product-ad 데이터가 있으면 함께 실어 보냄.
+    const cards: CardOut[] = copies.map((c, i) => {
+      const pa = productAdCopies[i]
+      const base: CardOut = {
+        id: randId(),
+        layout: layouts[i],
+        title: sanitizeText(pa?.title ?? c.title),
+        body: sanitizeText(pa?.body ?? c.body),
+        subtext: sanitizeText(pa?.subtitle ?? c.subtext),
+        cta: sanitizeText(pa?.ctaLabel ?? c.cta),
+        imageUrl: editResults[i].url ?? undefined,
+        template,
+      }
+      if (pa && template === 'product-ad') {
+        base.productAd = {
+          subtitle: sanitizeText(pa.subtitle),
+          badgeLabel: sanitizeText(pa.badgeLabel),
+          features: pa.features.map((f) => ({
+            icon: f.icon,
+            label: sanitizeText(f.label),
+          })),
+          colors: pa.colors,
+          priceOriginal: pa.priceOriginal ?? undefined,
+          priceSale: pa.priceSale ?? undefined,
+          discountPercent: pa.discountPercent ?? undefined,
+          deadlineText: sanitizeText(pa.deadlineText),
+          ctaLabel: sanitizeText(pa.ctaLabel),
+        }
+      }
+      return base
+    })
 
     const partial = editFailed > 0
     return {
@@ -126,6 +179,87 @@ export class Orchestrator {
         durationMs: Date.now() - t0,
         partial,
       },
+    }
+  }
+
+  // template 분기 래퍼. basic 은 기존 generateCopy, product-ad 는 generateProductAdCopy 를 호출하고
+  // 두 채널(basic/productAd) 을 함께 돌려 이미지 랭킹 등은 그대로 재사용.
+  private async generateCopyByTemplate(
+    prompt: string,
+    n: number,
+    layouts: Layout[],
+    brand: any,
+    recipe: StyleRecipe,
+    chunks: RetrievedChunk[],
+    template: 'basic' | 'product-ad' | 'promo',
+  ): Promise<{ basic: ValidatedCard[]; productAd: (ValidatedProductAdCard | null)[] }> {
+    const basic = await this.generateCopy(prompt, n, layouts, brand, recipe, chunks)
+    if (template !== 'product-ad') {
+      return { basic, productAd: Array(n).fill(null) }
+    }
+    const productAd = await this.generateProductAdCopy(prompt, n, layouts, brand, recipe, chunks)
+    return { basic, productAd }
+  }
+
+  // product-ad 전용 카피 — features/가격/뱃지·CTA 라벨 등 구조화 필드.
+  private async generateProductAdCopy(
+    prompt: string,
+    n: number,
+    layouts: Layout[],
+    brand: any,
+    recipe: StyleRecipe,
+    chunks: RetrievedChunk[],
+  ): Promise<(ValidatedProductAdCard | null)[]> {
+    if (!process.env.GEMINI_API_KEY) {
+      this.logger.warn('GEMINI_API_KEY 없음 — product-ad 기본 카피 생략')
+      return Array(n).fill(null)
+    }
+    const contextBlock = chunks.length
+      ? chunks.map((c, i) => `[${i + 1}] ${c.docTitle}: ${c.text}`).join('\n---\n')
+      : '(브랜드 지식노트 비어 있음)'
+
+    const sys = [
+      '한국 쇼핑몰 상품 광고 카드뉴스 카피라이터. 패션·뷰티·라이프스타일 톤.',
+      '각 카드는 구조화된 광고 카드 — {title, subtitle, body, badgeLabel, features[3~4]{icon,label}, colors[], priceOriginal, priceSale, discountPercent, deadlineText, ctaLabel, layout}.',
+      'icon 은 단일 이모지(예: 🧴 👕 ✨ 🌿 💧 🔥 🎁 ⏰). label 은 10자 이내 키워드("수분 가득", "100% 면", "무료배송" 등).',
+      'colors 는 제품 컬러를 HEX 코드 배열로(최대 4개). 모르면 빈 배열.',
+      'badgeLabel 은 "BEST SELLER", "NEW", "한정 수량" 중 문맥에 맞는 것. 없으면 빈 문자열.',
+      'deadlineText 는 "5월 5일까지", "이번 주 한정" 같은 간결한 표현.',
+      '의학적 단정·절대 표현 금지. 페이지 번호 금지.',
+    ].join(' ')
+
+    const userText = [
+      recipeAsPromptBlock(recipe),
+      '',
+      '[브랜드 지식노트 발췌]',
+      contextBlock,
+      '',
+      `주제: ${prompt}`,
+      `브랜드: ${brand?.name ?? '미지정'}`,
+      `카드 수: ${n}`,
+      `레이아웃 순서: ${layouts.join(', ')}`,
+      `길이 상한: title ${PRODUCT_AD_LIMITS.title}, subtitle ${PRODUCT_AD_LIMITS.subtitle}, body ${PRODUCT_AD_LIMITS.body}, ctaLabel ${PRODUCT_AD_LIMITS.ctaLabel}`,
+      'price 값은 숫자(원화, KRW). 근거가 없으면 0 대신 생략(null 또는 필드 없음).',
+      'features 는 정확히 4개 권장. 아이콘+짧은 라벨 형태.',
+    ].join('\n')
+
+    try {
+      const parsed = await callGeminiJson<{ cards: unknown[] }>({
+        systemInstruction: sys,
+        userText,
+        schema: productAdArraySchema(n),
+        timeoutMs: LLM_TIMEOUT_MS,
+        temperature: 0.7,
+      })
+      if (!parsed || !Array.isArray(parsed.cards)) return Array(n).fill(null)
+      const out: (ValidatedProductAdCard | null)[] = []
+      for (let i = 0; i < n; i++) {
+        out.push(validateProductAdCard(parsed.cards[i]))
+      }
+      return out
+    } catch (e: any) {
+      this.logger.warn(`Gemini product-ad 호출 예외 — null 폴백: ${e?.message ?? e}`)
+      return Array(n).fill(null)
     }
   }
 
@@ -196,9 +330,10 @@ export class Orchestrator {
     ranked: (RankedImage | null)[],
     refs: string[],
     recipe: StyleRecipe,
+    template: 'basic' | 'product-ad' | 'promo',
   ): Promise<Array<{ url: string | null; status: 'edited' | 'original' | 'failed' }>> {
     const jobs = copies.map((c, i) =>
-      this.editOne(c, ranked[i], refs, i, recipe).catch((e) => {
+      this.editOne(c, ranked[i], refs, i, recipe, template).catch((e) => {
         this.logger.warn(`카드 ${i} 이미지 편집 실패: ${e?.message ?? e}`)
         const fallback = ranked[i]?.url ?? (refs.length ? refs[i % refs.length] : null)
         return { url: fallback, status: 'failed' as const }
@@ -213,6 +348,7 @@ export class Orchestrator {
     refs: string[],
     cardIdx: number,
     recipe: StyleRecipe,
+    template: 'basic' | 'product-ad' | 'promo',
   ): Promise<{ url: string | null; status: 'edited' | 'original' | 'failed' }> {
     // 카드별 베이스: 랭커 결과 우선, 없으면 참조 이미지 round-robin
     const baseUrl = image?.url ?? (refs.length ? refs[cardIdx % refs.length] : null)
@@ -235,6 +371,7 @@ export class Orchestrator {
       refPaths,
       recipe,
       instruction: `${copy.title} · ${copy.body}`.slice(0, 200),
+      template,
     })
     const url = await saveEditedImage(result.bytes, result.mimeType)
     return { url, status: 'edited' }

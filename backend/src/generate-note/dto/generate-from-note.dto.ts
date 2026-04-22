@@ -36,4 +36,12 @@ export class GenerateFromNoteDto {
   @ApiPropertyOptional({ enum: ['1:1', '4:5', '9:16'], example: '1:1' })
   @IsOptional() @IsIn(['1:1', '4:5', '9:16'])
   sizePreset?: '1:1' | '4:5' | '9:16'
+
+  @ApiPropertyOptional({
+    enum: ['basic', 'product-ad', 'promo'],
+    example: 'basic',
+    description: '카드 템플릿. product-ad 는 상품 광고용 구조화 필드(가격/스와치/features) 를 LLM 에 요구.',
+  })
+  @IsOptional() @IsIn(['basic', 'product-ad', 'promo'])
+  template?: 'basic' | 'product-ad' | 'promo'
 }

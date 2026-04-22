@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { signIn, signOut, useSession } from 'next-auth/react'
-import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset } from '@/lib/types'
+import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template } from '@/lib/types'
+import { ProductAdCard } from '@/components/templates/ProductAdCard'
 
 // 인증 세션의 API 토큰을 모든 /api/* fetch 에 자동으로 실어 보내는 래퍼.
 // NextAuth session.apiToken 이 있으면 Authorization 헤더에 추가.
@@ -116,6 +117,8 @@ export default function Page() {
       .catch(() => {})
   }, [isLoggedIn, session])
   const [mode, setMode] = useState<GenMode>('auto')
+  // 카드 템플릿 — basic(기본) / product-ad(상품 광고) / promo(프로모션, 추후).
+  const [template, setTemplate] = useState<Template>('basic')
   const [size, setSize] = useState<SizePreset>('1:1')
   const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
   // 가로·세로 타이핑 드래프트 — 입력 중에는 clamp 하지 않아 숫자를 자유롭게 타이핑할 수 있다.
@@ -488,6 +491,7 @@ export default function Page() {
             count,
             baseImageUrls: baseImages.length ? baseImages : undefined,
             sizePreset: size,
+            template,
           }),
         })
         if (enqRes.status === 429) {
@@ -501,8 +505,10 @@ export default function Page() {
         }
         const { jobId } = await enqRes.json()
         const cards = await pollRagJob(jobId)
-        setCards(cards)
-        setSelectedCardId(cards[0]?.id ?? null)
+        // 응답에 template 필드가 없을 수도 있으므로 현재 선택값으로 보정
+        const withTemplate = cards.map((c) => ({ ...c, template: c.template ?? template }))
+        setCards(withTemplate)
+        setSelectedCardId(withTemplate[0]?.id ?? null)
         setRagProgress(100)
         return
       }
@@ -515,6 +521,7 @@ export default function Page() {
               count,
               brandId: selectedBrandId || undefined,
               baseImageUrls: baseImages.length ? baseImages : undefined,
+              template,
             }
           : {
               mode: 'manual',
@@ -526,13 +533,15 @@ export default function Page() {
               })),
               brandId: selectedBrandId || undefined,
               baseImageUrls: baseImages.length ? baseImages : undefined,
+              template,
             }
       const r = await authedFetch('/api/generate/cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }).then((r) => r.json())
-      const newCards: CardData[] = r.cards ?? []
+      const rawCards: CardData[] = r.cards ?? []
+      const newCards = rawCards.map((c) => ({ ...c, template: c.template ?? template }))
       setCards(newCards)
       setSelectedCardId(newCards[0]?.id ?? null)
     } finally {
@@ -1267,6 +1276,54 @@ export default function Page() {
                 })}
               </div>
             </div>
+
+            {/* 템플릿 선택 — 기본 / 상품 광고 / 프로모션 */}
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-3">
+                카드 템플릿
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    { k: 'basic' as Template, title: '기본', desc: '제목·본문·CTA', disabled: false },
+                    { k: 'product-ad' as Template, title: '상품 광고', desc: '가격·할인·스펙', disabled: false },
+                    { k: 'promo' as Template, title: '프로모션', desc: '준비 중', disabled: true },
+                  ]
+                ).map((t) => {
+                  const active = template === t.k
+                  return (
+                    <button
+                      key={t.k}
+                      onClick={() => !t.disabled && setTemplate(t.k)}
+                      disabled={t.disabled}
+                      className={`px-2.5 py-2.5 rounded-[10px] text-left transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                        active
+                          ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200'
+                          : 'text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200'
+                      }`}
+                    >
+                      <span className="block text-[13px] font-semibold tracking-[-0.01em]">
+                        {t.title}
+                      </span>
+                      <span
+                        className={`block text-[11px] mt-0.5 ${
+                          active ? 'text-indigo-700/80' : 'text-slate-500'
+                        }`}
+                      >
+                        {t.desc}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {template === 'product-ad' && (
+                <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                  배경 이미지는 <b>텍스트 없음</b>으로 생성되고, 가격·할인·기능 아이콘은 화면 위에서 합성됩니다.
+                  4:5 세로 비율을 권장합니다.
+                </p>
+              )}
+            </div>
+
             {mode === 'note-rag' && selectedBrand && (
               <button
                 onClick={() => {
@@ -3008,6 +3065,29 @@ function CardItem({
 
       {/* 카드 프리뷰 (렌더 대상) */}
       <div className="flex justify-center">
+        {card.template === 'product-ad' ? (
+          <div id={`card-${card.id}`}>
+            <ProductAdCard
+              title={card.title}
+              subtitle={card.productAd?.subtitle ?? card.subtext}
+              body={card.body}
+              badgeLabel={card.productAd?.badgeLabel}
+              features={card.productAd?.features ?? []}
+              colors={card.productAd?.colors ?? []}
+              priceOriginal={card.productAd?.priceOriginal}
+              priceSale={card.productAd?.priceSale}
+              discountPercent={card.productAd?.discountPercent}
+              deadlineText={card.productAd?.deadlineText}
+              ctaLabel={card.productAd?.ctaLabel ?? card.cta}
+              backgroundImageUrl={card.imageUrl}
+              displayWidth={d.display}
+              aspectRatio={
+                size === '4:5' ? '4:5' : size === '9:16' ? '9:16' : '1:1'
+              }
+              primaryColor={primary}
+            />
+          </div>
+        ) : (
         <div
           id={`card-${card.id}`}
           className="relative overflow-hidden rounded-md shadow-sm"
@@ -3122,6 +3202,7 @@ function CardItem({
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* 인라인 텍스트 편집 — 입력 즉시 프리뷰 반영 */}

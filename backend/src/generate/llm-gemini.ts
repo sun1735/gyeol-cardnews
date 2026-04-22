@@ -86,3 +86,60 @@ export function cardArraySchema(maxCount: number) {
     required: ['cards'],
   }
 }
+
+// product-ad 템플릿 전용 스키마 — 구조화된 광고 필드를 강제.
+// features 는 정확히 4개 권장(UI 아이콘 자리), colors 는 HEX 배열(스와치).
+export function productAdArraySchema(maxCount: number) {
+  return {
+    type: 'object',
+    properties: {
+      cards: {
+        type: 'array',
+        maxItems: maxCount,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            subtitle: { type: 'string' },
+            body: { type: 'string' },
+            badgeLabel: { type: 'string' },
+            features: {
+              type: 'array',
+              minItems: 3,
+              maxItems: 4,
+              items: {
+                type: 'object',
+                properties: {
+                  icon: { type: 'string' }, // 이모지 1자 권장
+                  label: { type: 'string' },
+                },
+                required: ['icon', 'label'],
+              },
+            },
+            colors: {
+              type: 'array',
+              maxItems: 6,
+              items: { type: 'string' }, // HEX
+            },
+            priceOriginal: { type: 'number' },
+            priceSale: { type: 'number' },
+            discountPercent: { type: 'number' },
+            deadlineText: { type: 'string' },
+            ctaLabel: { type: 'string' },
+            layout: { type: 'string', enum: ['cover', 'content', 'cta'] },
+          },
+          required: [
+            'title',
+            'subtitle',
+            'body',
+            'features',
+            'priceSale',
+            'ctaLabel',
+            'layout',
+          ],
+        },
+      },
+    },
+    required: ['cards'],
+  }
+}

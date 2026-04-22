@@ -80,4 +80,12 @@ export class GenerateCardsDto {
   @IsOptional() @IsArray() @ArrayMaxSize(3)
   @IsString({ each: true })
   baseImageUrls?: string[]
+
+  @ApiPropertyOptional({
+    enum: ['basic', 'product-ad', 'promo'],
+    example: 'basic',
+    description: '카드 템플릿. product-ad 는 상품 광고용 구조화 카피 출력.',
+  })
+  @IsOptional() @IsIn(['basic', 'product-ad', 'promo'])
+  template?: 'basic' | 'product-ad' | 'promo'
 }

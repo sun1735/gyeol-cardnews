@@ -97,3 +97,107 @@ function coerceString(v: unknown, maxLen: number): string | null {
   if (!trimmed) return null
   return trimmed.length > maxLen ? trimmed.slice(0, maxLen).trim() : trimmed
 }
+
+// product-ad 템플릿 카피 검증. 핵심 필드(title/body/ctaLabel/layout) 필수.
+// features/colors 는 없어도 빈 배열로 반환 — 프런트에서 숨김 처리.
+export interface ProductAdFeatureOut {
+  icon: string
+  label: string
+}
+export interface ValidatedProductAdCard {
+  title: string
+  subtitle: string
+  body: string
+  badgeLabel: string
+  features: ProductAdFeatureOut[]
+  colors: string[]
+  priceOriginal: number | null
+  priceSale: number | null
+  discountPercent: number | null
+  deadlineText: string
+  ctaLabel: string
+  layout: Layout
+}
+
+const HEX_RE = /^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/
+
+export const PRODUCT_AD_LIMITS = {
+  title: 24,
+  subtitle: 40,
+  body: 120,
+  badgeLabel: 14,
+  featureLabel: 12,
+  deadlineText: 20,
+  ctaLabel: 16,
+} as const
+
+export function validateProductAdCard(raw: unknown): ValidatedProductAdCard | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+
+  const title = coerceString(r.title, PRODUCT_AD_LIMITS.title)
+  const subtitle = coerceString(r.subtitle, PRODUCT_AD_LIMITS.subtitle) ?? ''
+  const body = coerceString(r.body, PRODUCT_AD_LIMITS.body)
+  const badgeLabel = coerceString(r.badgeLabel, PRODUCT_AD_LIMITS.badgeLabel) ?? ''
+  const deadlineText = coerceString(r.deadlineText, PRODUCT_AD_LIMITS.deadlineText) ?? ''
+  const ctaLabel = coerceString(r.ctaLabel, PRODUCT_AD_LIMITS.ctaLabel)
+
+  // features — 최대 4개
+  const featuresRaw = Array.isArray(r.features) ? r.features : []
+  const features: ProductAdFeatureOut[] = []
+  for (const f of featuresRaw.slice(0, 4)) {
+    if (!f || typeof f !== 'object') continue
+    const fo = f as Record<string, unknown>
+    const icon = typeof fo.icon === 'string' ? fo.icon.trim().slice(0, 4) : ''
+    const label = coerceString(fo.label, PRODUCT_AD_LIMITS.featureLabel) ?? ''
+    if (!icon || !label) continue
+    features.push({ icon, label })
+  }
+
+  // colors — HEX 만 통과
+  const colorsRaw = Array.isArray(r.colors) ? r.colors : []
+  const colors: string[] = []
+  for (const c of colorsRaw.slice(0, 6)) {
+    if (typeof c !== 'string') continue
+    const v = c.trim()
+    if (!HEX_RE.test(v)) continue
+    colors.push(v.startsWith('#') ? v : `#${v}`)
+  }
+
+  const priceOriginal = coerceNumber(r.priceOriginal)
+  const priceSale = coerceNumber(r.priceSale)
+  const discountPercent = (() => {
+    const n = coerceNumber(r.discountPercent)
+    if (n === null) return null
+    return Math.max(1, Math.min(99, Math.round(n)))
+  })()
+
+  const layout = (LAYOUTS as readonly string[]).includes(String(r.layout))
+    ? (r.layout as Layout)
+    : null
+
+  if (!title || !body || !ctaLabel || !layout) return null
+  return {
+    title,
+    subtitle,
+    body,
+    badgeLabel,
+    features,
+    colors,
+    priceOriginal,
+    priceSale,
+    discountPercent,
+    deadlineText,
+    ctaLabel,
+    layout,
+  }
+}
+
+function coerceNumber(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'string') {
+    const n = Number(v.replace(/[^\d.\-]/g, ''))
+    if (Number.isFinite(n) && n !== 0) return n
+  }
+  return null
+}
