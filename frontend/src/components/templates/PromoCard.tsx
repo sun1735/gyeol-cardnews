@@ -56,7 +56,7 @@ export function PromoCard({
 
   const bigNumber = typeof discountPercent === 'number' ? `${discountPercent}` : discountLabel
   const showPercentSign = typeof discountPercent === 'number'
-  const ctaHeight = ctaLabel ? 110 * s : 0
+  const ctaHeight = ctaLabel ? 130 * s : 0
 
   // 브랜드 컬러 그라디언트 — 중앙 숫자용
   const numberGradient = `linear-gradient(180deg, #fff 0%, ${primaryColor} 100%)`
@@ -104,44 +104,44 @@ export function PromoCard({
       <div
         style={{
           position: 'absolute',
-          top: 48 * s,
+          top: 56 * s,
           left: 60 * s,
           right: 60 * s,
           display: 'flex',
           alignItems: 'center',
-          gap: 14 * s,
+          gap: 16 * s,
         }}
       >
-        <div style={{ flex: 1, height: 2 * s, background: 'rgba(255,255,255,0.35)' }} />
+        <div style={{ flex: 1, height: 3 * s, background: 'rgba(255,255,255,0.55)' }} />
         <span
           style={{
-            fontSize: 14 * s,
-            fontWeight: 800,
-            letterSpacing: 4 * s,
-            color: 'rgba(255,255,255,0.85)',
+            fontSize: 20 * s,
+            fontWeight: 900,
+            letterSpacing: 6 * s,
+            color: '#ffffff',
           }}
         >
           LIMITED TIME
         </span>
-        <div style={{ flex: 1, height: 2 * s, background: 'rgba(255,255,255,0.35)' }} />
+        <div style={{ flex: 1, height: 3 * s, background: 'rgba(255,255,255,0.55)' }} />
       </div>
 
-      {/* 상단 리본 뱃지 — 상단 장식 줄 아래 */}
+      {/* 상단 리본 뱃지 */}
       {badgeLabel && (
         <div
           style={{
             position: 'absolute',
-            top: 90 * s,
+            top: 110 * s,
             left: '50%',
             transform: 'translateX(-50%)',
-            padding: `${12 * s}px ${36 * s}px`,
+            padding: `${16 * s}px ${48 * s}px`,
             background: primaryColor,
             color: '#fff',
-            fontSize: 28 * s,
+            fontSize: 40 * s,
             fontWeight: 900,
-            letterSpacing: 5 * s,
+            letterSpacing: 7 * s,
             textTransform: 'uppercase',
-            boxShadow: `0 8px 20px ${primaryColor}88, 0 2px 6px rgba(0,0,0,0.35)`,
+            boxShadow: `0 10px 24px ${primaryColor}aa, 0 2px 8px rgba(0,0,0,0.4)`,
             clipPath:
               'polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%)',
           }}
@@ -155,7 +155,7 @@ export function PromoCard({
         style={{
           position: 'absolute',
           inset: 0,
-          paddingTop: badgeLabel ? 180 * s : 120 * s,
+          paddingTop: badgeLabel ? 220 * s : 150 * s,
           paddingBottom: ctaHeight + 40 * s,
           display: 'flex',
           flexDirection: 'column',
@@ -168,13 +168,13 @@ export function PromoCard({
             style={{
               display: 'inline-flex',
               alignItems: 'flex-start',
-              gap: 8 * s,
-              filter: `drop-shadow(0 8px 24px ${primaryColor}88) drop-shadow(0 2px 4px rgba(0,0,0,0.5))`,
+              gap: 12 * s,
+              filter: `drop-shadow(0 10px 28px ${primaryColor}aa) drop-shadow(0 2px 6px rgba(0,0,0,0.6))`,
             }}
           >
             <span
               style={{
-                fontSize: 340 * s,
+                fontSize: 420 * s,
                 fontWeight: 900,
                 lineHeight: 0.82,
                 letterSpacing: '-0.06em',
@@ -182,7 +182,7 @@ export function PromoCard({
                 WebkitBackgroundClip: 'text',
                 backgroundClip: 'text',
                 color: 'transparent',
-                WebkitTextStroke: `${2 * s}px rgba(255,255,255,0.15)`,
+                WebkitTextStroke: `${3 * s}px rgba(255,255,255,0.25)`,
                 fontFeatureSettings: '"tnum"',
               }}
             >
@@ -191,11 +191,11 @@ export function PromoCard({
             {showPercentSign && (
               <span
                 style={{
-                  fontSize: 140 * s,
+                  fontSize: 170 * s,
                   fontWeight: 900,
                   lineHeight: 1,
-                  marginTop: 20 * s,
-                  color: '#fff',
+                  marginTop: 24 * s,
+                  color: '#ffffff',
                   letterSpacing: '-0.04em',
                 }}
               >
@@ -207,38 +207,39 @@ export function PromoCard({
         {showPercentSign && (
           <div
             style={{
-              marginTop: -20 * s,
-              fontSize: 44 * s,
+              marginTop: -12 * s,
+              fontSize: 58 * s,
               fontWeight: 900,
-              letterSpacing: 10 * s,
-              color: primaryColor,
+              letterSpacing: 14 * s,
+              color: '#ffffff',
               textTransform: 'uppercase',
+              textShadow: `0 4px 12px ${primaryColor}aa`,
             }}
           >
             O F F
           </div>
         )}
 
-        {/* 타이틀 블록 — 솔리드 다크 박스 위에서 읽힘 */}
+        {/* 타이틀 블록 */}
         <div
           style={{
-            marginTop: 30 * s,
-            padding: `${16 * s}px ${28 * s}px`,
-            background: 'rgba(255,255,255,0.08)',
-            border: `${1 * s}px solid rgba(255,255,255,0.18)`,
+            marginTop: 40 * s,
+            padding: `${22 * s}px ${36 * s}px`,
+            background: 'rgba(255,255,255,0.14)',
+            border: `${2 * s}px solid rgba(255,255,255,0.3)`,
             backdropFilter: 'blur(8px)',
-            borderRadius: 12 * s,
+            borderRadius: 14 * s,
             textAlign: 'center',
-            maxWidth: '82%',
+            maxWidth: '85%',
           }}
         >
           <div
             style={{
-              fontSize: 38 * s,
+              fontSize: 56 * s,
               fontWeight: 900,
-              lineHeight: 1.12,
-              color: '#fff',
-              letterSpacing: '-0.015em',
+              lineHeight: 1.1,
+              color: '#ffffff',
+              letterSpacing: '-0.02em',
             }}
           >
             {title}
@@ -246,11 +247,11 @@ export function PromoCard({
           {subtitle && (
             <div
               style={{
-                fontSize: 22 * s,
-                fontWeight: 500,
+                fontSize: 30 * s,
+                fontWeight: 600,
                 lineHeight: 1.4,
-                marginTop: 8 * s,
-                color: 'rgba(255,255,255,0.85)',
+                marginTop: 12 * s,
+                color: '#ffffff',
               }}
             >
               {subtitle}
@@ -261,21 +262,21 @@ export function PromoCard({
         {deadlineText && (
           <div
             style={{
-              marginTop: 22 * s,
+              marginTop: 28 * s,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 10 * s,
-              padding: `${10 * s}px ${22 * s}px`,
-              border: `${2 * s}px solid #fff`,
+              gap: 12 * s,
+              padding: `${14 * s}px ${30 * s}px`,
+              border: `${3 * s}px solid #ffffff`,
               borderRadius: 999,
-              fontSize: 22 * s,
-              fontWeight: 700,
+              fontSize: 28 * s,
+              fontWeight: 800,
               letterSpacing: 1 * s,
-              color: '#fff',
-              background: 'rgba(0,0,0,0.35)',
+              color: '#ffffff',
+              background: 'rgba(0,0,0,0.5)',
             }}
           >
-            <span style={{ fontSize: 22 * s }}>⏰</span>
+            <span style={{ fontSize: 28 * s }}>⏰</span>
             <span>{deadlineText}</span>
           </div>
         )}
@@ -298,10 +299,10 @@ export function PromoCard({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 14 * s,
-            fontSize: 32 * s,
-            fontWeight: 800,
-            letterSpacing: '-0.005em',
+            gap: 18 * s,
+            fontSize: 42 * s,
+            fontWeight: 900,
+            letterSpacing: '-0.01em',
           }}
         >
           <span>{ctaLabel}</span>
@@ -310,11 +311,11 @@ export function PromoCard({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 44 * s,
-              height: 44 * s,
+              width: 54 * s,
+              height: 54 * s,
               borderRadius: '50%',
-              background: 'rgba(255,255,255,0.25)',
-              fontSize: 24 * s,
+              background: 'rgba(255,255,255,0.3)',
+              fontSize: 32 * s,
               fontWeight: 900,
             }}
           >

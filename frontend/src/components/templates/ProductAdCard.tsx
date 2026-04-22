@@ -64,7 +64,7 @@ export function ProductAdCard({
   const hasPriceSale = typeof priceSale === 'number' && priceSale > 0
   const hasPriceOriginal = typeof priceOriginal === 'number' && priceOriginal > (priceSale ?? 0)
   const hasDiscount = typeof discountPercent === 'number' && discountPercent >= 1 && discountPercent <= 99
-  const ctaHeight = ctaLabel ? 110 * s : 0
+  const ctaHeight = ctaLabel ? 130 * s : 0
 
   const containerStyle: CSSProperties = {
     width: displayWidth,
@@ -169,15 +169,15 @@ export function ProductAdCard({
             border: `${4 * s}px solid #fff`,
           }}
         >
-          <span style={{ fontSize: 58 * s, fontWeight: 900, lineHeight: 0.9 }}>
+          <span style={{ fontSize: 72 * s, fontWeight: 900, lineHeight: 0.9 }}>
             {discountPercent}%
           </span>
           <span
             style={{
-              fontSize: 20 * s,
-              fontWeight: 800,
-              letterSpacing: 3 * s,
-              marginTop: 4 * s,
+              fontSize: 26 * s,
+              fontWeight: 900,
+              letterSpacing: 4 * s,
+              marginTop: 6 * s,
             }}
           >
             OFF
@@ -203,26 +203,26 @@ export function ProductAdCard({
           <div
             style={{
               alignSelf: 'flex-start',
-              padding: `${8 * s}px ${16 * s}px`,
+              padding: `${12 * s}px ${22 * s}px`,
               background: primaryColor,
               color: '#fff',
-              fontSize: 18 * s,
+              fontSize: 26 * s,
               fontWeight: 900,
-              letterSpacing: 2 * s,
+              letterSpacing: 3 * s,
               textTransform: 'uppercase',
-              marginBottom: 22 * s,
-              boxShadow: `0 4px 10px ${primaryColor}66`,
+              marginBottom: 28 * s,
+              boxShadow: `0 6px 14px ${primaryColor}88`,
               position: 'relative',
             }}
           >
             <span
               style={{
                 display: 'inline-block',
-                width: 8 * s,
-                height: 8 * s,
+                width: 10 * s,
+                height: 10 * s,
                 background: '#fff',
                 borderRadius: '50%',
-                marginRight: 8 * s,
+                marginRight: 10 * s,
                 verticalAlign: 'middle',
               }}
             />
@@ -230,61 +230,63 @@ export function ProductAdCard({
           </div>
         )}
 
-        {/* 타이틀 — 매우 굵고 큼 */}
+        {/* 타이틀 — 2025 트렌드: 극대형 · 극굵기 */}
         <h2
           style={{
-            fontSize: 76 * s,
+            fontSize: 108 * s,
             fontWeight: 900,
-            lineHeight: 0.98,
+            lineHeight: 0.95,
             margin: 0,
-            letterSpacing: '-0.03em',
+            letterSpacing: '-0.035em',
             color: '#fff',
           }}
         >
           {title}
         </h2>
 
-        {/* 서브타이틀 — 브랜드 컬러 · 얇은 언더라인 */}
+        {/* 서브타이틀 — 흰색 주조 + 브랜드 컬러는 언더라인 액센트로만 */}
         {subtitle && (
           <div
             style={{
-              fontSize: 24 * s,
-              fontWeight: 600,
-              lineHeight: 1.35,
-              marginTop: 14 * s,
-              color: primaryColor,
-              paddingBottom: 12 * s,
-              borderBottom: `${2 * s}px solid rgba(255,255,255,0.15)`,
-              letterSpacing: '-0.005em',
+              fontSize: 36 * s,
+              fontWeight: 700,
+              lineHeight: 1.3,
+              marginTop: 22 * s,
+              color: '#ffffff',
+              paddingBottom: 18 * s,
+              borderBottom: `${3 * s}px solid ${primaryColor}`,
+              letterSpacing: '-0.01em',
+              display: 'inline-block',
+              alignSelf: 'flex-start',
             }}
           >
             {subtitle}
           </div>
         )}
 
-        {/* 본문 한 줄 */}
+        {/* 본문 — 밝기 대폭 증가, 크기 증가 */}
         {body && (
           <div
             style={{
-              fontSize: 20 * s,
-              fontWeight: 400,
+              fontSize: 28 * s,
+              fontWeight: 500,
               lineHeight: 1.55,
-              marginTop: 14 * s,
-              color: 'rgba(255,255,255,0.78)',
+              marginTop: 20 * s,
+              color: 'rgba(255,255,255,0.95)',
             }}
           >
             {body}
           </div>
         )}
 
-        {/* 피처 2열 그리드 — 아이콘 옆에 라벨 (원형 아이콘 → 더 읽기 쉬운 가로 배치) */}
+        {/* 피처 2열 그리드 — 읽기 쉬운 박스 아이콘 + 라벨 */}
         {features.length > 0 && (
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: `${14 * s}px ${18 * s}px`,
-              marginTop: 28 * s,
+              gap: `${18 * s}px ${22 * s}px`,
+              marginTop: 36 * s,
             }}
           >
             {features.slice(0, 4).map((f, i) => (
@@ -293,30 +295,30 @@ export function ProductAdCard({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 12 * s,
+                  gap: 14 * s,
                 }}
               >
                 <span
                   style={{
-                    width: 42 * s,
-                    height: 42 * s,
-                    borderRadius: 10 * s,
-                    background: `${primaryColor}33`,
-                    border: `${1 * s}px solid ${primaryColor}`,
+                    width: 54 * s,
+                    height: 54 * s,
+                    borderRadius: 12 * s,
+                    background: primaryColor,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 22 * s,
+                    fontSize: 28 * s,
                     flexShrink: 0,
+                    boxShadow: `0 4px 10px ${primaryColor}66`,
                   }}
                 >
                   {f.icon}
                 </span>
                 <span
                   style={{
-                    fontSize: 18 * s,
-                    fontWeight: 600,
-                    color: '#fff',
+                    fontSize: 24 * s,
+                    fontWeight: 700,
+                    color: '#ffffff',
                     letterSpacing: '-0.005em',
                     lineHeight: 1.2,
                   }}
@@ -330,15 +332,15 @@ export function ProductAdCard({
 
         {/* 컬러 스와치 */}
         {colors.length > 0 && (
-          <div style={{ display: 'flex', gap: 10 * s, marginTop: 24 * s, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12 * s, marginTop: 28 * s, alignItems: 'center' }}>
             <span
               style={{
-                fontSize: 14 * s,
-                fontWeight: 700,
-                color: 'rgba(255,255,255,0.5)',
-                letterSpacing: 2 * s,
+                fontSize: 18 * s,
+                fontWeight: 800,
+                color: 'rgba(255,255,255,0.75)',
+                letterSpacing: 3 * s,
                 textTransform: 'uppercase',
-                marginRight: 6 * s,
+                marginRight: 8 * s,
               }}
             >
               COLORS
@@ -348,49 +350,49 @@ export function ProductAdCard({
                 key={i}
                 title={c}
                 style={{
-                  width: 24 * s,
-                  height: 24 * s,
+                  width: 32 * s,
+                  height: 32 * s,
                   borderRadius: '50%',
                   background: c,
-                  border: `${2 * s}px solid rgba(255,255,255,0.8)`,
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                  border: `${3 * s}px solid #ffffff`,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
                 }}
               />
             ))}
           </div>
         )}
 
-        {/* 가격 영역 — 마감 문구 + 원가 + 세일가 */}
+        {/* 가격 영역 */}
         {hasPriceSale && (
-          <div style={{ marginTop: 'auto', paddingTop: 24 * s }}>
+          <div style={{ marginTop: 'auto', paddingTop: 28 * s }}>
             {deadlineText && (
               <div
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6 * s,
-                  padding: `${6 * s}px ${12 * s}px`,
-                  background: 'rgba(255,255,255,0.12)',
+                  gap: 8 * s,
+                  padding: `${10 * s}px ${18 * s}px`,
+                  background: 'rgba(255,255,255,0.18)',
                   borderRadius: 999,
-                  fontSize: 15 * s,
-                  fontWeight: 700,
-                  color: '#fff',
-                  marginBottom: 10 * s,
-                  border: `${1 * s}px solid rgba(255,255,255,0.25)`,
+                  fontSize: 20 * s,
+                  fontWeight: 800,
+                  color: '#ffffff',
+                  marginBottom: 14 * s,
+                  border: `${2 * s}px solid rgba(255,255,255,0.4)`,
                 }}
               >
                 <span>⏰</span>
                 <span>{deadlineText}</span>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 * s, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 * s, flexWrap: 'wrap' }}>
               {hasPriceOriginal && (
                 <span
                   style={{
-                    fontSize: 20 * s,
-                    color: 'rgba(255,255,255,0.5)',
+                    fontSize: 28 * s,
+                    color: 'rgba(255,255,255,0.6)',
                     textDecoration: 'line-through',
-                    fontWeight: 500,
+                    fontWeight: 600,
                   }}
                 >
                   {fmt(priceOriginal)}
@@ -398,10 +400,10 @@ export function ProductAdCard({
               )}
               <span
                 style={{
-                  fontSize: 54 * s,
+                  fontSize: 78 * s,
                   fontWeight: 900,
-                  color: '#fff',
-                  letterSpacing: '-0.02em',
+                  color: '#ffffff',
+                  letterSpacing: '-0.025em',
                   lineHeight: 1,
                 }}
               >
@@ -426,10 +428,10 @@ export function ProductAdCard({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 14 * s,
-            fontSize: 32 * s,
-            fontWeight: 800,
-            letterSpacing: '-0.005em',
+            gap: 18 * s,
+            fontSize: 42 * s,
+            fontWeight: 900,
+            letterSpacing: '-0.01em',
           }}
         >
           <span>{ctaLabel}</span>
@@ -438,11 +440,11 @@ export function ProductAdCard({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 44 * s,
-              height: 44 * s,
+              width: 54 * s,
+              height: 54 * s,
               borderRadius: '50%',
-              background: 'rgba(255,255,255,0.25)',
-              fontSize: 24 * s,
+              background: 'rgba(255,255,255,0.3)',
+              fontSize: 32 * s,
               fontWeight: 900,
             }}
           >

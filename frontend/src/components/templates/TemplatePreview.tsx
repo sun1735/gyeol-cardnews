@@ -109,35 +109,36 @@ export function TemplatePreview({
       >
         <div
           style={{
-            fontSize: 14 * s,
-            fontWeight: 800,
-            letterSpacing: 3 * s,
+            fontSize: 20 * s,
+            fontWeight: 900,
+            letterSpacing: 4 * s,
             textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.85)',
-            marginBottom: 10 * s,
+            color: '#ffffff',
+            marginBottom: 12 * s,
           }}
         >
           BRAND
         </div>
         <div
           style={{
-            fontSize: 64 * s,
+            fontSize: 96 * s,
             fontWeight: 900,
-            lineHeight: 1.02,
-            letterSpacing: '-0.03em',
-            textShadow: '0 2px 8px rgba(0,0,0,0.35)',
+            lineHeight: 0.98,
+            letterSpacing: '-0.035em',
+            color: '#ffffff',
+            textShadow: '0 2px 10px rgba(0,0,0,0.4)',
           }}
         >
           카드 제목
         </div>
         <div
           style={{
-            fontSize: 22 * s,
-            fontWeight: 500,
-            lineHeight: 1.55,
-            marginTop: 12 * s,
-            opacity: 0.92,
-            textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+            fontSize: 30 * s,
+            fontWeight: 600,
+            lineHeight: 1.45,
+            marginTop: 16 * s,
+            color: '#ffffff',
+            textShadow: '0 1px 6px rgba(0,0,0,0.5)',
           }}
         >
           본문이 여기에 들어갑니다.
@@ -146,14 +147,14 @@ export function TemplatePreview({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 8 * s,
-            marginTop: 20 * s,
-            padding: `${10 * s}px ${20 * s}px`,
+            gap: 10 * s,
+            marginTop: 24 * s,
+            padding: `${14 * s}px ${26 * s}px`,
             background: '#fff',
             color: pc,
-            fontSize: 20 * s,
-            fontWeight: 800,
-            borderRadius: 8 * s,
+            fontSize: 26 * s,
+            fontWeight: 900,
+            borderRadius: 10 * s,
           }}
         >
           자세히 보기 <span>→</span>
