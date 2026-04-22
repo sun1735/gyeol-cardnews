@@ -24,6 +24,7 @@ export interface ElementStyle {
   sizeScale?: number // 0.6 ~ 1.8 · 해당 요소에만 적용
   weight?: 300 | 400 | 500 | 600 | 700 | 800 | 900
   align?: 'left' | 'center' | 'right' // 해당 요소 정렬 (미지정 시 카드 align)
+  color?: string // HEX · 미지정 시 카드 기본(브랜드 textColor 또는 템플릿 디폴트)
 }
 
 // 사용자가 카드별로 조절할 수 있는 텍스트 스타일. 요소별로 세밀 조정 가능.

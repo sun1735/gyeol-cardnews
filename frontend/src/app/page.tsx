@@ -3114,6 +3114,12 @@ function CardItem({
   const toAlignSelf = (a: 'left' | 'center' | 'right') =>
     a === 'center' ? 'center' : a === 'right' ? 'flex-end' : 'flex-start'
 
+  // 요소별 컬러 오버라이드 — 미지정 시 기존 브랜드/이미지 감각 유지
+  const titleColor = ts.title?.color
+  const bodyColor = ts.body?.color
+  const subtextColor = ts.subtext?.color
+  const ctaColor = ts.cta?.color
+
   // 렌더 직전 페이지 번호·순번 흔적 제거 — 이미지에 찍히는 것 방지.
   // 백엔드 (schema.ts stripPageNumber) 와 동일 규칙을 프론트에서도 한 번 더 적용.
   const scrubPageNumbers = (s: string | undefined): string => {
@@ -3266,7 +3272,7 @@ function CardItem({
                   fontSize: subtextSize,
                   fontWeight: subtextWeight,
                   letterSpacing: '0.04em',
-                  color: onImage ? '#e2e8f0' : primary,
+                  color: subtextColor ?? (onImage ? '#e2e8f0' : primary),
                   textAlign: subtextAlign,
                 }}
               >
@@ -3277,7 +3283,7 @@ function CardItem({
               style={{
                 fontSize: titleSize,
                 fontWeight: titleWeight,
-                color: onImage ? '#ffffff' : text,
+                color: titleColor ?? (onImage ? '#ffffff' : text),
                 lineHeight: 1.25,
                 letterSpacing: '-0.02em',
                 textAlign: titleAlign,
@@ -3291,7 +3297,7 @@ function CardItem({
                   fontSize: bodySize,
                   fontWeight: bodyWeight,
                   lineHeight: 1.65,
-                  color: onImage ? '#f8fafc' : text,
+                  color: bodyColor ?? (onImage ? '#f8fafc' : text),
                   whiteSpace: 'pre-wrap',
                   textAlign: bodyAlign,
                 }}
@@ -3306,7 +3312,7 @@ function CardItem({
                   marginTop: Math.round(d.display * 0.015),
                   fontSize: ctaSize,
                   fontWeight: ctaWeight,
-                  color: onImage ? primary : '#ffffff',
+                  color: ctaColor ?? (onImage ? primary : '#ffffff'),
                   background: onImage ? '#ffffff' : primary,
                   padding: `${Math.round(d.display * 0.018)}px ${Math.round(d.display * 0.038)}px`,
                   borderRadius: Math.round(d.display * 0.015),
@@ -3573,6 +3579,70 @@ function CardItem({
               maxLength={24}
             />
           </label>
+
+          {/* 팔레트 — dominant / accent / 글자색 컬러 피커 */}
+          {card.design && (
+            <div className="pt-1 border-t border-indigo-100">
+              <div className="text-[10px] font-semibold text-indigo-700 uppercase tracking-wider mb-1.5">
+                팔레트
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { k: 'dominant', label: '배경' },
+                    { k: 'accent', label: '강조' },
+                    { k: 'textOnDominant', label: '글자' },
+                  ] as const
+                ).map((p) => {
+                  const currentColor =
+                    card.design?.palette?.[p.k] ??
+                    (p.k === 'textOnDominant' ? '#ffffff' : '#1a1a2e')
+                  return (
+                    <label key={p.k} className="block">
+                      <span className="block text-[10px] text-slate-500 mb-0.5">{p.label}</span>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="color"
+                          value={currentColor}
+                          onChange={(e) =>
+                            card.design &&
+                            onChange({
+                              design: {
+                                ...card.design,
+                                palette: { ...card.design.palette, [p.k]: e.target.value },
+                              },
+                            })
+                          }
+                          className="w-8 h-7 p-0 border border-slate-200 rounded cursor-pointer flex-shrink-0"
+                          title={p.label}
+                        />
+                        <input
+                          type="text"
+                          value={currentColor}
+                          onChange={(e) => {
+                            const v = e.target.value.trim()
+                            if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
+                              card.design &&
+                                onChange({
+                                  design: {
+                                    ...card.design,
+                                    palette: {
+                                      ...card.design.palette,
+                                      [p.k]: v.startsWith('#') ? v : `#${v}`,
+                                    },
+                                  },
+                                })
+                            }
+                          }}
+                          className="flex-1 min-w-0 text-[10px] px-1.5 py-1 border border-slate-200 rounded font-mono"
+                        />
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3650,8 +3720,17 @@ function CardItem({
                 const currentWeight = elem.weight ?? (styleTab === 'title' ? (ts.titleWeight ?? 800) : defaultWeights[styleTab])
                 const currentSize = elem.sizeScale ?? ts.sizeScale ?? 1
                 const currentAlign = elem.align ?? ts.align ?? 'left'
-                const update = (patch: { sizeScale?: number; weight?: number; align?: 'left' | 'center' | 'right' }) => {
-                  const nextElem = { ...elem, ...patch }
+                const update = (patch: {
+                  sizeScale?: number
+                  weight?: number
+                  align?: 'left' | 'center' | 'right'
+                  color?: string
+                }) => {
+                  const nextElem: Record<string, unknown> = { ...elem, ...patch }
+                  // undefined 로 지정된 키는 제거 (기본값 복귀)
+                  for (const k of Object.keys(patch)) {
+                    if ((patch as any)[k] === undefined) delete nextElem[k]
+                  }
                   onChange({ textStyle: { ...ts, [styleTab]: nextElem } })
                 }
 
@@ -3725,6 +3804,52 @@ function CardItem({
                             </button>
                           )
                         })}
+                      </div>
+                    </div>
+
+                    {/* 컬러 */}
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-600 mb-1 flex items-center justify-between">
+                        <span>글자 색상</span>
+                        <span className="text-slate-400 tabular-nums">
+                          {elem.color ?? '기본'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={elem.color ?? '#111827'}
+                          onChange={(e) => update({ color: e.target.value })}
+                          onClick={stop}
+                          className="w-10 h-8 p-0 border border-slate-200 rounded cursor-pointer"
+                          title="컬러 선택"
+                        />
+                        <input
+                          type="text"
+                          value={elem.color ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value.trim()
+                            if (!v) update({ color: undefined })
+                            else if (/^#?[0-9a-fA-F]{3,6}$/.test(v)) {
+                              update({ color: v.startsWith('#') ? v : `#${v}` })
+                            }
+                          }}
+                          onClick={stop}
+                          placeholder="#111827"
+                          className="flex-1 text-[11px] px-2 py-1 border border-slate-200 rounded font-mono"
+                        />
+                        {elem.color && (
+                          <button
+                            onClick={(e) => {
+                              stop(e)
+                              update({ color: undefined })
+                            }}
+                            className="text-[11px] px-2 py-1 border rounded bg-white hover:bg-slate-50 text-slate-500"
+                            title="기본값으로"
+                          >
+                            기본
+                          </button>
+                        )}
                       </div>
                     </div>
 
