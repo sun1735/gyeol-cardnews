@@ -8,6 +8,7 @@ import { ProductAdCard } from '@/components/templates/ProductAdCard'
 import { PromoCard } from '@/components/templates/PromoCard'
 import { TEMPLATES } from '@/components/templates/registry'
 import { TemplatePreview } from '@/components/templates/TemplatePreview'
+import { Landing } from '@/components/Landing'
 
 // 인증 세션의 API 토큰을 모든 /api/* fetch 에 자동으로 실어 보내는 래퍼.
 // NextAuth session.apiToken 이 있으면 Authorization 헤더에 추가.
@@ -1072,6 +1073,14 @@ export default function Page() {
       resetBrandForm()
     }
     await loadBrands()
+  }
+
+  // 비로그인 방문자 → 랜딩 페이지. 로딩 중은 잠깐 빈 화면(깜빡임 방지).
+  if (authStatus === 'loading') {
+    return <main className="min-h-screen bg-white" />
+  }
+  if (authStatus === 'unauthenticated') {
+    return <Landing />
   }
 
   return (
