@@ -105,7 +105,7 @@ export function productAdArraySchema(maxCount: number) {
             badgeLabel: { type: 'string' },
             features: {
               type: 'array',
-              minItems: 3,
+              // Gemini responseSchema 는 minItems 를 일부 거절한 사례가 있어 maxItems 만 유지.
               maxItems: 4,
               items: {
                 type: 'object',

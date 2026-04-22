@@ -5,6 +5,8 @@ import { flushSync } from 'react-dom'
 import { signIn, signOut, useSession } from 'next-auth/react'
 import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template } from '@/lib/types'
 import { ProductAdCard } from '@/components/templates/ProductAdCard'
+import { PromoCard } from '@/components/templates/PromoCard'
+import { TEMPLATES } from '@/components/templates/registry'
 
 // 인증 세션의 API 토큰을 모든 /api/* fetch 에 자동으로 실어 보내는 래퍼.
 // NextAuth session.apiToken 이 있으면 Authorization 헤더에 추가.
@@ -119,9 +121,10 @@ export default function Page() {
   const [mode, setMode] = useState<GenMode>('auto')
   // 카드 템플릿 — basic(기본) / product-ad(상품 광고) / promo(프로모션, 추후).
   const [template, setTemplate] = useState<Template>('basic')
-  // product-ad 는 note-rag 경로에서만 구조화 카피가 생성되므로 모드가 바뀌면 자동으로 basic 복귀.
+  // requiresNoteRag 인 템플릿은 모드가 note-rag 가 아니면 자동 basic 복귀.
   useEffect(() => {
-    if (template === 'product-ad' && mode !== 'note-rag') setTemplate('basic')
+    const meta = TEMPLATES.find((t) => t.key === template)
+    if (meta?.requiresNoteRag && mode !== 'note-rag') setTemplate('basic')
   }, [mode, template])
   const [size, setSize] = useState<SizePreset>('1:1')
   const [customSize, setCustomSize] = useState({ w: 1080, h: 1080 })
@@ -1287,26 +1290,15 @@ export default function Page() {
                 카드 템플릿
               </div>
               <div className="grid grid-cols-3 gap-1.5">
-                {(
-                  [
-                    { k: 'basic' as Template, title: '기본', desc: '제목·본문·CTA', disabled: false },
-                    {
-                      k: 'product-ad' as Template,
-                      title: '상품 광고',
-                      desc:
-                        mode === 'note-rag' ? '가격·할인·스펙' : '지식노트 모드 전용',
-                      // product-ad 풀 구조(가격·features 등) 생성은 note-rag 경로에서만 동작 — auto/manual 은 텍스트만 채워짐.
-                      disabled: mode !== 'note-rag',
-                    },
-                    { k: 'promo' as Template, title: '프로모션', desc: '준비 중', disabled: true },
-                  ]
-                ).map((t) => {
-                  const active = template === t.k
+                {TEMPLATES.map((t) => {
+                  const active = template === t.key
+                  const blocked = t.disabled || (t.requiresNoteRag && mode !== 'note-rag')
+                  const desc = t.requiresNoteRag && mode !== 'note-rag' ? '지식노트 모드 전용' : t.description
                   return (
                     <button
-                      key={t.k}
-                      onClick={() => !t.disabled && setTemplate(t.k)}
-                      disabled={t.disabled}
+                      key={t.key}
+                      onClick={() => !blocked && setTemplate(t.key)}
+                      disabled={blocked}
                       className={`px-2.5 py-2.5 rounded-[10px] text-left transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         active
                           ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200'
@@ -1321,7 +1313,7 @@ export default function Page() {
                           active ? 'text-indigo-700/80' : 'text-slate-500'
                         }`}
                       >
-                        {t.desc}
+                        {desc}
                       </span>
                     </button>
                   )
@@ -1329,8 +1321,12 @@ export default function Page() {
               </div>
               {template === 'product-ad' && (
                 <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
-                  배경 이미지는 <b>텍스트 없음</b>으로 생성되고, 가격·할인·기능 아이콘은 화면 위에서 합성됩니다.
-                  4:5 세로 비율을 권장합니다.
+                  배경은 <b>텍스트 없음</b>으로 생성, 가격·할인·기능 아이콘은 화면 위에서 합성됩니다. 4:5 권장.
+                </p>
+              )}
+              {template === 'promo' && (
+                <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                  중앙 대형 할인율 + 기간 문구 중심 레이아웃. 1:1 정사각을 권장합니다.
                 </p>
               )}
             </div>
@@ -3098,6 +3094,21 @@ function CardItem({
               primaryColor={primary}
             />
           </div>
+        ) : card.template === 'promo' ? (
+          <div id={`card-${card.id}`}>
+            <PromoCard
+              title={card.title}
+              subtitle={card.subtext || card.body}
+              discountPercent={card.productAd?.discountPercent}
+              deadlineText={card.productAd?.deadlineText}
+              ctaLabel={card.productAd?.ctaLabel ?? card.cta}
+              badgeLabel={card.productAd?.badgeLabel ?? 'EVENT'}
+              backgroundImageUrl={card.imageUrl}
+              displayWidth={d.display}
+              aspectRatio={size === '4:5' ? '4:5' : size === '9:16' ? '9:16' : '1:1'}
+              primaryColor={primary}
+            />
+          </div>
         ) : (
         <div
           id={`card-${card.id}`}
@@ -3249,8 +3260,119 @@ function CardItem({
         />
       </div>
 
-      {/* 텍스트 스타일 편집 — product-ad 카드는 고정 디자인이라 표시하지 않음 */}
-      {card.template !== 'product-ad' && (
+      {/* 상품 광고 / 프로모션 전용 필드 인라인 편집 */}
+      {(card.template === 'product-ad' || card.template === 'promo') && (
+        <div
+          onClick={stop}
+          className="border border-indigo-100 rounded-md bg-indigo-50/40 p-2.5 space-y-2"
+        >
+          <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">
+            {card.template === 'promo' ? '프로모션 필드' : '상품 광고 필드'}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="block text-[10px] text-slate-500 mb-0.5">뱃지</span>
+              <input
+                className="w-full border rounded-md px-2 py-1 text-xs"
+                value={card.productAd?.badgeLabel ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    productAd: { ...(card.productAd ?? {}), badgeLabel: e.target.value },
+                  })
+                }
+                placeholder="BEST SELLER"
+                maxLength={20}
+              />
+            </label>
+            <label className="block">
+              <span className="block text-[10px] text-slate-500 mb-0.5">CTA 라벨</span>
+              <input
+                className="w-full border rounded-md px-2 py-1 text-xs"
+                value={card.productAd?.ctaLabel ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    productAd: { ...(card.productAd ?? {}), ctaLabel: e.target.value },
+                  })
+                }
+                placeholder="지금 구매 →"
+                maxLength={20}
+              />
+            </label>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <label className="block">
+              <span className="block text-[10px] text-slate-500 mb-0.5">원가(₩)</span>
+              <input
+                type="number"
+                className="w-full border rounded-md px-2 py-1 text-xs tabular-nums"
+                value={card.productAd?.priceOriginal ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    productAd: {
+                      ...(card.productAd ?? {}),
+                      priceOriginal: e.target.value ? Number(e.target.value) : undefined,
+                    },
+                  })
+                }
+                placeholder="38000"
+              />
+            </label>
+            <label className="block">
+              <span className="block text-[10px] text-slate-500 mb-0.5">판매가(₩)</span>
+              <input
+                type="number"
+                className="w-full border rounded-md px-2 py-1 text-xs tabular-nums"
+                value={card.productAd?.priceSale ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    productAd: {
+                      ...(card.productAd ?? {}),
+                      priceSale: e.target.value ? Number(e.target.value) : undefined,
+                    },
+                  })
+                }
+                placeholder="30400"
+              />
+            </label>
+            <label className="block">
+              <span className="block text-[10px] text-slate-500 mb-0.5">할인율(%)</span>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                className="w-full border rounded-md px-2 py-1 text-xs tabular-nums"
+                value={card.productAd?.discountPercent ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value ? Number(e.target.value) : undefined
+                  const clamped =
+                    typeof v === 'number' ? Math.max(1, Math.min(99, v)) : undefined
+                  onChange({
+                    productAd: { ...(card.productAd ?? {}), discountPercent: clamped },
+                  })
+                }}
+                placeholder="20"
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="block text-[10px] text-slate-500 mb-0.5">마감 문구</span>
+            <input
+              className="w-full border rounded-md px-2 py-1 text-xs"
+              value={card.productAd?.deadlineText ?? ''}
+              onChange={(e) =>
+                onChange({
+                  productAd: { ...(card.productAd ?? {}), deadlineText: e.target.value },
+                })
+              }
+              placeholder="5월 5일까지"
+              maxLength={24}
+            />
+          </label>
+        </div>
+      )}
+
+      {/* 텍스트 스타일 편집 — 상품광고·프로모션 템플릿은 고정 디자인이라 표시하지 않음 */}
+      {card.template !== 'product-ad' && card.template !== 'promo' && (
       <div className="border rounded-md bg-slate-50/50" onClick={stop}>
         <button
           onClick={(e) => { stop(e); setStyleOpen((v) => !v) }}

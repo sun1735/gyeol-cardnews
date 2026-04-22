@@ -109,7 +109,7 @@ export class Orchestrator {
     const template = dto.template ?? 'basic'
 
     // 5) LLM 카피 생성 — template 에 따라 다른 스키마/프롬프트.
-    //    product-ad 는 구조화된 광고 필드를 생성.
+    //    product-ad / promo 는 구조화된 광고 필드를 생성.
     const copyResult = await this.generateCopyByTemplate(
       dto.prompt,
       n,
@@ -194,14 +194,24 @@ export class Orchestrator {
     template: 'basic' | 'product-ad' | 'promo',
   ): Promise<{ basic: ValidatedCard[]; productAd: (ValidatedProductAdCard | null)[] }> {
     const basic = await this.generateCopy(prompt, n, layouts, brand, recipe, chunks)
-    if (template !== 'product-ad') {
+    // product-ad 와 promo 모두 구조화된 광고 필드(가격·뱃지·CTA 라벨) 를 재사용.
+    // promo 는 중앙 대형 할인율만 표시하므로 features/colors 는 선택.
+    if (template !== 'product-ad' && template !== 'promo') {
       return { basic, productAd: Array(n).fill(null) }
     }
-    const productAd = await this.generateProductAdCopy(prompt, n, layouts, brand, recipe, chunks)
+    const productAd = await this.generateProductAdCopy(
+      prompt,
+      n,
+      layouts,
+      brand,
+      recipe,
+      chunks,
+      template,
+    )
     return { basic, productAd }
   }
 
-  // product-ad 전용 카피 — features/가격/뱃지·CTA 라벨 등 구조화 필드.
+  // product-ad / promo 전용 카피 — features/가격/뱃지·CTA 라벨 등 구조화 필드.
   private async generateProductAdCopy(
     prompt: string,
     n: number,
@@ -209,24 +219,37 @@ export class Orchestrator {
     brand: any,
     recipe: StyleRecipe,
     chunks: RetrievedChunk[],
+    template: 'product-ad' | 'promo' = 'product-ad',
   ): Promise<(ValidatedProductAdCard | null)[]> {
+    const fallback = buildProductAdFallback(prompt, brand, layouts)
     if (!process.env.GEMINI_API_KEY) {
-      this.logger.warn('GEMINI_API_KEY 없음 — product-ad 기본 카피 생략')
-      return Array(n).fill(null)
+      this.logger.warn(`GEMINI_API_KEY 없음 — ${template} 폴백 카피 사용`)
+      return fallback
     }
     const contextBlock = chunks.length
       ? chunks.map((c, i) => `[${i + 1}] ${c.docTitle}: ${c.text}`).join('\n---\n')
       : '(브랜드 지식노트 비어 있음)'
 
-    const sys = [
-      '한국 쇼핑몰 상품 광고 카드뉴스 카피라이터. 패션·뷰티·라이프스타일 톤.',
-      '각 카드는 구조화된 광고 카드 — {title, subtitle, body, badgeLabel, features[3~4]{icon,label}, colors[], priceOriginal, priceSale, discountPercent, deadlineText, ctaLabel, layout}.',
-      'icon 은 단일 이모지(예: 🧴 👕 ✨ 🌿 💧 🔥 🎁 ⏰). label 은 10자 이내 키워드("수분 가득", "100% 면", "무료배송" 등).',
-      'colors 는 제품 컬러를 HEX 코드 배열로(최대 4개). 모르면 빈 배열.',
-      'badgeLabel 은 "BEST SELLER", "NEW", "한정 수량" 중 문맥에 맞는 것. 없으면 빈 문자열.',
-      'deadlineText 는 "5월 5일까지", "이번 주 한정" 같은 간결한 표현.',
-      '의학적 단정·절대 표현 금지. 페이지 번호 금지.',
-    ].join(' ')
+    const sys =
+      template === 'promo'
+        ? [
+            '한국 이커머스 이벤트/세일 카피라이터. 강렬하고 간결한 톤.',
+            '각 카드는 {title, subtitle, body, badgeLabel, features[], colors[], priceOriginal, priceSale, discountPercent(필수), deadlineText(필수), ctaLabel, layout}.',
+            'title 은 이벤트명(예: "봄맞이 대세일", "5월 가정의 달 EVENT"). subtitle 은 설명 카피(예: "모든 상품 최대 50%").',
+            'discountPercent 는 1~90 사이 정수. 가장 강조할 숫자.',
+            'deadlineText 는 "5월 5일 마감", "3일 남음", "이번 주 일요일까지" 같은 시간적 긴장감.',
+            'badgeLabel 은 "EVENT", "SALE", "한정 수량", "오늘만" 중 하나.',
+            'features/colors 는 필요 없으면 빈 배열. 의학 단정·페이지 번호 금지.',
+          ].join(' ')
+        : [
+            '한국 쇼핑몰 상품 광고 카드뉴스 카피라이터. 패션·뷰티·라이프스타일 톤.',
+            '각 카드는 구조화된 광고 카드 — {title, subtitle, body, badgeLabel, features[3~4]{icon,label}, colors[], priceOriginal, priceSale, discountPercent, deadlineText, ctaLabel, layout}.',
+            'icon 은 단일 이모지(예: 🧴 👕 ✨ 🌿 💧 🔥 🎁 ⏰). label 은 10자 이내 키워드("수분 가득", "100% 면", "무료배송" 등).',
+            'colors 는 제품 컬러를 HEX 코드 배열로(최대 4개). 모르면 빈 배열.',
+            'badgeLabel 은 "BEST SELLER", "NEW", "한정 수량" 중 문맥에 맞는 것. 없으면 빈 문자열.',
+            'deadlineText 는 "5월 5일까지", "이번 주 한정" 같은 간결한 표현.',
+            '의학적 단정·절대 표현 금지. 페이지 번호 금지.',
+          ].join(' ')
 
     const userText = [
       recipeAsPromptBlock(recipe),
@@ -251,15 +274,16 @@ export class Orchestrator {
         timeoutMs: LLM_TIMEOUT_MS,
         temperature: 0.7,
       })
-      if (!parsed || !Array.isArray(parsed.cards)) return Array(n).fill(null)
+      if (!parsed || !Array.isArray(parsed.cards)) return fallback
       const out: (ValidatedProductAdCard | null)[] = []
       for (let i = 0; i < n; i++) {
-        out.push(validateProductAdCard(parsed.cards[i]))
+        const v = validateProductAdCard(parsed.cards[i])
+        out.push(v ?? fallback[i])
       }
       return out
     } catch (e: any) {
-      this.logger.warn(`Gemini product-ad 호출 예외 — null 폴백: ${e?.message ?? e}`)
-      return Array(n).fill(null)
+      this.logger.warn(`Gemini product-ad 호출 예외 — 폴백 카피 사용: ${e?.message ?? e}`)
+      return fallback
     }
   }
 
@@ -384,6 +408,76 @@ function buildLayouts(n: number): Layout[] {
     out.push(i === 0 ? 'cover' : i === n - 1 ? 'cta' : 'content')
   }
   return out
+}
+
+// product-ad 폴백 카피. LLM 호출 실패/스키마 불일치 시 이 값으로 빈 자리 채움.
+// 프롬프트·브랜드명을 제목에 재사용하고 기본 features·뱃지를 주입해 시각적으로 비어보이지 않게 한다.
+function buildProductAdFallback(
+  prompt: string,
+  brand: any,
+  layouts: Layout[],
+): ValidatedProductAdCard[] {
+  const name = brand?.name ?? '브랜드'
+  const phrase = brand?.defaultPhrase ?? '지금 만나보세요'
+  const topic = prompt.trim().slice(0, 20) || name
+  const primary = typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
+  const secondary = typeof brand?.secondaryColor === 'string' ? brand.secondaryColor : '#f1f5f9'
+  const defaultFeatures = [
+    { icon: '✨', label: '세심한 마감' },
+    { icon: '🌿', label: '저자극' },
+    { icon: '💧', label: '보습 지속' },
+    { icon: '🎁', label: '특별 패키지' },
+  ]
+
+  return layouts.map((layout, i) => {
+    if (layout === 'cover') {
+      return {
+        layout,
+        title: topic,
+        subtitle: phrase,
+        body: prompt.trim().slice(0, 100) || `${name} 에서 준비한 신상을 만나보세요.`,
+        badgeLabel: 'BEST SELLER',
+        features: defaultFeatures.slice(0, 4),
+        colors: [primary, secondary],
+        priceOriginal: null,
+        priceSale: null,
+        discountPercent: null,
+        deadlineText: '',
+        ctaLabel: '지금 구매 →',
+      }
+    }
+    if (layout === 'cta') {
+      return {
+        layout,
+        title: '지금 만나보세요',
+        subtitle: phrase,
+        body: '온라인에서 바로 확인하실 수 있습니다.',
+        badgeLabel: '한정 수량',
+        features: defaultFeatures.slice(0, 3),
+        colors: [primary],
+        priceOriginal: null,
+        priceSale: null,
+        discountPercent: null,
+        deadlineText: '이번 주까지',
+        ctaLabel: '바로 구매 →',
+      }
+    }
+    // content
+    return {
+      layout,
+      title: `포인트 ${i}`,
+      subtitle: '핵심을 짧게',
+      body: '제품의 특징을 간결하게 전달합니다.',
+      badgeLabel: '',
+      features: defaultFeatures.slice(0, 4),
+      colors: [primary],
+      priceOriginal: null,
+      priceSale: null,
+      discountPercent: null,
+      deadlineText: '',
+      ctaLabel: '자세히 보기',
+    }
+  })
 }
 
 function buildTemplateCopies(prompt: string, brand: any, layouts: Layout[]): ValidatedCard[] {
