@@ -70,6 +70,13 @@ export interface DynamicDesign {
   decorations: string[] // 'discount-circle' | 'corner-accent' | 'big-number' | 'divider-lines'
 }
 
+// 사용자가 카드별로 오버라이드할 수 있는 레이아웃 모드.
+// split: 좌측 텍스트·우측 이미지 (2컬럼 그리드, 기본값)
+// hero: 카드 전체 배경 이미지 + 오버레이 (기존 full-bleed 감성)
+// top-image: 상단 이미지 + 하단 텍스트 (좁은 프리뷰 자동 폴백)
+export type CardLayoutMode = 'split' | 'hero' | 'top-image'
+export type ImageFitMode = 'contain' | 'cover'
+
 // 단계 4 출력 고정 포맷: title / body / subtext / cta (+ layout, imageUrl, id, textStyle)
 // template 이 'product-ad' / 'promo' 일 때 design 필드에 AI 생성 스펙이 들어옴.
 export interface CardData {
@@ -84,6 +91,9 @@ export interface CardData {
   template?: Template
   productAd?: ProductAdData // 레거시 — 차후 design 으로 통합
   design?: DynamicDesign
+  // product-ad / promo 용 — 사용자가 편집 가능. 미지정 시 기본값(split / contain)
+  layoutMode?: CardLayoutMode
+  imageFit?: ImageFitMode
 }
 
 export interface BrandAsset {

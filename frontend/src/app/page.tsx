@@ -3190,12 +3190,16 @@ function CardItem({
       <div className="flex justify-center">
         {(card.template === 'product-ad' || card.template === 'promo') && card.design ? (
           <div id={`card-${card.id}`}>
-            {/* AI 가 layout·palette·decorations 을 결정한 DynamicCard — 매번 다른 구도 */}
+            {/* AI 가 layout·palette·decorations 을 결정한 DynamicCard.
+                layoutMode/imageFit 은 사용자가 카드별로 오버라이드. */}
             <DynamicCard
               design={card.design}
               backgroundImageUrl={card.imageUrl}
               displayWidth={d.display}
               aspectRatio={size === '4:5' ? '4:5' : size === '9:16' ? '9:16' : '1:1'}
+              layoutMode={card.layoutMode}
+              imageFit={card.imageFit}
+              secondaryColor={brand?.secondaryColor}
             />
           </div>
         ) : (
@@ -3388,6 +3392,64 @@ function CardItem({
           <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">
             {card.template === 'promo' ? '프로모션 필드' : '상품 광고 필드'}
           </div>
+          {/* 레이아웃 모드 · 이미지 핏 */}
+          {card.design && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="block text-[10px] text-slate-500 mb-1">레이아웃</span>
+                <div className="grid grid-cols-3 gap-1">
+                  {(
+                    [
+                      { k: 'split', label: '좌우' },
+                      { k: 'hero', label: '전면' },
+                      { k: 'top-image', label: '상하' },
+                    ] as const
+                  ).map((o) => {
+                    const active = (card.layoutMode ?? 'split') === o.k
+                    return (
+                      <button
+                        key={o.k}
+                        onClick={() => onChange({ layoutMode: o.k })}
+                        className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                          active
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <span className="block text-[10px] text-slate-500 mb-1">이미지 핏</span>
+                <div className="grid grid-cols-2 gap-1">
+                  {(
+                    [
+                      { k: 'contain', label: '맞춤' },
+                      { k: 'cover', label: '채움' },
+                    ] as const
+                  ).map((o) => {
+                    const active = (card.imageFit ?? 'contain') === o.k
+                    return (
+                      <button
+                        key={o.k}
+                        onClick={() => onChange({ imageFit: o.k })}
+                        className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                          active
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           {/* 뱃지 — CTA 라벨은 상단 subtext/cta 자리에서 편집 */}
           <label className="block">
             <span className="block text-[10px] text-slate-500 mb-0.5">뱃지</span>
