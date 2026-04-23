@@ -638,6 +638,50 @@ export default function Page() {
     })
   }
 
+  // LayoutDSL 만 다시 생성 — 이미지·imageUrl 은 유지, LLM 에 새 배치만 요청.
+  // 같은 프롬프트로 temperature 1.0 을 던지면 매번 다른 구도가 나옴.
+  async function relayoutCard(id: string) {
+    const target = cards.find((c) => c.id === id)
+    if (!target) return
+    if (target.template !== 'product-ad' && target.template !== 'promo') return
+    const promptText = prompt.trim() || target.title || '새로운 배치'
+    try {
+      const r = await authedFetch('/api/generate/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'auto',
+          prompt: promptText,
+          count: 1,
+          brandId: selectedBrandId || undefined,
+          template: target.template,
+        }),
+      }).then((res) => res.json())
+      const fresh: CardData | undefined = r?.cards?.[0]
+      if (!fresh?.layoutDsl) {
+        alert('새 배치 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+        return
+      }
+      // 이미지·id·layout(cover/content/cta) 는 유지. DSL·title·body·subtext·cta 는 새로.
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                layoutDsl: fresh.layoutDsl,
+                title: fresh.title ?? c.title,
+                body: fresh.body ?? c.body,
+                subtext: fresh.subtext ?? c.subtext,
+                cta: fresh.cta ?? c.cta,
+              }
+            : c,
+        ),
+      )
+    } catch (e: any) {
+      alert('새 배치 생성 실패: ' + (e?.message ?? e))
+    }
+  }
+
   function updateManual(i: number, patch: Partial<ManualInput>) {
     setManual((prev) => {
       const next = [...prev]
@@ -2197,6 +2241,11 @@ export default function Page() {
                       })
                       if (ok) deleteCard(c.id)
                     }}
+                    onRelayout={
+                      c.template === 'product-ad' || c.template === 'promo'
+                        ? () => relayoutCard(c.id)
+                        : undefined
+                    }
                   />
                 ))}
                 {cards.length < 10 && (
@@ -3041,6 +3090,7 @@ function CardItem({
   onMoveUp,
   onMoveDown,
   onDelete,
+  onRelayout,
   customSize,
 }: {
   card: CardData
@@ -3060,11 +3110,13 @@ function CardItem({
   onMoveUp: () => void
   onMoveDown: () => void
   onDelete: () => void
+  onRelayout?: () => Promise<void>
 }) {
   const [aiEditing, setAiEditing] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [styleOpen, setStyleOpen] = useState(false)
   const [styleTab, setStyleTab] = useState<'title' | 'body' | 'subtext' | 'cta'>('title')
+  const [relayouting, setRelayouting] = useState(false)
   const d = resolveSizePx(size, customSize)
   const ratio = d.display / d.w
   const height = Math.round(d.h * ratio)
@@ -3442,8 +3494,26 @@ function CardItem({
           <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">
             {card.template === 'promo' ? '프로모션 필드' : '상품 광고 필드'}
           </div>
-          {/* 레이아웃 모드 · 이미지 핏 */}
-          {card.design && (
+          {/* AI 배치 다시 뽑기 — layoutDsl 있는 카드에만 노출 */}
+          {card.layoutDsl && onRelayout && (
+            <button
+              onClick={async () => {
+                if (relayouting) return
+                setRelayouting(true)
+                try {
+                  await onRelayout()
+                } finally {
+                  setRelayouting(false)
+                }
+              }}
+              disabled={relayouting}
+              className="w-full px-3 py-2 rounded-md bg-indigo-600 text-white text-[12px] font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+            >
+              {relayouting ? '새 배치 생성 중…' : '🎲 AI 배치 다시 뽑기'}
+            </button>
+          )}
+          {/* 레거시 카드(design only) 용 layoutMode/imageFit 토글 */}
+          {!card.layoutDsl && card.design && (
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <span className="block text-[10px] text-slate-500 mb-1">레이아웃</span>
