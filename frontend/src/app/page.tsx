@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { signIn, signOut, useSession } from 'next-auth/react'
 import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template } from '@/lib/types'
-import { ProductAdCard } from '@/components/templates/ProductAdCard'
-import { PromoCard } from '@/components/templates/PromoCard'
+// LayoutRenderer 가 product-ad/promo 렌더링을 전담. DynamicCard 는 layoutDsl 없는 레거시 카드용 fallback.
+// ProductAdCard/PromoCard (구 고정 템플릿) 는 더 이상 렌더 경로에 사용되지 않음.
 import { DynamicCard } from '@/components/templates/DynamicCard'
 import { LayoutRenderer } from '@/components/LayoutRenderer'
 import { TEMPLATES } from '@/components/templates/registry'

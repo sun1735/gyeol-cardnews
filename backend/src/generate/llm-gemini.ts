@@ -14,6 +14,8 @@ export interface GeminiJsonCall {
   schema: unknown
   timeoutMs?: number
   temperature?: number
+  // 지정 시 system·user·raw response 를 Logger.log 로 전체 출력 (운영 디버깅용)
+  debugLabel?: string
 }
 
 // 성공 시 파싱된 JSON 을 그대로 반환. 실패 시 Error throw.
@@ -37,6 +39,16 @@ export async function callGeminiJson<T = unknown>(call: GeminiJsonCall): Promise
       body.systemInstruction = { parts: [{ text: call.systemInstruction }] }
     }
 
+    if (call.debugLabel) {
+      logger.log(
+        `━━━━━━ [${call.debugLabel}] SYSTEM PROMPT ━━━━━━\n${call.systemInstruction ?? '(none)'}`,
+      )
+      logger.log(`━━━━━━ [${call.debugLabel}] USER PROMPT ━━━━━━\n${call.userText}`)
+      logger.log(
+        `━━━━━━ [${call.debugLabel}] SCHEMA (truncated) ━━━━━━\n${JSON.stringify(call.schema).slice(0, 800)}`,
+      )
+    }
+
     const res = await fetch(`${GEMINI_ENDPOINT}?key=${encodeURIComponent(key)}`, {
       method: 'POST',
       signal: controller.signal,
@@ -45,6 +57,9 @@ export async function callGeminiJson<T = unknown>(call: GeminiJsonCall): Promise
     })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
+      if (call.debugLabel) {
+        logger.error(`[${call.debugLabel}] Gemini HTTP ${res.status}: ${text.slice(0, 1000)}`)
+      }
       throw new Error(`Gemini HTTP ${res.status}: ${text.slice(0, 300)}`)
     }
     const j: any = await res.json()
@@ -52,10 +67,24 @@ export async function callGeminiJson<T = unknown>(call: GeminiJsonCall): Promise
     const textPart = parts.find((p) => typeof p?.text === 'string')
     if (!textPart) {
       logger.warn(`Gemini 응답에 text 파트 없음: ${JSON.stringify(j).slice(0, 200)}`)
+      if (call.debugLabel) {
+        logger.error(`[${call.debugLabel}] FULL RESPONSE: ${JSON.stringify(j).slice(0, 2000)}`)
+      }
       throw new Error('Gemini 응답 형식 비정상')
     }
+    if (call.debugLabel) {
+      logger.log(
+        `━━━━━━ [${call.debugLabel}] RAW RESPONSE (${textPart.text.length}자) ━━━━━━\n${textPart.text}`,
+      )
+    }
     // responseSchema 가 있어도 Gemini 는 text 안에 JSON 문자열로 반환 — 파싱 필요.
-    return JSON.parse(textPart.text) as T
+    const parsed = JSON.parse(textPart.text) as T
+    if (call.debugLabel) {
+      logger.log(
+        `━━━━━━ [${call.debugLabel}] PARSED JSON ━━━━━━\n${JSON.stringify(parsed, null, 2).slice(0, 4000)}`,
+      )
+    }
+    return parsed
   } finally {
     clearTimeout(timeoutId)
   }

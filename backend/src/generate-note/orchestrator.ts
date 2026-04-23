@@ -274,11 +274,27 @@ export class Orchestrator {
         schema: layoutDslSchema(n),
         timeoutMs: LLM_TIMEOUT_MS,
         temperature: 1.0, // 최대 다양성
+        debugLabel: `layout-dsl:note-rag:${template}`,
       })
-      if (!parsed || !Array.isArray(parsed.cards)) return Array(n).fill(null)
+      if (!parsed || !Array.isArray(parsed.cards)) {
+        this.logger.warn(`[layout-dsl:note-rag] parsed.cards 배열 아님 — null 폴백`)
+        return Array(n).fill(null)
+      }
       const out: (ValidatedLayoutDsl | null)[] = []
       for (let i = 0; i < n; i++) {
-        out.push(validateLayoutDsl(parsed.cards[i]))
+        const v = validateLayoutDsl(parsed.cards[i])
+        if (v) {
+          this.logger.log(
+            `[layout-dsl:note-rag] 카드 ${i} 검증 통과 — blocks=${v.blocks.length}, types=${v.blocks
+              .map((b: any) => b.type)
+              .join(',')}`,
+          )
+        } else {
+          this.logger.warn(
+            `[layout-dsl:note-rag] 카드 ${i} 검증 실패 — 원본: ${JSON.stringify(parsed.cards[i]).slice(0, 400)}`,
+          )
+        }
+        out.push(v)
       }
       return out
     } catch (e: any) {
