@@ -21,6 +21,8 @@ import {
   PRODUCT_AD_LIMITS,
   validateDynamicDesign,
   ValidatedDynamicDesign,
+  validateLayoutDsl,
+  ValidatedLayoutDsl,
 } from '../generate/schema'
 import { buildStyleRecipe, recipeAsPromptBlock, StyleRecipe } from '../generate/style'
 import { checkSafety } from '../generate/safety'
@@ -29,6 +31,7 @@ import {
   cardArraySchema,
   productAdArraySchema,
   dynamicDesignArraySchema,
+  layoutDslSchema,
 } from '../generate/llm-gemini'
 import { editImageWithGemini, saveEditedImage } from '../images/editor'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
@@ -46,7 +49,9 @@ interface CardOut {
   cta: string
   imageUrl?: string
   template?: 'basic' | 'product-ad' | 'promo'
-  // AI 가 결정한 동적 디자인 스펙 (product-ad / promo 템플릿에서 생성)
+  // AI 가 결정한 자유 배치 스펙 (product-ad / promo)
+  layoutDsl?: ValidatedLayoutDsl
+  // 레거시 — 프런트 역호환용
   design?: {
     layout: 'split-dark-left' | 'image-top-card-bottom' | 'fullbleed-center-glass'
     palette: { dominant: string; accent: string; textOnDominant: string }
@@ -121,8 +126,8 @@ export class Orchestrator {
     const template = dto.template ?? 'basic'
 
     // 5) LLM 카피 생성
-    //    - basic: 기존 cardArraySchema
-    //    - product-ad / promo: DynamicDesign (layout·palette·decorations 을 AI 가 결정)
+    //    - basic: 기존 cardArraySchema (카피만)
+    //    - product-ad / promo: LayoutDSL (자유 배치 블록 + 카피 통합)
     const copies: ValidatedCard[] = await this.generateCopy(
       dto.prompt,
       n,
@@ -131,9 +136,10 @@ export class Orchestrator {
       recipe,
       chunks,
     )
-    const designCopies: (ValidatedDynamicDesign | null)[] =
+    const designCopies: (ValidatedDynamicDesign | null)[] = Array(n).fill(null)
+    const layoutDsls: (ValidatedLayoutDsl | null)[] =
       template === 'product-ad' || template === 'promo'
-        ? await this.generateDynamicDesigns(dto.prompt, n, layouts, brand, recipe, chunks, template)
+        ? await this.generateLayoutDsls(dto.prompt, n, layouts, brand, recipe, chunks, template)
         : Array(n).fill(null)
     await setProgress(55)
 
@@ -149,35 +155,34 @@ export class Orchestrator {
     const editFailed = editResults.filter((r) => r.status === 'failed').length
     await setProgress(90)
 
-    // 8) 최종 카드 조립 (sanitize 포함) — AI 생성 design 이 있으면 함께 실어 보냄.
+    // 8) 최종 카드 조립 — layoutDsl 우선, 없으면 basic 카피로.
     const cards: CardOut[] = copies.map((c, i) => {
-      const d = designCopies[i]
+      const dsl = layoutDsls[i]
       const base: CardOut = {
         id: randId(),
         layout: layouts[i],
-        title: sanitizeText(d?.title ?? c.title),
-        body: sanitizeText(d?.body ?? c.body),
-        subtext: sanitizeText(d?.subtitle ?? c.subtext),
-        cta: sanitizeText(d?.ctaLabel ?? c.cta),
+        title: sanitizeText(c.title),
+        body: sanitizeText(c.body),
+        subtext: sanitizeText(c.subtext),
+        cta: sanitizeText(c.cta),
         imageUrl: editResults[i].url ?? undefined,
         template,
       }
-      if (d) {
-        base.design = {
-          layout: d.layout,
-          palette: d.palette,
-          title: sanitizeText(d.title),
-          subtitle: sanitizeText(d.subtitle),
-          body: sanitizeText(d.body),
-          badgeLabel: sanitizeText(d.badgeLabel),
-          ctaLabel: sanitizeText(d.ctaLabel),
-          features: d.features.map((f) => ({ icon: f.icon, label: sanitizeText(f.label) })),
-          priceOriginal: d.priceOriginal ?? undefined,
-          priceSale: d.priceSale ?? undefined,
-          discountPercent: d.discountPercent ?? undefined,
-          deadlineText: sanitizeText(d.deadlineText),
-          decorations: d.decorations,
-        }
+      if (dsl) {
+        // DSL 에서 핵심 텍스트 추출 — 프런트 역호환용 top-level 필드 채움
+        const titleBlock = dsl.blocks.find((b: any) => b.type === 'title')
+        const bodyBlock = dsl.blocks.find((b: any) => b.type === 'body')
+        const subBlock = dsl.blocks.find((b: any) => b.type === 'subtitle')
+        const ctaBlock = dsl.blocks.find((b: any) => b.type === 'cta')
+        base.title = sanitizeText(titleBlock?.text ?? c.title)
+        base.body = sanitizeText(bodyBlock?.text ?? c.body)
+        base.subtext = sanitizeText(subBlock?.text ?? c.subtext)
+        base.cta = sanitizeText(ctaBlock?.text ?? c.cta)
+        // 블록 내부 text 도 sanitize
+        dsl.blocks = dsl.blocks.map((b: any) =>
+          b.text ? { ...b, text: sanitizeText(b.text) } : b,
+        )
+        base.layoutDsl = dsl
       }
       return base
     })
@@ -197,7 +202,79 @@ export class Orchestrator {
     }
   }
 
-  // AI 가 layout·palette·decorations 까지 결정하는 DynamicDesign 카드 생성.
+  // LayoutDSL 자유 배치 생성 — LLM 이 블록을 직접 디자인.
+  // product-ad / promo 에서 호출. 실패·검증 실패 시 null → 상위에서 basic 카피로 폴백.
+  private async generateLayoutDsls(
+    prompt: string,
+    n: number,
+    layouts: Layout[],
+    brand: any,
+    recipe: StyleRecipe,
+    chunks: RetrievedChunk[],
+    template: 'product-ad' | 'promo',
+  ): Promise<(ValidatedLayoutDsl | null)[]> {
+    if (!process.env.GEMINI_API_KEY) {
+      this.logger.warn('GEMINI_API_KEY 없음 — LayoutDSL 스킵')
+      return Array(n).fill(null)
+    }
+    const contextBlock = chunks.length
+      ? chunks.map((c, i) => `[${i + 1}] ${c.docTitle}: ${c.text}`).join('\n---\n')
+      : '(브랜드 지식노트 비어 있음)'
+    const brandPrimary = typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
+
+    const sys = [
+      '한국 SNS 카드뉴스 AI 레이아웃 디자이너. 템플릿을 쓰지 않고 매번 새로운 구도를 설계한다.',
+      '출력은 canvas + blocks 배열. blocks 은 5~10개, rect 는 [x,y,w,h] 퍼센트(0~100).',
+      '블록 종류: image / title / subtitle / body / badge / price / features / cta / swatch / decor.',
+      '규칙:',
+      '  · title, body, cta 블록은 반드시 포함',
+      '  · image 블록은 canvas 전체가 아닌 일부(30~70%) 만 차지 — 좌/우/상/하 어디든 배치 가능',
+      '  · 텍스트가 이미지와 겹치면 decor(mask-gradient 또는 mask-solid) 블록을 해당 영역에 배치해 가독성 확보',
+      '  · 블록끼리 50% 이상 겹치지 않게. 좌우 상하 안전영역 5% 존중',
+      '  · image 블록의 url 은 반드시 "{{image}}" (프런트에서 실제 URL 로 치환)',
+      '  · 글자색·배경색은 HEX. 본문·타이틀은 배경과 대비 높게 (흰 위 검, 검 위 흰)',
+      '  · 매 생성마다 다른 구도. 같은 프롬프트라도 배치가 달라야 함',
+      '예시 (split 스타일): image 우측 55%, title 좌측 상단, body 좌측 중단, price 좌측 하단, cta 좌측 최하단, badge 좌상단',
+      '예시 (editorial): image 상단 60%, title 중앙, body 하단, decor mask-gradient 하단',
+      '예시 (hero-number): image 전면 배경, decor mask-solid 전면, circle decor 우상단 (discountPercent), title 중앙',
+      'badgeLabel·할인·기간은 자연스럽게 배치. 페이지 번호·과장·의학 단정 금지.',
+    ].join(' ')
+
+    const userText = [
+      recipeAsPromptBlock(recipe),
+      '',
+      '[브랜드 지식노트]',
+      contextBlock,
+      '',
+      `주제: ${prompt}`,
+      `브랜드: ${brand?.name ?? '미지정'} (primary ${brandPrimary})`,
+      `카드 수: ${n} · 레이아웃 순서(cardLayout): ${layouts.join(', ')}`,
+      `템플릿 방향: ${template === 'promo' ? '이벤트·세일 (강렬·대담)' : '상품 광고 (정보 밀집·신뢰)'}`,
+      `canvas.w=1080 고정. h 는 비율에 따라: 1080(1:1), 1350(4:5), 1920(9:16) 중 하나.`,
+      `길이 상한: title 20자, body 90자, cta 14자 (한국어)`,
+    ].join('\n')
+
+    try {
+      const parsed = await callGeminiJson<{ cards: unknown[] }>({
+        systemInstruction: sys,
+        userText,
+        schema: layoutDslSchema(n),
+        timeoutMs: LLM_TIMEOUT_MS,
+        temperature: 1.0, // 최대 다양성
+      })
+      if (!parsed || !Array.isArray(parsed.cards)) return Array(n).fill(null)
+      const out: (ValidatedLayoutDsl | null)[] = []
+      for (let i = 0; i < n; i++) {
+        out.push(validateLayoutDsl(parsed.cards[i]))
+      }
+      return out
+    } catch (e: any) {
+      this.logger.warn(`Gemini LayoutDSL 실패 — null 폴백: ${e?.message ?? e}`)
+      return Array(n).fill(null)
+    }
+  }
+
+  // AI 가 layout·palette·decorations 까지 결정하는 DynamicDesign 카드 생성. (레거시)
   // product-ad / promo 템플릿에서 호출. 실패 시 null 배열 — basic 카피로 폴백.
   private async generateDynamicDesigns(
     prompt: string,

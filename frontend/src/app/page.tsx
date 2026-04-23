@@ -7,6 +7,7 @@ import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template 
 import { ProductAdCard } from '@/components/templates/ProductAdCard'
 import { PromoCard } from '@/components/templates/PromoCard'
 import { DynamicCard } from '@/components/templates/DynamicCard'
+import { LayoutRenderer } from '@/components/LayoutRenderer'
 import { TEMPLATES } from '@/components/templates/registry'
 import { TemplatePreview } from '@/components/templates/TemplatePreview'
 import { Landing } from '@/components/Landing'
@@ -3194,10 +3195,19 @@ function CardItem({
 
       {/* 카드 프리뷰 (렌더 대상) */}
       <div className="flex justify-center">
-        {(card.template === 'product-ad' || card.template === 'promo') && card.design ? (
+        {(card.template === 'product-ad' || card.template === 'promo') && card.layoutDsl ? (
           <div id={`card-${card.id}`}>
-            {/* AI 가 layout·palette·decorations 을 결정한 DynamicCard.
-                layoutMode/imageFit 은 사용자가 카드별로 오버라이드. */}
+            {/* LayoutDSL 기반 자유 배치 — LLM 이 블록을 직접 디자인 */}
+            <LayoutRenderer
+              dsl={card.layoutDsl}
+              displayWidth={d.display}
+              imageUrl={card.imageUrl}
+              imageFitOverride={card.imageFitOverride}
+            />
+          </div>
+        ) : (card.template === 'product-ad' || card.template === 'promo') && card.design ? (
+          <div id={`card-${card.id}`}>
+            {/* 레거시 DynamicCard — DSL 이 없는 구형 카드용 fallback */}
             <DynamicCard
               design={card.design}
               backgroundImageUrl={card.imageUrl}

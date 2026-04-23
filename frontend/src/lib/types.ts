@@ -79,7 +79,7 @@ export type CardLayoutMode = 'split' | 'hero' | 'top-image'
 export type ImageFitMode = 'contain' | 'cover'
 
 // 단계 4 출력 고정 포맷: title / body / subtext / cta (+ layout, imageUrl, id, textStyle)
-// template 이 'product-ad' / 'promo' 일 때 design 필드에 AI 생성 스펙이 들어옴.
+// template 이 'product-ad' / 'promo' 일 때 layoutDsl 필드에 자유 배치 스펙이 들어옴.
 export interface CardData {
   id: string
   title: string
@@ -90,11 +90,24 @@ export interface CardData {
   layout: Layout
   textStyle?: TextStyle
   template?: Template
-  productAd?: ProductAdData // 레거시 — 차후 design 으로 통합
-  design?: DynamicDesign
-  // product-ad / promo 용 — 사용자가 편집 가능. 미지정 시 기본값(split / contain)
+  productAd?: ProductAdData // 레거시
+  design?: DynamicDesign // 레거시
+  // product-ad / promo 의 AI 자유 배치 스펙
+  layoutDsl?: LayoutDslData
+  // 사용자 오버라이드 (레거시 DynamicCard 용 — layoutDsl 이 있으면 무시)
   layoutMode?: CardLayoutMode
   imageFit?: ImageFitMode
+  // 이미지 블록별 fit 토글 (LayoutRenderer 용). 키 = block.id
+  imageFitOverride?: Record<string, 'cover' | 'contain'>
+}
+
+// LayoutDsl 의 프런트용 간이 타입 (렌더러가 실제 LayoutDsl 로 취급).
+// any 허용 — 백엔드 검증은 이미 끝나서 넘어옴.
+export interface LayoutDslData {
+  canvas: { w: number; h: number; bg: string; gradient?: string }
+  blocks: any[]
+  rationale?: string
+  cardLayout?: Layout
 }
 
 export interface BrandAsset {

@@ -10,6 +10,8 @@ import {
   ValidatedCard,
   validateDynamicDesign,
   ValidatedDynamicDesign,
+  validateLayoutDsl,
+  ValidatedLayoutDsl,
 } from './schema'
 import { buildStyleRecipe, recipeAsPromptBlock } from './style'
 import { checkSafety } from './safety'
@@ -17,6 +19,7 @@ import {
   callGeminiJson,
   cardArraySchema,
   dynamicDesignArraySchema,
+  layoutDslSchema,
 } from './llm-gemini'
 
 type CardSource = 'llm' | 'template'
@@ -88,6 +91,7 @@ interface CardOut {
   layout: Layout
   template?: 'basic' | 'product-ad' | 'promo'
   design?: DesignOut
+  layoutDsl?: ValidatedLayoutDsl
 }
 
 // ============ 콘텐츠 프레임 (프롬프트 키워드 → 제목/본문/기본배경) ============
@@ -300,24 +304,28 @@ export class GenerateService {
           ? this.wrapManual(input.cards ?? [], brand, baseImages)
           : await this.fromPrompt(input.prompt ?? '', effectiveCount, brand, baseImages)
 
-      // AI 동적 디자인(DynamicDesign) 합성 — product-ad/promo 일 때 LLM 에게 구도·컬러까지 생성시킴.
+      // LayoutDSL 자유 배치 — product-ad/promo 일 때 LLM 이 블록 배치를 매번 새로 설계.
       if (template === 'product-ad' || template === 'promo') {
-        const designs = await this.generateDynamicDesigns(
+        const dsls = await this.generateLayoutDsls(
           input.prompt ?? built.cards[0]?.title ?? '',
           built.cards.length,
           brand,
           template,
         )
         built.cards = built.cards.map((c, i) => {
-          const d = designs[i]
+          const dsl = dsls[i]
           const next: CardOut = { ...c, template }
-          if (d) {
-            next.design = d
-            // basic 필드도 design 값으로 덮어써 일관성 유지
-            next.title = d.title || c.title
-            next.body = d.body || c.body
-            next.subtext = d.subtitle || c.subtext
-            next.cta = d.ctaLabel || c.cta
+          if (dsl) {
+            next.layoutDsl = dsl
+            // top-level 텍스트 필드는 DSL 블록에서 추출해 동기화
+            const titleBlock = dsl.blocks.find((b: any) => b.type === 'title')
+            const bodyBlock = dsl.blocks.find((b: any) => b.type === 'body')
+            const subBlock = dsl.blocks.find((b: any) => b.type === 'subtitle')
+            const ctaBlock = dsl.blocks.find((b: any) => b.type === 'cta')
+            next.title = sanitizeText(titleBlock?.text ?? c.title)
+            next.body = sanitizeText(bodyBlock?.text ?? c.body)
+            next.subtext = sanitizeText(subBlock?.text ?? c.subtext)
+            next.cta = sanitizeText(ctaBlock?.text ?? c.cta)
           }
           return next
         })
@@ -714,7 +722,60 @@ export class GenerateService {
     }
   }
 
-  // AI 가 layout·palette·decorations 까지 결정하는 DynamicDesign 카드 생성.
+  // LayoutDSL 자유 배치 — 블록 단위로 LLM 이 직접 배치 설계.
+  private async generateLayoutDsls(
+    prompt: string,
+    n: number,
+    brand: any,
+    template: 'product-ad' | 'promo',
+  ): Promise<(ValidatedLayoutDsl | null)[]> {
+    const logger = new Logger('GenerateService')
+    if (!process.env.GEMINI_API_KEY) {
+      logger.warn('GEMINI_API_KEY 없음 — LayoutDSL 스킵')
+      return Array(n).fill(null)
+    }
+    const recipe = brand ? buildStyleRecipe(brand) : null
+    const brandPrimary = typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
+
+    const sys = [
+      '한국 SNS 카드뉴스 AI 레이아웃 디자이너. 템플릿을 쓰지 않고 매번 새로운 구도를 설계한다.',
+      '출력은 canvas + blocks 배열. blocks 은 5~10개, rect 는 [x,y,w,h] 퍼센트(0~100).',
+      '블록 종류: image / title / subtitle / body / badge / price / features / cta / swatch / decor.',
+      '규칙: title·body·cta 필수. image 는 30~70% 만 차지. 겹침 시 decor(mask-gradient) 로 가독성 확보.',
+      'image.url 은 반드시 "{{image}}". HEX 컬러, 대비 높게. 매 생성마다 다른 구도.',
+      '페이지 번호·과장·의학 단정 금지.',
+    ].join(' ')
+    const userText = [
+      recipe ? recipeAsPromptBlock(recipe) : '',
+      '',
+      `주제: ${prompt}`,
+      `브랜드: ${brand?.name ?? '미지정'} (primary ${brandPrimary})`,
+      `카드 수: ${n}`,
+      `템플릿 방향: ${template === 'promo' ? '이벤트·세일' : '상품 광고'}`,
+      'canvas.w=1080, h 는 1080/1350/1920 중 하나.',
+    ].filter(Boolean).join('\n')
+
+    try {
+      const parsed = await callGeminiJson<{ cards: unknown[] }>({
+        systemInstruction: sys,
+        userText,
+        schema: layoutDslSchema(n),
+        timeoutMs: LLM_TIMEOUT_MS,
+        temperature: 1.0,
+      })
+      if (!parsed || !Array.isArray(parsed.cards)) return Array(n).fill(null)
+      const out: (ValidatedLayoutDsl | null)[] = []
+      for (let i = 0; i < n; i++) {
+        out.push(validateLayoutDsl(parsed.cards[i]))
+      }
+      return out
+    } catch (e: any) {
+      logger.warn(`Gemini LayoutDSL 실패: ${e?.message ?? e}`)
+      return Array(n).fill(null)
+    }
+  }
+
+  // AI 가 layout·palette·decorations 까지 결정하는 DynamicDesign 카드 생성. (레거시)
   // auto/manual 모드에서 product-ad/promo 템플릿 선택 시 호출 — RAG 없이 프롬프트+브랜드톤으로 생성.
   private async generateDynamicDesigns(
     prompt: string,

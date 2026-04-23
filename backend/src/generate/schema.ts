@@ -202,6 +202,123 @@ function coerceNumber(v: unknown): number | null {
   return null
 }
 
+// ─────────────────────────────────────────────────────────────
+// LayoutDSL 검증 — LLM 이 생성한 자유 배치 스펙의 구조 유효성 체크.
+// body 블록 누락 시 null 반환(상위에서 폴백 또는 재시도). 그 외는 관대하게 통과.
+// ─────────────────────────────────────────────────────────────
+const DSL_BLOCK_TYPES = [
+  'image', 'title', 'subtitle', 'body', 'badge', 'price', 'features', 'cta', 'swatch', 'decor',
+] as const
+type DslBlockType = typeof DSL_BLOCK_TYPES[number]
+
+export interface ValidatedLayoutDsl {
+  canvas: { w: number; h: number; bg: string; gradient?: string }
+  blocks: any[]
+  rationale?: string
+  cardLayout: Layout
+}
+
+const HEX_RE_DSL = /^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/
+function normHexOr(v: unknown, fallback: string): string {
+  if (typeof v !== 'string') return fallback
+  const t = v.trim()
+  if (!HEX_RE_DSL.test(t)) return fallback
+  return t.startsWith('#') ? t : `#${t}`
+}
+
+export function validateLayoutDsl(raw: unknown): ValidatedLayoutDsl | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+
+  const canvasRaw = (r.canvas ?? {}) as Record<string, unknown>
+  const w = coerceNumber(canvasRaw.w) ?? 1080
+  const h = coerceNumber(canvasRaw.h) ?? 1350
+  const bg = normHexOr(canvasRaw.bg, '#0f172a')
+  const gradient = typeof canvasRaw.gradient === 'string' ? canvasRaw.gradient : undefined
+
+  const blocksRaw = Array.isArray(r.blocks) ? r.blocks : []
+  const blocks: any[] = []
+  const seenIds = new Set<string>()
+  for (const item of blocksRaw.slice(0, 12)) {
+    if (!item || typeof item !== 'object') continue
+    const b = item as Record<string, unknown>
+    const t = String(b.type)
+    if (!(DSL_BLOCK_TYPES as readonly string[]).includes(t)) continue
+    let id = typeof b.id === 'string' && b.id.length > 0 ? b.id : `${t}-${blocks.length}`
+    if (seenIds.has(id)) id = `${id}-${blocks.length}`
+    seenIds.add(id)
+
+    // rect: 숫자 배열로 강제 정규화 (4개 값)
+    let rect: [number, number, number, number] | undefined
+    if (Array.isArray(b.rect) && b.rect.length === 4) {
+      const rr = (b.rect as unknown[]).map((n) => coerceNumber(n))
+      if (rr.every((n): n is number => typeof n === 'number')) {
+        rect = rr as [number, number, number, number]
+      }
+    }
+
+    const block: any = {
+      id,
+      type: t as DslBlockType,
+      rect,
+      pos: typeof b.pos === 'string' ? b.pos : undefined,
+      align: b.align === 'left' || b.align === 'center' || b.align === 'right' ? b.align : undefined,
+      text: typeof b.text === 'string' ? b.text.slice(0, 200) : undefined,
+      url: typeof b.url === 'string' ? b.url : undefined,
+      color: typeof b.color === 'string' ? b.color : undefined,
+      background: typeof b.background === 'string' ? b.background : undefined,
+      size: coerceNumber(b.size) ?? undefined,
+      weight: coerceNumber(b.weight) ?? undefined,
+      fit: b.fit === 'cover' || b.fit === 'contain' ? b.fit : undefined,
+      style: typeof b.style === 'string' ? b.style : undefined,
+      rotate: coerceNumber(b.rotate) ?? undefined,
+      zIndex: coerceNumber(b.zIndex) ?? undefined,
+    }
+    if (t === 'price') {
+      block.priceOriginal = coerceNumber(b.priceOriginal) ?? undefined
+      block.priceSale = coerceNumber(b.priceSale) ?? undefined
+      block.discountPercent = coerceNumber(b.discountPercent) ?? undefined
+    }
+    if (t === 'features' && Array.isArray(b.features)) {
+      block.features = b.features
+        .map((f: any) => {
+          if (!f || typeof f !== 'object') return null
+          const icon = typeof f.icon === 'string' ? f.icon.slice(0, 4) : ''
+          const label = typeof f.label === 'string' ? f.label.slice(0, 14) : ''
+          if (!icon || !label) return null
+          return { icon, label }
+        })
+        .filter(Boolean)
+        .slice(0, 4)
+    }
+    if (t === 'swatch' && Array.isArray(b.swatches)) {
+      block.swatches = b.swatches
+        .filter((c: unknown): c is string => typeof c === 'string' && HEX_RE_DSL.test(c.trim()))
+        .slice(0, 6)
+    }
+    if (t === 'decor') {
+      block.big = typeof b.big === 'string' ? b.big.slice(0, 8) : undefined
+    }
+    blocks.push(block)
+  }
+
+  // title/cta 는 필수 (body 는 상위에서 ensureBody 로 보강)
+  const hasTitle = blocks.some((b) => b.type === 'title' && b.text)
+  const hasCta = blocks.some((b) => b.type === 'cta' && b.text)
+  if (!hasTitle || !hasCta) return null
+
+  const cardLayout = (LAYOUTS as readonly string[]).includes(String(r.cardLayout))
+    ? (r.cardLayout as Layout)
+    : 'cover'
+
+  return {
+    canvas: { w, h, bg, gradient },
+    blocks,
+    rationale: typeof r.rationale === 'string' ? r.rationale : undefined,
+    cardLayout,
+  }
+}
+
 // DynamicDesign — AI 가 결정한 layout·palette·decorations 검증.
 export type DynamicLayout = 'split-dark-left' | 'image-top-card-bottom' | 'fullbleed-center-glass'
 const DYNAMIC_LAYOUTS: readonly DynamicLayout[] = [

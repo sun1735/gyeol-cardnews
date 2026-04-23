@@ -87,7 +87,108 @@ export function cardArraySchema(maxCount: number) {
   }
 }
 
-// AI 가 구도·컬러·장식까지 결정하는 DynamicDesign 스키마.
+// LayoutDSL — LLM 이 "어떤 블록을 어디에 어떤 스타일로" 자유롭게 배치하게 하는 스키마.
+// rect 는 [x, y, w, h] 0~100 퍼센트. 매번 새로운 레이아웃이 나오도록 설계.
+export function layoutDslSchema(maxCount: number) {
+  const blockItem = {
+    type: 'object',
+    properties: {
+      id: { type: 'string' },
+      type: {
+        type: 'string',
+        enum: ['image', 'title', 'subtitle', 'body', 'badge', 'price', 'features', 'cta', 'swatch', 'decor'],
+      },
+      rect: {
+        type: 'array',
+        items: { type: 'number' },
+        maxItems: 4,
+      },
+      pos: {
+        type: 'string',
+        enum: [
+          'top-left', 'top-center', 'top-right',
+          'middle-left', 'center', 'middle-right',
+          'bottom-left', 'bottom-center', 'bottom-right',
+        ],
+      },
+      align: { type: 'string', enum: ['left', 'center', 'right'] },
+      text: { type: 'string' },
+      url: { type: 'string' },
+      color: { type: 'string' },
+      background: { type: 'string' },
+      size: { type: 'number' },
+      weight: { type: 'number' },
+      fit: { type: 'string', enum: ['cover', 'contain'] },
+      style: {
+        type: 'string',
+        enum: [
+          'pill', 'circle', 'underline', 'ribbon', 'blur', 'solid', 'glass',
+          'mask-gradient', 'mask-solid', 'corner-accent',
+        ],
+      },
+      rotate: { type: 'number' },
+      zIndex: { type: 'number' },
+      priceOriginal: { type: 'number' },
+      priceSale: { type: 'number' },
+      discountPercent: { type: 'number' },
+      features: {
+        type: 'array',
+        maxItems: 4,
+        items: {
+          type: 'object',
+          properties: {
+            icon: { type: 'string' },
+            label: { type: 'string' },
+          },
+          required: ['icon', 'label'],
+        },
+      },
+      swatches: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 6,
+      },
+      big: { type: 'string' },
+    },
+    required: ['id', 'type'],
+  }
+
+  return {
+    type: 'object',
+    properties: {
+      cards: {
+        type: 'array',
+        maxItems: maxCount,
+        items: {
+          type: 'object',
+          properties: {
+            rationale: { type: 'string' },
+            canvas: {
+              type: 'object',
+              properties: {
+                w: { type: 'number' },
+                h: { type: 'number' },
+                bg: { type: 'string' },
+                gradient: { type: 'string' },
+              },
+              required: ['w', 'h', 'bg'],
+            },
+            blocks: {
+              type: 'array',
+              maxItems: 12,
+              items: blockItem,
+            },
+            cardLayout: { type: 'string', enum: ['cover', 'content', 'cta'] },
+          },
+          required: ['canvas', 'blocks', 'cardLayout'],
+        },
+      },
+    },
+    required: ['cards'],
+  }
+}
+
+// AI 가 구도·컬러·장식까지 결정하는 DynamicDesign 스키마. (레거시 — LayoutDSL 로 대체 예정)
 // product-ad / promo 에서 공통 사용. 매 생성마다 다른 layout/palette 가 나오도록 설계.
 export function dynamicDesignArraySchema(maxCount: number) {
   return {
