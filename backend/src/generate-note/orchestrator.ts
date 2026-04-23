@@ -33,6 +33,7 @@ import {
   dynamicDesignArraySchema,
   layoutDslSchema,
 } from '../generate/llm-gemini'
+import { runLayoutDsls } from '../generate/layout-dsl-prompt'
 import { editImageWithGemini, saveEditedImage } from '../images/editor'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { KnowledgeSearchService, RetrievedChunk } from './knowledge-search.service'
@@ -215,8 +216,8 @@ export class Orchestrator {
     }
   }
 
-  // LayoutDSL 자유 배치 생성 — LLM 이 블록을 직접 디자인.
-  // product-ad / promo 에서 호출. 실패·검증 실패 시 null → 상위에서 basic 카피로 폴백.
+  // LayoutDSL 자유 배치 생성 — 공통 helper(layout-dsl-prompt.ts) 로 위임.
+  // auto / note-rag 가 동일한 system/user 프롬프트·temperature·재시도 규칙을 공유한다.
   private async generateLayoutDsls(
     prompt: string,
     n: number,
@@ -226,81 +227,18 @@ export class Orchestrator {
     chunks: RetrievedChunk[],
     template: 'product-ad' | 'promo',
   ): Promise<(ValidatedLayoutDsl | null)[]> {
-    if (!process.env.GEMINI_API_KEY) {
-      this.logger.warn('GEMINI_API_KEY 없음 — LayoutDSL 스킵')
-      return Array(n).fill(null)
-    }
     const contextBlock = chunks.length
       ? chunks.map((c, i) => `[${i + 1}] ${c.docTitle}: ${c.text}`).join('\n---\n')
-      : '(브랜드 지식노트 비어 있음)'
-    const brandPrimary = typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
-
-    const sys = [
-      '한국 SNS 카드뉴스 AI 레이아웃 디자이너. 템플릿을 쓰지 않고 매번 새로운 구도를 설계한다.',
-      '출력은 canvas + blocks 배열. blocks 은 5~10개, rect 는 [x,y,w,h] 퍼센트(0~100).',
-      '블록 종류: image / title / subtitle / body / badge / price / features / cta / swatch / decor.',
-      '규칙:',
-      '  · title, body, cta 블록은 반드시 포함',
-      '  · image 블록은 canvas 전체가 아닌 일부(30~70%) 만 차지 — 좌/우/상/하 어디든 배치 가능',
-      '  · 텍스트가 이미지와 겹치면 decor(mask-gradient 또는 mask-solid) 블록을 해당 영역에 배치해 가독성 확보',
-      '  · 블록끼리 50% 이상 겹치지 않게. 좌우 상하 안전영역 5% 존중',
-      '  · image 블록의 url 은 반드시 "{{image}}" (프런트에서 실제 URL 로 치환)',
-      '  · 글자색·배경색은 HEX. 본문·타이틀은 배경과 대비 높게 (흰 위 검, 검 위 흰)',
-      '  · 매 생성마다 다른 구도. 같은 프롬프트라도 배치가 달라야 함',
-      '예시 (split 스타일): image 우측 55%, title 좌측 상단, body 좌측 중단, price 좌측 하단, cta 좌측 최하단, badge 좌상단',
-      '예시 (editorial): image 상단 60%, title 중앙, body 하단, decor mask-gradient 하단',
-      '예시 (hero-number): image 전면 배경, decor mask-solid 전면, circle decor 우상단 (discountPercent), title 중앙',
-      'badgeLabel·할인·기간은 자연스럽게 배치. 페이지 번호·과장·의학 단정 금지.',
-    ].join(' ')
-
-    const userText = [
-      recipeAsPromptBlock(recipe),
-      '',
-      '[브랜드 지식노트]',
+      : undefined
+    return runLayoutDsls({
+      path: 'note-rag',
+      template,
+      prompt,
+      n,
+      brand,
       contextBlock,
-      '',
-      `주제: ${prompt}`,
-      `브랜드: ${brand?.name ?? '미지정'} (primary ${brandPrimary})`,
-      `카드 수: ${n} · 레이아웃 순서(cardLayout): ${layouts.join(', ')}`,
-      `템플릿 방향: ${template === 'promo' ? '이벤트·세일 (강렬·대담)' : '상품 광고 (정보 밀집·신뢰)'}`,
-      `canvas.w=1080 고정. h 는 비율에 따라: 1080(1:1), 1350(4:5), 1920(9:16) 중 하나.`,
-      `길이 상한: title 20자, body 90자, cta 14자 (한국어)`,
-    ].join('\n')
-
-    try {
-      const parsed = await callGeminiJson<{ cards: unknown[] }>({
-        systemInstruction: sys,
-        userText,
-        schema: layoutDslSchema(n),
-        timeoutMs: LLM_TIMEOUT_MS,
-        temperature: 1.0, // 최대 다양성
-        debugLabel: `layout-dsl:note-rag:${template}`,
-      })
-      if (!parsed || !Array.isArray(parsed.cards)) {
-        this.logger.warn(`[layout-dsl:note-rag] parsed.cards 배열 아님 — null 폴백`)
-        return Array(n).fill(null)
-      }
-      const out: (ValidatedLayoutDsl | null)[] = []
-      for (let i = 0; i < n; i++) {
-        const v = validateLayoutDsl(parsed.cards[i])
-        if (v) {
-          this.logger.log(
-            `[layout-dsl:note-rag] 카드 ${i} 검증 통과 — blocks=${v.blocks.length}, types=${v.blocks
-              .map((b: any) => b.type)
-              .join(',')}`,
-          )
-        } else {
-          this.logger.warn(
-            `[layout-dsl:note-rag] 카드 ${i} 검증 실패 — 원본: ${JSON.stringify(parsed.cards[i]).slice(0, 400)}`,
-          )
-        }
-        out.push(v)
-      }
-      return out
-    } catch (e: any) {
-      this.logger.warn(`Gemini LayoutDSL 실패 — null 폴백: ${e?.message ?? e}`)
-      return Array(n).fill(null)
-    }
+      timeoutMs: LLM_TIMEOUT_MS,
+    })
   }
 
   // AI 가 layout·palette·decorations 까지 결정하는 DynamicDesign 카드 생성. (레거시)
