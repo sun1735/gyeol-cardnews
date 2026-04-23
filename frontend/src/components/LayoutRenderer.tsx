@@ -16,10 +16,15 @@ import { clampRect, posToRect } from '@/lib/layoutDsl'
 export interface LayoutRendererProps {
   dsl: LayoutDsl
   displayWidth: number
-  // 이미지 블록에서 {{image}} 치환용
+  // 이미지 블록 URL — LLM 의 b.url 은 무시하고 항상 이 값을 사용 (CORS·외부 URL 방어)
   imageUrl?: string
-  // 블록별 fit override (사용자가 카드별로 cover/contain 토글) — block.id 별
+  // 블록별 fit override — block.id 별 cover/contain
   imageFitOverride?: Record<string, 'cover' | 'contain'>
+  // 인라인 편집 오버라이드 — card.title/body/subtext/cta 값이 들어오면 해당 블록의 text 를 덮어씀
+  titleOverride?: string
+  bodyOverride?: string
+  subtitleOverride?: string
+  ctaOverride?: string
   innerRef?: React.Ref<HTMLDivElement>
 }
 
@@ -64,11 +69,49 @@ export function LayoutRenderer({
   displayWidth,
   imageUrl,
   imageFitOverride,
+  titleOverride,
+  bodyOverride,
+  subtitleOverride,
+  ctaOverride,
   innerRef,
 }: LayoutRendererProps) {
   const ratioH = dsl.canvas.h / dsl.canvas.w
   const displayHeight = Math.round(displayWidth * ratioH)
   const s = displayWidth / 1080
+
+  // 블록 전처리:
+  //   1) 타입별 오버라이드 텍스트 덮어쓰기 (인라인 편집 즉시 반영)
+  //   2) body 블록 누락 + bodyOverride 있으면 자동 주입
+  //   3) image 블록의 b.url 은 {{image}} 여부와 무관하게 imageUrl 로 치환
+  //      (LLM 이 외부 URL 을 넣어 CORS tainted 나는 것 방어)
+  let blocks = dsl.blocks.map((b) => {
+    const next = { ...b }
+    if (b.type === 'title' && titleOverride !== undefined) next.text = titleOverride
+    else if (b.type === 'body' && bodyOverride !== undefined) next.text = bodyOverride
+    else if (b.type === 'subtitle' && subtitleOverride !== undefined) next.text = subtitleOverride
+    else if (b.type === 'cta' && ctaOverride !== undefined) next.text = ctaOverride
+    if (b.type === 'image') {
+      // 이미지 블록은 항상 imageUrl 사용 (LLM 의 b.url 은 신뢰하지 않음)
+      next.url = imageUrl || undefined
+    }
+    return next
+  })
+  const hasBody = blocks.some((b) => b.type === 'body')
+  if (!hasBody && bodyOverride?.trim()) {
+    blocks = [
+      ...blocks,
+      {
+        id: 'auto-body',
+        type: 'body',
+        rect: [6, 72, 88, 10],
+        text: bodyOverride,
+        align: 'left',
+        size: 26,
+        weight: 400,
+        zIndex: 11,
+      },
+    ]
+  }
 
   const canvasStyle: CSSProperties = {
     width: displayWidth,
@@ -107,7 +150,7 @@ export function LayoutRenderer({
 
   return (
     <div ref={innerRef} style={canvasStyle}>
-      {dsl.blocks.map((b) => renderBlock(b, { s, resolveRect, typeZ, imageUrl, imageFitOverride, canvasBg: dsl.canvas.bg }))}
+      {blocks.map((b) => renderBlock(b, { s, resolveRect, typeZ, imageUrl, imageFitOverride, canvasBg: dsl.canvas.bg }))}
     </div>
   )
 }
@@ -140,7 +183,9 @@ function renderBlock(b: LayoutBlock, ctx: RenderCtx): ReactNode {
 
   // ─── image ───
   if (b.type === 'image') {
-    const url = b.url === '{{image}}' ? imageUrl : b.url
+    // 상단 전처리에서 b.url 을 imageUrl 로 덮어썼으므로 그대로 사용.
+    // 외부 URL 이 들어와도 무시되어 tainted canvas 방어.
+    const url = b.url
     const fit = imageFitOverride?.[b.id] ?? b.fit ?? 'cover'
     if (!url) {
       return (

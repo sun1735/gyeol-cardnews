@@ -3249,12 +3249,18 @@ function CardItem({
       <div className="flex justify-center">
         {(card.template === 'product-ad' || card.template === 'promo') && card.layoutDsl ? (
           <div id={`card-${card.id}`}>
-            {/* LayoutDSL 기반 자유 배치 — LLM 이 블록을 직접 디자인 */}
+            {/* LayoutDSL 기반 자유 배치.
+                card.title/body/subtext/cta 를 override 로 넘겨 인라인 편집 즉시 반영 +
+                LLM 이 body 블록 누락해도 card.body 가 있으면 자동 주입. */}
             <LayoutRenderer
               dsl={card.layoutDsl}
               displayWidth={d.display}
               imageUrl={card.imageUrl}
               imageFitOverride={card.imageFitOverride}
+              titleOverride={card.title}
+              bodyOverride={card.body}
+              subtitleOverride={card.subtext}
+              ctaOverride={card.cta}
             />
           </div>
         ) : (card.template === 'product-ad' || card.template === 'promo') && card.design ? (
@@ -3393,57 +3399,35 @@ function CardItem({
           모든 텍스트 인풋을 design.* 로 바인딩해 즉시 프리뷰에 반영되게 한다. */}
       {card.template === 'product-ad' || card.template === 'promo' ? (
         <>
+          {/* DSL 카드는 LayoutRenderer 가 card.title/body/subtext/cta 를 override 로 읽음.
+              레거시 design 필드는 더 이상 갱신하지 않음. */}
           <input
             className="w-full border rounded-md px-2 py-1 text-sm"
-            value={card.design?.title ?? card.title}
-            onChange={(e) =>
-              onChange({
-                title: e.target.value,
-                design: card.design ? { ...card.design, title: e.target.value } : undefined,
-              })
-            }
+            value={card.title}
+            onChange={(e) => onChange({ title: e.target.value })}
             onClick={stop}
             placeholder="제목 (title)"
           />
           <textarea
             rows={3}
             className="w-full border rounded-md px-2 py-1 text-sm"
-            value={card.design?.body ?? card.body}
-            onChange={(e) =>
-              onChange({
-                body: e.target.value,
-                design: card.design ? { ...card.design, body: e.target.value } : undefined,
-              })
-            }
+            value={card.body}
+            onChange={(e) => onChange({ body: e.target.value })}
             onClick={stop}
             placeholder="본문 (body)"
           />
           <div className="grid grid-cols-2 gap-2">
             <input
               className="border rounded-md px-2 py-1 text-sm"
-              value={card.design?.subtitle ?? card.subtext}
-              onChange={(e) =>
-                onChange({
-                  subtext: e.target.value,
-                  design: card.design
-                    ? { ...card.design, subtitle: e.target.value }
-                    : undefined,
-                })
-              }
+              value={card.subtext}
+              onChange={(e) => onChange({ subtext: e.target.value })}
               onClick={stop}
               placeholder="서브타이틀"
             />
             <input
               className="border rounded-md px-2 py-1 text-sm"
-              value={card.design?.ctaLabel ?? card.cta}
-              onChange={(e) =>
-                onChange({
-                  cta: e.target.value,
-                  design: card.design
-                    ? { ...card.design, ctaLabel: e.target.value }
-                    : undefined,
-                })
-              }
+              value={card.cta}
+              onChange={(e) => onChange({ cta: e.target.value })}
               onClick={stop}
               placeholder="CTA 라벨"
             />

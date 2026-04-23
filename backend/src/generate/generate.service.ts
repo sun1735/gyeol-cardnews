@@ -316,7 +316,6 @@ export class GenerateService {
           const dsl = dsls[i]
           const next: CardOut = { ...c, template }
           if (dsl) {
-            next.layoutDsl = dsl
             // top-level 텍스트 필드는 DSL 블록에서 추출해 동기화
             const titleBlock = dsl.blocks.find((b: any) => b.type === 'title')
             const bodyBlock = dsl.blocks.find((b: any) => b.type === 'body')
@@ -326,6 +325,20 @@ export class GenerateService {
             next.body = sanitizeText(bodyBlock?.text ?? c.body)
             next.subtext = sanitizeText(subBlock?.text ?? c.subtext)
             next.cta = sanitizeText(ctaBlock?.text ?? c.cta)
+            // body 누락 방어
+            if (!bodyBlock && next.body) {
+              dsl.blocks.push({
+                id: 'auto-body',
+                type: 'body',
+                rect: [6, 72, 88, 10],
+                text: next.body,
+                align: 'left',
+                size: 26,
+                weight: 400,
+                zIndex: 11,
+              })
+            }
+            next.layoutDsl = dsl
           }
           return next
         })

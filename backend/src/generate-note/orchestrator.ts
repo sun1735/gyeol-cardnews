@@ -178,10 +178,23 @@ export class Orchestrator {
         base.body = sanitizeText(bodyBlock?.text ?? c.body)
         base.subtext = sanitizeText(subBlock?.text ?? c.subtext)
         base.cta = sanitizeText(ctaBlock?.text ?? c.cta)
-        // 블록 내부 text 도 sanitize
+        // 블록 내부 text sanitize
         dsl.blocks = dsl.blocks.map((b: any) =>
           b.text ? { ...b, text: sanitizeText(b.text) } : b,
         )
+        // body 블록 누락 방어 — 기본 카피 body 로 자동 주입 (하단 여백)
+        if (!bodyBlock && base.body) {
+          dsl.blocks.push({
+            id: 'auto-body',
+            type: 'body',
+            rect: [6, 72, 88, 10],
+            text: base.body,
+            align: 'left',
+            size: 26,
+            weight: 400,
+            zIndex: 11,
+          })
+        }
         base.layoutDsl = dsl
       }
       return base
