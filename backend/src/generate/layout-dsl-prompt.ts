@@ -263,10 +263,15 @@ export interface RunLayoutDslsInput {
   timeoutMs?: number
 }
 
+// DSL 은 구조화 JSON 을 많이 만들어야 해 일반 카피 LLM(15s)보다 오래 걸림.
+// Gemini 2.5 Flash 기준 통상 10~30s, worst case 40s. 여유있게 45s 로 세팅.
+const DSL_CALL_TIMEOUT_MS = 45_000
+
 export async function runLayoutDsls(
   input: RunLayoutDslsInput,
 ): Promise<(ValidatedLayoutDsl | null)[]> {
   const { path, template, prompt, n, brand, contextBlock, timeoutMs } = input
+  const effectiveTimeout = Math.max(timeoutMs ?? 0, DSL_CALL_TIMEOUT_MS)
   const logger = new Logger(`LayoutDSL:${path}`)
   const tag = `layout-dsl:${path}:${template}`
   const t0 = Date.now()
@@ -314,7 +319,7 @@ export async function runLayoutDsls(
       systemInstruction: p1.sys,
       userText: p1.userText,
       schema: layoutDslSchema(n),
-      timeoutMs: timeoutMs ?? 20_000,
+      timeoutMs: effectiveTimeout,
       temperature: 1.15,
       debugLabel: tag,
     })
@@ -381,7 +386,7 @@ export async function runLayoutDsls(
         systemInstruction: p2.sys,
         userText: p2.userText,
         schema: layoutDslSchema(n),
-        timeoutMs: timeoutMs ?? 20_000,
+        timeoutMs: effectiveTimeout,
         temperature: 1.15,
         debugLabel: `${tag}:retry`,
       })
