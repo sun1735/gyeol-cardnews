@@ -4,7 +4,7 @@
 // 블록 타입별로 CSS 를 분기. 모든 rect 는 퍼센트 → 실제 px 로 환산.
 // 한글 폰트 Pretendard, 이미지 안엔 텍스트 넣지 않음 (DSL 바깥에서 이미 보장).
 
-import type { CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import type {
   BlockPos,
   LayoutBlock,
@@ -175,6 +175,130 @@ function rectToStyle(rect: Rect): CSSProperties {
   }
 }
 
+// 이미지 URL 유효성 — 자리표시자·빈값·이상한 스킴 제외.
+function isValidImageUrl(url: unknown): url is string {
+  if (typeof url !== 'string') return false
+  const t = url.trim()
+  if (!t || t === '{{image}}') return false
+  // 허용: /uploads/..., http://, https://
+  if (t.startsWith('/uploads/')) return true
+  if (t.startsWith('http://') || t.startsWith('https://')) return true
+  return false
+}
+
+// 텍스트 블록 rect 최소 크기 강제 — LLM 이 너무 좁게 잡은 경우 자동 확장.
+// 원본 rect 는 보존하고 렌더용 스타일에서만 min-width / min-height 적용.
+function enforceTextMinSize(
+  rect: Rect,
+  type: LayoutBlock['type'],
+): CSSProperties {
+  const [x, y, w, h] = rect
+  const base = rectToStyle(rect)
+  const isText = type === 'title' || type === 'body' || type === 'subtitle'
+  if (!isText) return base
+  const tooNarrow = w < 40
+  const tooShort = h < 8
+  if (!tooNarrow && !tooShort) return base
+  if (tooNarrow) {
+    console.warn(
+      `LayoutRenderer: ${type} rect too narrow (w=${w}%) — enforced min width`,
+    )
+  }
+  if (tooShort) {
+    console.warn(
+      `LayoutRenderer: ${type} rect too short (h=${h}%) — enforced min height`,
+    )
+  }
+  // 확장: x 를 줄이지 않고 width 만 늘리되 100-x 상한
+  const expandedW = tooNarrow ? Math.min(60, 100 - x) : w
+  const expandedH = tooShort ? Math.min(12, 100 - y) : h
+  return {
+    ...base,
+    width: `${expandedW}%`,
+    height: `${expandedH}%`,
+  }
+}
+
+// 이미지 블록 — URL 검증 + onError fallback 을 위한 컴포넌트.
+function ImageBlock({
+  b,
+  rect,
+  fit,
+  canvasBg,
+  zIndex,
+  s,
+}: {
+  b: LayoutBlock
+  rect: Rect
+  fit: 'cover' | 'contain'
+  canvasBg: string
+  zIndex: number
+  s: number
+}) {
+  const valid = isValidImageUrl(b.url)
+  const [broken, setBroken] = useState(false)
+
+  if (!valid) {
+    console.warn(
+      `LayoutRenderer: image block url invalid, fallback to gradient (url="${b.url ?? ''}")`,
+    )
+    return (
+      <div
+        key={b.id}
+        style={{
+          ...rectToStyle(rect),
+          background:
+            b.background ??
+            `linear-gradient(135deg, ${shift(canvasBg, 40)}, ${shift(canvasBg, 80)})`,
+          zIndex,
+        }}
+      />
+    )
+  }
+  if (broken) {
+    return (
+      <div
+        key={b.id}
+        style={{
+          ...rectToStyle(rect),
+          background: `linear-gradient(135deg, ${shift(canvasBg, 30)}, ${shift(canvasBg, 70)})`,
+          zIndex,
+        }}
+      />
+    )
+  }
+  return (
+    <div
+      key={b.id}
+      style={{
+        ...rectToStyle(rect),
+        zIndex,
+        background: b.background ?? 'transparent',
+        padding: fit === 'contain' ? 16 * s : 0,
+        overflow: 'hidden',
+      }}
+    >
+      <img
+        src={b.url}
+        alt=""
+        crossOrigin="anonymous"
+        onError={() => {
+          console.warn(`LayoutRenderer: image load failed (${b.url}), fallback to gradient`)
+          setBroken(true)
+        }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: fit,
+          objectPosition: 'center',
+          display: 'block',
+        }}
+        draggable={false}
+      />
+    </div>
+  )
+}
+
 function renderBlock(b: LayoutBlock, ctx: RenderCtx): ReactNode {
   const { s, resolveRect, typeZ, imageUrl, imageFitOverride, canvasBg } = ctx
   const rect = resolveRect(b)
@@ -183,48 +307,8 @@ function renderBlock(b: LayoutBlock, ctx: RenderCtx): ReactNode {
 
   // ─── image ───
   if (b.type === 'image') {
-    // 상단 전처리에서 b.url 을 imageUrl 로 덮어썼으므로 그대로 사용.
-    // 외부 URL 이 들어와도 무시되어 tainted canvas 방어.
-    const url = b.url
     const fit = imageFitOverride?.[b.id] ?? b.fit ?? 'cover'
-    if (!url) {
-      return (
-        <div
-          key={b.id}
-          style={{
-            ...rectToStyle(rect),
-            background: b.background ?? `linear-gradient(135deg, ${shift(canvasBg, 40)}, ${shift(canvasBg, 80)})`,
-            zIndex,
-          }}
-        />
-      )
-    }
-    return (
-      <div
-        key={b.id}
-        style={{
-          ...rectToStyle(rect),
-          zIndex,
-          background: b.background ?? 'transparent',
-          padding: fit === 'contain' ? 16 * s : 0,
-          overflow: 'hidden',
-        }}
-      >
-        <img
-          src={url}
-          alt=""
-          crossOrigin="anonymous"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: fit,
-            objectPosition: 'center',
-            display: 'block',
-          }}
-          draggable={false}
-        />
-      </div>
-    )
+    return <ImageBlock key={b.id} b={b} rect={rect} fit={fit} canvasBg={canvasBg} zIndex={zIndex} s={s} />
   }
 
   // ─── decor: 마스크·코너 액센트·원형 할인 뱃지 ───
@@ -356,7 +440,7 @@ function renderBlock(b: LayoutBlock, ctx: RenderCtx): ReactNode {
       <div
         key={b.id}
         style={{
-          ...rectToStyle(rect),
+          ...enforceTextMinSize(rect, 'title'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
@@ -394,7 +478,7 @@ function renderBlock(b: LayoutBlock, ctx: RenderCtx): ReactNode {
       <div
         key={b.id}
         style={{
-          ...rectToStyle(rect),
+          ...enforceTextMinSize(rect, 'subtitle'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
@@ -427,7 +511,7 @@ function renderBlock(b: LayoutBlock, ctx: RenderCtx): ReactNode {
       <div
         key={b.id}
         style={{
-          ...rectToStyle(rect),
+          ...enforceTextMinSize(rect, 'body'),
           zIndex,
           color: b.color ?? '#ffffff',
           fontSize: (b.size ?? 24) * s,
