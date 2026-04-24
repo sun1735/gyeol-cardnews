@@ -76,6 +76,8 @@ interface CallStat {
 }
 const callStats: CallStat[] = []
 const STATS_MAX = 50
+// 마지막 에러 — health 엔드포인트에서 바로 확인할 수 있도록 모듈 레벨에 보존
+let lastError: { ts: number; tag: string; message: string } | null = null
 
 export function getLayoutDslHealth() {
   const recent = callStats.slice(-20).reverse()
@@ -98,6 +100,9 @@ export function getLayoutDslHealth() {
     outcomes: totals,
     familyDistribution: familyCounts,
     dominance: detectFamilyDominance(),
+    lastError: lastError
+      ? { ...lastError, ageSec: Math.round((Date.now() - lastError.ts) / 1000) }
+      : null,
     recentCalls: recent.map((s) => ({
       path: s.path,
       template: s.template,
@@ -314,12 +319,42 @@ export async function runLayoutDsls(
       debugLabel: tag,
     })
   } catch (e: any) {
-    logger.warn(`[${tag}] Gemini 호출 실패: ${e?.message ?? e}`)
+    const msg = e?.message ?? String(e)
+    logger.error(`[${tag}] ✗ Gemini 호출 실패 (http-fail): ${msg}`)
+    callStats.push({
+      ts: Date.now(),
+      path,
+      template,
+      seed: p1.seed,
+      family: p1.family,
+      outcome: 'http-fail',
+      validCount: 0,
+      nullCount: n,
+      retried: false,
+      durationMs: Date.now() - t0,
+    })
+    if (callStats.length > STATS_MAX) callStats.shift()
+    // 마지막 에러 메시지를 health 엔드포인트에서 볼 수 있게 저장
+    lastError = { ts: Date.now(), tag, message: msg.slice(0, 500) }
     return Array(n).fill(null)
   }
 
   if (!parsed || !Array.isArray(parsed.cards)) {
-    logger.warn(`[${tag}] parsed.cards 배열 아님 — null 폴백`)
+    logger.error(`[${tag}] ✗ parsed.cards 배열 아님 (invalid-shape)`)
+    callStats.push({
+      ts: Date.now(),
+      path,
+      template,
+      seed: p1.seed,
+      family: p1.family,
+      outcome: 'invalid-shape',
+      validCount: 0,
+      nullCount: n,
+      retried: false,
+      durationMs: Date.now() - t0,
+    })
+    if (callStats.length > STATS_MAX) callStats.shift()
+    lastError = { ts: Date.now(), tag, message: `invalid shape: ${JSON.stringify(parsed).slice(0, 200)}` }
     return Array(n).fill(null)
   }
 
