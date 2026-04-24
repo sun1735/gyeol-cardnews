@@ -16,7 +16,12 @@ export interface TemplateMeta {
   // 베타 기능 — 선택은 가능하지만 뱃지 + 안내 표시
   beta?: boolean
   betaNote?: string
+  // UI 에서 완전히 숨김 (백엔드 기능은 유지, 품질 확보 후 재노출)
+  hidden?: boolean
 }
+
+// 화면에 노출할 템플릿만 필터링한 목록
+export const VISIBLE_TEMPLATES: TemplateMeta[] = []
 
 export const TEMPLATES: TemplateMeta[] = [
   {
@@ -30,24 +35,29 @@ export const TEMPLATES: TemplateMeta[] = [
   {
     key: 'product-ad',
     title: '상품 광고',
-    description: 'AI 구도 (베타)',
+    description: 'AI 구도 (내부 테스트)',
     requiresNoteRag: false,
     recommendedAspect: '4:5',
     disabled: false,
     beta: true,
-    betaNote: 'AI 이미지 생성 품질이 안정화 중입니다. 실패 시 기본 템플릿으로 시도해 주세요.',
+    hidden: true, // UI 미노출 — 품질 확보 후 재노출
+    betaNote: '품질 안정화 중 — 현재 메뉴에서 숨김.',
   },
   {
     key: 'promo',
     title: '프로모션',
-    description: 'AI 이벤트 감성 (베타)',
+    description: 'AI 이벤트 (내부 테스트)',
     requiresNoteRag: false,
     recommendedAspect: '1:1',
     disabled: false,
     beta: true,
-    betaNote: 'AI 이미지 생성 품질이 안정화 중입니다. 실패 시 기본 템플릿으로 시도해 주세요.',
+    hidden: true,
+    betaNote: '품질 안정화 중 — 현재 메뉴에서 숨김.',
   },
 ]
+
+// 정적 초기화: hidden 플래그 없는 항목만 VISIBLE_TEMPLATES 에 채움
+VISIBLE_TEMPLATES.push(...TEMPLATES.filter((t) => !t.hidden))
 
 export function getTemplateMeta(key: Template): TemplateMeta | undefined {
   return TEMPLATES.find((t) => t.key === key)

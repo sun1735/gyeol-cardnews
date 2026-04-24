@@ -113,35 +113,50 @@ export function Landing() {
             </p>
           </div>
 
-          {/* 우측 미리보기 콜라주 — 실제 생성된 샘플 + 다른 템플릿 미리보기 */}
+          {/* 우측 미리보기 — 실제 시리즈 5장 샘플 오버랩 + "→ 릴스" 힌트 */}
           <div className="relative h-[440px] hidden lg:block">
-            <div
-              className="absolute"
-              style={{ top: 0, right: 40, transform: 'rotate(-4deg)' }}
-            >
-              <div className="rounded-[20px] overflow-hidden shadow-2xl">
-                <TemplatePreview
-                  template="basic"
-                  displayWidth={260}
-                  sampleImageUrl="/samples/yoosun-basic.png"
-                  sampleAspect="4:5"
-                />
+            {/* 카드 5장이 살짝 겹쳐 시리즈 감각 */}
+            {[
+              { top: 0, right: 100, rotate: -6, width: 230, opacity: 0.85 },
+              { top: 30, right: 60, rotate: -3, width: 240, opacity: 0.92 },
+              { top: 60, right: 20, rotate: 0, width: 260, opacity: 1 },
+            ].map((s, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  top: s.top,
+                  right: s.right,
+                  transform: `rotate(${s.rotate}deg)`,
+                  opacity: s.opacity,
+                  zIndex: i + 1,
+                }}
+              >
+                <div className="rounded-[20px] overflow-hidden shadow-2xl">
+                  <TemplatePreview
+                    template="basic"
+                    displayWidth={s.width}
+                    sampleImageUrl="/samples/yoosun-basic.png"
+                    sampleAspect="4:5"
+                  />
+                </div>
               </div>
-            </div>
+            ))}
+            {/* "→ 릴스 MP4" 플로팅 뱃지 */}
             <div
               className="absolute"
-              style={{ top: 80, left: 0, transform: 'rotate(3deg)' }}
+              style={{ bottom: 20, left: 0, zIndex: 10 }}
             >
-              <div className="rounded-[20px] overflow-hidden shadow-2xl">
-                <TemplatePreview template="promo" displayWidth={220} primaryColor="#dc2626" />
-              </div>
-            </div>
-            <div
-              className="absolute"
-              style={{ bottom: 0, right: 10, transform: 'rotate(2deg)' }}
-            >
-              <div className="rounded-[20px] overflow-hidden shadow-2xl">
-                <TemplatePreview template="product-ad" displayWidth={200} primaryColor="#4338ca" />
+              <div className="px-4 py-3 rounded-[14px] bg-white border border-slate-200 shadow-xl flex items-center gap-2.5">
+                <span className="text-[28px]">🎬</span>
+                <div>
+                  <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                    한 번 더 클릭
+                  </div>
+                  <div className="text-[15px] font-black text-slate-900">
+                    릴스 MP4 한 개
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -160,18 +175,18 @@ export function Landing() {
           {[
             {
               emoji: '📚',
-              title: '브랜드 메모리 (지식노트)',
-              desc: '브랜드 문서·FAQ·보도자료를 업로드하면 AI 가 톤·핵심 메시지·숫자·고유명사를 기억합니다. 매 생성마다 같은 브랜드 감성이 유지됩니다.',
+              title: '브랜드 메모리',
+              desc: '브랜드 문서·FAQ·보도자료를 한 번 올리면 AI 가 톤·핵심 메시지·숫자·고유명사를 기억합니다. 매번 같은 브랜드 감성으로 생성.',
             },
             {
               emoji: '🧵',
               title: '5~10장 시리즈 일관성',
-              desc: 'Cover → Content → CTA 흐름으로 5~10장이 연결된 스토리로 나옵니다. GPT 한 번에 한 장씩 뽑는 것과 차원이 다른 결과물.',
+              desc: 'Cover → Content → CTA 흐름으로 5~10장이 연결된 스토리. GPT 로 한 장씩 뽑는 것과 차원이 다른 결과.',
             },
             {
-              emoji: '⚡',
-              title: '바로 내보내기',
-              desc: 'PNG 카드 1장부터 ZIP 일괄, 9:16 릴스 MP4 까지 한 번에. 인스타·스토리·블로그 어디든 그대로 업로드.',
+              emoji: '🎬',
+              title: '릴스 MP4 자동 변환',
+              desc: '생성한 카드뉴스 시리즈를 9:16 세로 릴스 MP4 한 번에 합성. 페이드·슬라이드 전환 자동 · 인스타 릴스·틱톡 바로 업로드.',
             },
           ].map((f, i) => (
             <div
@@ -191,83 +206,71 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ─────────── 템플릿 갤러리 ─────────── */}
+      {/* ─────────── 결과물 · 릴스 변환 ─────────── */}
       <section id="templates" className="bg-slate-50 border-y border-slate-100">
         <div className="max-w-6xl mx-auto px-5 py-20 sm:py-24">
           <div className="text-center">
             <h2 className="text-[28px] sm:text-[36px] font-black tracking-[-0.025em]">
-              원하는 디자인 바로 선택
+              카드뉴스 5~10장 <span style={{ color: '#4338ca' }}>→</span> 릴스 MP4 한 번에
             </h2>
             <p className="mt-3 text-slate-600 text-[16px] font-medium">
-              업종·용도별로 다른 레이아웃과 AI 프롬프트가 적용됩니다
+              브랜드 톤 유지하며 시리즈로 생성 · 바로 릴스로 합성해 인스타 업로드
             </p>
           </div>
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                key: 'basic' as const,
-                title: '기본 (추천)',
-                desc: '5~10장 카드뉴스 시리즈. 브랜드 톤·스토리 일관성 유지. 실제 생성 예시 ↓',
-                primary: '#4338ca',
-                sample: '/samples/yoosun-basic.png',
-                badge: '실제 생성 예시',
-                beta: false,
-              },
-              {
-                key: 'product-ad' as const,
-                title: '상품 광고',
-                desc: '가격·할인율 AI 구도 (베타 · 이미지 품질 안정화 중)',
-                primary: '#4338ca',
-                sample: undefined,
-                beta: true,
-              },
-              {
-                key: 'promo' as const,
-                title: '프로모션',
-                desc: '이벤트·세일 AI 구도 (베타 · 이미지 품질 안정화 중)',
-                primary: '#dc2626',
-                sample: undefined,
-                beta: true,
-              },
-            ].map((t) => (
-              <div
-                key={t.key}
-                className={`flex flex-col items-center gap-5 p-6 bg-white rounded-[20px] border transition relative ${
-                  t.beta
-                    ? 'border-slate-200 opacity-75 hover:opacity-100'
-                    : 'border-slate-200 hover:shadow-lg'
-                }`}
-              >
-                {t.badge && !t.beta && (
-                  <div
-                    className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full text-white text-[10px] font-bold tracking-wider uppercase"
-                    style={{ background: '#4338ca' }}
-                  >
-                    {t.badge}
-                  </div>
-                )}
-                {t.beta && (
-                  <div className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold tracking-wider uppercase border border-amber-200">
-                    BETA
-                  </div>
-                )}
+          {/* 시리즈 카드 5장 샘플 + 릴스 MP4 프리뷰 */}
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-[1.3fr_1fr] gap-6 items-center">
+            {/* 좌: 실제 생성된 YOOSUN 시리즈 */}
+            <div className="p-6 bg-white rounded-[20px] border border-slate-200 relative">
+              <div className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full text-white text-[10px] font-bold tracking-wider uppercase" style={{ background: '#4338ca' }}>
+                실제 생성 시리즈
+              </div>
+              <div className="flex justify-center overflow-hidden">
                 <TemplatePreview
-                  template={t.key}
-                  displayWidth={260}
-                  primaryColor={t.primary}
-                  sampleImageUrl={t.sample}
+                  template="basic"
+                  displayWidth={280}
+                  sampleImageUrl="/samples/yoosun-basic.png"
                   sampleAspect="4:5"
                 />
-                <div className="text-center">
-                  <h3 className="text-[20px] font-bold tracking-[-0.015em]">{t.title}</h3>
-                  <p className={`mt-1.5 text-[14px] font-medium leading-relaxed ${
-                    t.beta ? 'text-slate-500' : 'text-slate-600'
-                  }`}>
-                    {t.desc}
-                  </p>
-                </div>
               </div>
-            ))}
+              <div className="mt-5 text-center">
+                <h3 className="text-[20px] font-bold tracking-[-0.015em]">
+                  브랜드 톤 유지 시리즈
+                </h3>
+                <p className="mt-1.5 text-[14px] text-slate-600 font-medium leading-relaxed">
+                  Cover → 성분 → 복용법 → 후기 → 구매 5장이 같은 브랜드 감성으로 일관되게 나옵니다
+                </p>
+              </div>
+            </div>
+
+            {/* 우: 릴스 MP4 변환 설명 */}
+            <div className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-[20px] border border-indigo-100 relative">
+              <div className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase">
+                NEW
+              </div>
+              <div className="text-[56px] text-center mt-4">🎬</div>
+              <h3 className="mt-2 text-[22px] font-black text-center tracking-[-0.02em]">
+                한 번 더 클릭 → <br />
+                <span style={{ color: '#4338ca' }}>릴스 MP4 완성</span>
+              </h3>
+              <ul className="mt-5 space-y-2 text-[14px] text-slate-700 font-medium">
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-0.5">✓</span>
+                  <span>9:16 세로 자동 레이아웃</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-0.5">✓</span>
+                  <span>페이드 · 슬라이드 · 줌 전환 선택</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-0.5">✓</span>
+                  <span>인스타 릴스 · 틱톡 · 유튜브 쇼츠 바로 업로드</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-0.5">✓</span>
+                  <span>FFmpeg 자체 처리 · 서버 비용 0원</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </section>

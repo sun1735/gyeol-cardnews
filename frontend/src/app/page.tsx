@@ -8,7 +8,7 @@ import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template 
 // ProductAdCard/PromoCard (구 고정 템플릿) 는 더 이상 렌더 경로에 사용되지 않음.
 import { DynamicCard } from '@/components/templates/DynamicCard'
 import { LayoutRenderer } from '@/components/LayoutRenderer'
-import { TEMPLATES } from '@/components/templates/registry'
+import { TEMPLATES, VISIBLE_TEMPLATES } from '@/components/templates/registry'
 import { TemplatePreview } from '@/components/templates/TemplatePreview'
 import { Landing } from '@/components/Landing'
 
@@ -1390,13 +1390,14 @@ export default function Page() {
               </div>
             </div>
 
-            {/* 템플릿 선택 — 기본 / 상품 광고 / 프로모션 */}
+            {/* 템플릿 선택 — 기본만 노출 (상품광고/프로모션은 품질 확보 후 재노출) */}
+            {VISIBLE_TEMPLATES.length > 1 && (
             <div>
               <div className="text-[13px] font-bold text-slate-700 uppercase tracking-[0.08em] mb-3">
                 카드 템플릿
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {TEMPLATES.map((t) => {
+              <div className={`grid gap-1.5 grid-cols-${VISIBLE_TEMPLATES.length}`}>
+                {VISIBLE_TEMPLATES.map((t) => {
                   const active = template === t.key
                   const blocked = t.disabled || (t.requiresNoteRag && mode !== 'note-rag')
                   const desc = t.requiresNoteRag && mode !== 'note-rag' ? '지식노트 모드 전용' : t.description
@@ -1471,6 +1472,7 @@ export default function Page() {
                 </label>
               )}
             </div>
+            )}
 
             {mode === 'note-rag' && selectedBrand && (
               <button
@@ -2135,8 +2137,8 @@ export default function Page() {
                     )}
                   </ol>
 
-                  {/* 템플릿 미리보기 갤러리 — 각 템플릿을 썸네일로 보여주고 클릭 시 즉시 선택.
-                      requiresNoteRag 템플릿(상품광고·프로모션) 은 클릭 시 자동으로 지식노트 모드로 전환. */}
+                  {/* 템플릿 미리보기 갤러리 — 2개 이상일 때만 노출 (현재는 기본 1개) */}
+                  {VISIBLE_TEMPLATES.length > 1 && (
                   <div className="mt-8 pt-6 border-t border-slate-100">
                     <div className="flex items-baseline justify-between mb-4">
                       <h3 className="text-[14px] font-bold tracking-[-0.01em]">카드 템플릿</h3>
@@ -2144,8 +2146,8 @@ export default function Page() {
                         클릭하면 바로 선택됩니다
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {TEMPLATES.map((t) => {
+                    <div className={`grid gap-3 grid-cols-${VISIBLE_TEMPLATES.length}`}>
+                      {VISIBLE_TEMPLATES.map((t) => {
                         const active = template === t.key
                         const selectTemplate = () => {
                           if (t.disabled) return
@@ -2209,6 +2211,7 @@ export default function Page() {
                       · 상품 광고 / 프로모션 템플릿은 지식노트 모드에서 가격·할인율·기능 아이콘까지 자동 생성됩니다
                     </p>
                   </div>
+                  )}
 
                   <div className="mt-6 pt-6 border-t border-slate-100 text-[12px] text-slate-500 leading-relaxed">
                     브랜드를 만들어두면 톤·색상·기본 문구·지식노트 문서·이미지 라이브러리를 함께 관리할 수 있습니다.
