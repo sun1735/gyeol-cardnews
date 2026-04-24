@@ -264,6 +264,8 @@ export default function Page() {
   const [isExportingReel, setIsExportingReel] = useState(false)
   const [reelStatus, setReelStatus] = useState<string | null>(null)
   const [lastReelUrl, setLastReelUrl] = useState<string | null>(null)
+  // 플랫폼 프리셋 — 각 플랫폼 권장 초·전환 효과를 원클릭 적용
+  const [reelPreset, setReelPreset] = useState<'reels' | 'story' | 'tiktok' | 'shorts'>('reels')
 
   const selectedBrand = useMemo(
     () => brands.find((b) => b.id === selectedBrandId),
@@ -1830,122 +1832,224 @@ export default function Page() {
           )}
 
           {cards.length >= 2 && (
-            <div className="bg-white rounded-xl border p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="text-sm font-medium flex items-center gap-2">
-                  🎬 릴스 내보내기 <span className="text-xs text-slate-400 font-normal">9:16 MP4</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="px-2 py-0.5 rounded-full border bg-slate-50 text-slate-700">
-                    {cards.length}장
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full border bg-slate-50 text-slate-700">
-                    총 {Math.round((cards.length * reelDuration - (cards.length - 1) * 0.5) * 10) / 10}초
-                  </span>
+            <div
+              className="relative rounded-2xl border-2 border-indigo-200 overflow-hidden shadow-lg"
+              style={{
+                background:
+                  'linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%)',
+              }}
+            >
+              {/* 헤더 배지 */}
+              <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
+                <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-black tracking-wider uppercase">
+                  차별점
+                </span>
+                <div className="text-[15px] font-black tracking-[-0.015em]">
+                  🎬 카드뉴스 → 릴스 MP4 자동 변환
                 </div>
               </div>
+              <p className="px-4 pb-3 text-[11px] text-slate-600 font-medium leading-relaxed">
+                {cards.length}장의 카드를 한 번에 9:16 릴스로 합성합니다.
+                GPT·Canva 에서 안 되는 핵심 기능.
+              </p>
 
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">전환 효과</label>
-                <div className="grid grid-cols-3 gap-1">
-                  {(['fade', 'slide', 'zoom'] as ReelTransition[]).map((t) => {
-                    const ko = t === 'fade' ? '페이드' : t === 'slide' ? '슬라이드' : '줌'
-                    return (
+              <div className="bg-white mx-3 rounded-xl border border-indigo-100 p-3.5 space-y-3.5 mb-3">
+                {/* 1) 플랫폼 프리셋 */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    플랫폼 프리셋
+                  </label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(
+                      [
+                        { k: 'reels', label: '릴스', emoji: '📷', dur: 3, trans: 'fade' as const },
+                        { k: 'story', label: '스토리', emoji: '📱', dur: 4, trans: 'slide' as const },
+                        { k: 'tiktok', label: '틱톡', emoji: '🎵', dur: 2.5, trans: 'zoom' as const },
+                        { k: 'shorts', label: '쇼츠', emoji: '▶️', dur: 3, trans: 'fade' as const },
+                      ] as const
+                    ).map((p) => {
+                      const active = reelPreset === p.k
+                      return (
+                        <button
+                          key={p.k}
+                          onClick={() => {
+                            setReelPreset(p.k)
+                            setReelDuration(p.dur)
+                            setReelTransition(p.trans)
+                          }}
+                          className={`py-1.5 rounded-md text-[11px] font-bold transition ${
+                            active
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="block text-[14px] leading-none mb-0.5">{p.emoji}</span>
+                          {p.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* 2) 전환 효과 — 시각 미리보기 */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    전환 효과
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        { k: 'fade' as const, label: '페이드', desc: '부드럽게' },
+                        { k: 'slide' as const, label: '슬라이드', desc: '옆으로' },
+                        { k: 'zoom' as const, label: '줌', desc: '확대' },
+                      ]
+                    ).map((t) => {
+                      const active = reelTransition === t.k
+                      return (
+                        <button
+                          key={t.k}
+                          onClick={() => setReelTransition(t.k)}
+                          className={`relative p-2 rounded-md text-[11px] transition overflow-hidden ${
+                            active
+                              ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                              : 'bg-slate-50 text-slate-700 hover:bg-slate-100 ring-1 ring-slate-200'
+                          }`}
+                        >
+                          {/* CSS 애니메이션 썸네일 */}
+                          <div className="relative h-8 mb-1 flex items-center justify-center">
+                            <TransitionPreview kind={t.k} active={active} />
+                          </div>
+                          <span className="block font-bold leading-tight">{t.label}</span>
+                          <span className={`block text-[9px] font-medium ${active ? 'opacity-85' : 'text-slate-500'}`}>
+                            {t.desc}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* 3) 카드당 초 */}
+                <div>
+                  <label className="flex items-baseline justify-between text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    <span>카드당 시간</span>
+                    <span className="text-slate-500 font-mono normal-case tracking-normal">
+                      {reelDuration}s · 총 {Math.round((cards.length * reelDuration - (cards.length - 1) * 0.5) * 10) / 10}s
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min={2}
+                    max={5}
+                    step={0.5}
+                    value={reelDuration}
+                    onChange={(e) => setReelDuration(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-400">
+                    <span>2s</span><span>3s</span><span>4s</span><span>5s</span>
+                  </div>
+                </div>
+
+                {/* 4) 렌더 품질 */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    렌더 품질
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { label: '표준', value: 0.82, hint: '빠름' },
+                      { label: '고화질', value: 0.88, hint: '권장' },
+                    ].map((q) => (
                       <button
-                        key={t}
-                        onClick={() => setReelTransition(t)}
-                        className={`px-1 py-1.5 rounded-md text-xs border leading-tight ${
-                          reelTransition === t
-                            ? 'bg-rose-700 text-white border-rose-700'
-                            : 'bg-white hover:bg-slate-50'
+                        key={q.label}
+                        onClick={() => setReelImageQuality(q.value)}
+                        className={`py-1.5 rounded-md text-[11px] font-bold transition ${
+                          reelImageQuality === q.value
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        <span className="block font-semibold">{ko}</span>
-                        <span className="block text-[10px] opacity-75">{t}</span>
+                        {q.label}
+                        <span className="ml-1 opacity-70 font-medium">· {q.hint}</span>
                       </button>
-                    )
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">렌더 품질</label>
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    { label: '표준', value: 0.82, hint: '빠름' },
-                    { label: '고화질', value: 0.88, hint: '권장' },
-                  ].map((q) => (
-                    <button
-                      key={q.label}
-                      onClick={() => setReelImageQuality(q.value)}
-                      className={`px-2 py-1.5 rounded-md text-xs border ${
-                        reelImageQuality === q.value
-                          ? 'bg-indigo-700 text-white border-indigo-700'
-                          : 'bg-white hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className="font-semibold">{q.label}</span>
-                      <span className="ml-1 opacity-80">({q.hint})</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">
-                  카드당 {reelDuration}초 · 총 약{' '}
-                  <span className="font-semibold text-slate-700">
-                    {Math.round((cards.length * reelDuration - (cards.length - 1) * 0.5) * 10) / 10}초
+                {/* 5) BGM (준비 중) */}
+                <div className="flex items-center justify-between p-2 rounded-md bg-amber-50 border border-amber-100">
+                  <span className="text-[11px] text-amber-800 font-bold flex items-center gap-1.5">
+                    <span>🎵</span>
+                    BGM · 트랜지션 효과음
                   </span>
-                </label>
-                <input
-                  type="range"
-                  min={2}
-                  max={5}
-                  step={0.5}
-                  value={reelDuration}
-                  onChange={(e) => setReelDuration(Number(e.target.value))}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-[10px] text-slate-400">
-                  <span>2s</span><span>3s</span><span>4s</span><span>5s</span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold tracking-wider uppercase">
+                    준비 중
+                  </span>
                 </div>
               </div>
 
-              <button
-                onClick={exportReel}
-                disabled={isExportingReel}
-                className="w-full bg-rose-700 hover:bg-rose-800 text-white rounded-md py-2 text-sm font-medium disabled:opacity-60"
-              >
-                {isExportingReel ? '🎬 렌더링 중… (수초~수십초)' : '🎬 릴스 MP4 내보내기'}
-              </button>
+              {/* 생성 버튼 */}
+              <div className="px-3 pb-3 space-y-2">
+                <button
+                  onClick={exportReel}
+                  disabled={isExportingReel}
+                  className="w-full rounded-xl py-3 text-[15px] font-black transition disabled:opacity-60 text-white shadow-md hover:shadow-lg"
+                  style={{
+                    background: isExportingReel
+                      ? '#6366f1'
+                      : 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
+                  }}
+                >
+                  {isExportingReel ? '🎬 렌더링 중… (10~30초)' : '🎬 릴스 MP4 내보내기'}
+                </button>
 
-              {reelStatus && (
-                <div className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-md px-3 py-2">
-                  {reelStatus}
-                </div>
-              )}
+                {reelStatus && (
+                  <div className="text-[11px] text-indigo-900 bg-indigo-100 border border-indigo-200 rounded-md px-3 py-2 font-medium">
+                    {reelStatus}
+                  </div>
+                )}
 
-              {lastReelUrl && (
-                <div className="border rounded-md overflow-hidden bg-black">
-                  <video src={lastReelUrl} controls className="w-full h-auto" preload="metadata" />
-                  <a
-                    href={lastReelUrl}
-                    download
-                    className="block text-center text-xs py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700"
-                  >
-                    ⬇ 다시 다운로드
-                  </a>
-                </div>
-              )}
+                {lastReelUrl && (
+                  <div className="space-y-2">
+                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-black shadow-sm">
+                      <video src={lastReelUrl} controls className="w-full h-auto" preload="metadata" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <a
+                        href={lastReelUrl}
+                        download
+                        className="text-center text-[12px] font-bold py-2 rounded-md bg-slate-900 text-white hover:bg-slate-800 transition"
+                      >
+                        ⬇ MP4 다운로드
+                      </a>
+                      <a
+                        href="https://www.instagram.com/"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-center text-[12px] font-bold py-2 rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition"
+                      >
+                        📷 인스타 열기 →
+                      </a>
+                    </div>
+                    {/* 업로드 가이드 */}
+                    <div className="text-[10px] text-slate-600 bg-white border border-slate-200 rounded-md p-2 leading-relaxed">
+                      <b className="text-slate-800">📱 업로드하는 법:</b>
+                      <br />
+                      다운로드한 MP4 를 스마트폰으로 옮긴 뒤 인스타 앱 → 릴스 만들기 → 갤러리에서 선택.
+                      자막이나 음악은 인스타 자체 기능으로 추가하세요.
+                    </div>
+                  </div>
+                )}
 
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                {size === '9:16'
-                  ? '현재 9:16 프리뷰 그대로 렌더합니다.'
-                  : `현재 프리뷰(${size})가 아닌 9:16 로 자동 전환 후 렌더, 완료 시 복귀.`}
-                {' · '}
-                카드 수정 후 다시 버튼을 누르면 최신 상태로 재렌더됩니다. 생성이 길어지면 자동으로 용량 최적화 재시도를 수행합니다.
-              </p>
+                <p className="text-[9px] text-slate-500 leading-relaxed px-1">
+                  {size === '9:16'
+                    ? '현재 9:16 프리뷰 그대로 렌더.'
+                    : `${size} → 9:16 자동 전환 후 렌더, 완료 시 복귀.`}
+                  {' · '}
+                  FFmpeg 서버 합성 · 무료 · 로그인 유지됨
+                </p>
+              </div>
             </div>
           )}
         </section>
@@ -3132,6 +3236,53 @@ export default function Page() {
         </div>
       </footer>
     </main>
+  )
+}
+
+// 전환 효과 시각 미리보기 — 두 카드가 fade/slide/zoom 으로 이어지는 느낌을 CSS 로 재현.
+// 2초 루프 애니메이션으로 버튼 안에서 살아있게.
+function TransitionPreview({ kind, active }: { kind: 'fade' | 'slide' | 'zoom'; active: boolean }) {
+  const boxBase: React.CSSProperties = {
+    position: 'absolute',
+    width: 14,
+    height: 20,
+    borderRadius: 3,
+    backgroundColor: active ? 'rgba(255,255,255,0.95)' : '#4338ca',
+  }
+  if (kind === 'fade') {
+    return (
+      <div style={{ position: 'relative', width: 40, height: 20 }}>
+        <style>{`
+          @keyframes tpFadeA { 0%,40%{opacity:1} 60%,100%{opacity:0} }
+          @keyframes tpFadeB { 0%,40%{opacity:0} 60%,100%{opacity:1} }
+        `}</style>
+        <div style={{ ...boxBase, left: 13, animation: 'tpFadeA 2s infinite' }} />
+        <div style={{ ...boxBase, left: 13, animation: 'tpFadeB 2s infinite' }} />
+      </div>
+    )
+  }
+  if (kind === 'slide') {
+    return (
+      <div style={{ position: 'relative', width: 40, height: 20, overflow: 'hidden' }}>
+        <style>{`
+          @keyframes tpSlideA { 0%,40%{transform:translateX(13px)} 60%,100%{transform:translateX(-24px)} }
+          @keyframes tpSlideB { 0%,40%{transform:translateX(40px)} 60%,100%{transform:translateX(13px)} }
+        `}</style>
+        <div style={{ ...boxBase, left: 0, animation: 'tpSlideA 2s infinite' }} />
+        <div style={{ ...boxBase, left: 0, animation: 'tpSlideB 2s infinite' }} />
+      </div>
+    )
+  }
+  // zoom
+  return (
+    <div style={{ position: 'relative', width: 40, height: 20 }}>
+      <style>{`
+        @keyframes tpZoomA { 0%,40%{transform:scale(1);opacity:1} 60%,100%{transform:scale(1.6);opacity:0} }
+        @keyframes tpZoomB { 0%,40%{transform:scale(0.3);opacity:0} 60%,100%{transform:scale(1);opacity:1} }
+      `}</style>
+      <div style={{ ...boxBase, left: 13, transformOrigin: 'center', animation: 'tpZoomA 2s infinite' }} />
+      <div style={{ ...boxBase, left: 13, transformOrigin: 'center', animation: 'tpZoomB 2s infinite' }} />
+    </div>
   )
 }
 
