@@ -306,13 +306,21 @@ export class GenerateService {
           : await this.fromPrompt(input.prompt ?? '', effectiveCount, brand, baseImages)
 
       // LayoutDSL 자유 배치 — product-ad/promo 일 때 LLM 이 블록 배치를 매번 새로 설계.
+      // DSL 생성 실패(timeout/error)가 전체 요청을 500 으로 만들지 않도록 try/catch 로 격리.
       if (template === 'product-ad' || template === 'promo') {
-        const dsls = await this.generateLayoutDsls(
-          input.prompt ?? built.cards[0]?.title ?? '',
-          built.cards.length,
-          brand,
-          template,
-        )
+        let dsls: (ValidatedLayoutDsl | null)[] = []
+        try {
+          dsls = await this.generateLayoutDsls(
+            input.prompt ?? built.cards[0]?.title ?? '',
+            built.cards.length,
+            brand,
+            template,
+          )
+        } catch (e: any) {
+          const logger = new Logger('GenerateService')
+          logger.warn(`LayoutDSL 생성 단계 예외 — basic 카드로 진행: ${e?.message ?? e}`)
+          dsls = Array(built.cards.length).fill(null)
+        }
         built.cards = built.cards.map((c, i) => {
           const dsl = dsls[i]
           const next: CardOut = { ...c, template }

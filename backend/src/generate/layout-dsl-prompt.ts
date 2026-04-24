@@ -170,19 +170,23 @@ export function buildLayoutDslPrompt(input: BuildDslPromptInput): BuildDslPrompt
 
   const brandPrimary = typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
 
-  // 시스템 프롬프트 — 간결하게. 긴 프롬프트는 Gemini 응답 지연의 주원인.
+  // 시스템 프롬프트 — 출력 JSON 구조를 명시 (responseSchema 없이 프롬프트로만 강제).
   const sys = [
-    '한국 SNS 카드뉴스 AI 디자이너. canvas + blocks 로 구성된 Layout DSL JSON 하나만 반환.',
-    '블록 6~10개. 타입: image, title, subtitle, body, badge, price, features, cta, swatch, decor.',
-    'rect=[x,y,w,h] 퍼센트(0~100). 겹침 시 decor(mask-gradient/mask-solid)로 가독성 확보.',
-    'image.url 은 반드시 "{{image}}". image 크기 30~100%.',
-    'title/body/cta 필수. body 는 48자 이상, 제목과 다른 내용(설명/혜택).',
-    '색상 HEX #RRGGBB, 대비 4.5:1 이상. 페이지 번호·과장 금지.',
+    '한국 SNS 카드뉴스 AI 디자이너. 다음 형식의 JSON 하나만 반환:',
+    '{ "cards": [ { "canvas": { "w":1080, "h":1350, "bg":"#HEX" }, "blocks": [...] } ] }',
+    '',
+    'block 필드: { id, type, rect:[x,y,w,h], pos?, align?, text?, url?, color?, background?, size?, weight?, fit?, style?, priceOriginal?, priceSale?, discountPercent?, features?, swatches?, big? }',
+    'block 타입: image / title / subtitle / body / badge / price / features / cta / swatch / decor',
+    'rect 는 퍼센트 0~100. 블록 6~10개. image.url 은 반드시 "{{image}}".',
+    'title·body·cta 블록 필수. body 48자 이상 문장, 제목과 다른 내용.',
+    '겹침 시 decor(style=mask-gradient 또는 mask-solid) 로 가독성 확보.',
+    '색상 HEX #RRGGBB, 텍스트/배경 대비 4.5:1 이상.',
+    '페이지 번호·과장·의료 단정 금지.',
     `강제 패밀리: ${familyFull}`,
     '전형적 split(좌 텍스트+우 이미지) 만 뽑지 말 것. 매 호출마다 다른 구도.',
     '',
     '예시:',
-    JSON.stringify(EXAMPLE_1),
+    JSON.stringify({ cards: [EXAMPLE_1] }),
   ].join('\n')
 
   // 사용자 텍스트 — RAG 청크는 총 800자로 제한해 속도 확보.
@@ -304,10 +308,12 @@ export async function runLayoutDsls(
 
   let parsed: { cards: unknown[] } | null = null
   try {
+    // responseSchema 를 제거해 속도 최적화 (Gemini CFG 제약 회피).
+    // 출력 형식은 프롬프트로 강제 + runtime validator (validateLayoutDsl) 가 품질 보장.
     parsed = await callGeminiJson<{ cards: unknown[] }>({
       systemInstruction: p1.sys,
       userText: p1.userText,
-      schema: layoutDslSchema(n),
+      // schema 생략 — responseMimeType=application/json 만 사용
       timeoutMs: effectiveTimeout,
       temperature: 1.15,
       debugLabel: tag,
@@ -374,7 +380,7 @@ export async function runLayoutDsls(
       const retry = await callGeminiJson<{ cards: unknown[] }>({
         systemInstruction: p2.sys,
         userText: p2.userText,
-        schema: layoutDslSchema(n),
+        // 재시도도 schema 없이 빠르게
         timeoutMs: effectiveTimeout,
         temperature: 1.15,
         debugLabel: `${tag}:retry`,

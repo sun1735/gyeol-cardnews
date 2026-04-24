@@ -10,8 +10,10 @@ const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models
 export interface GeminiJsonCall {
   systemInstruction?: string
   userText: string
-  // JSON 스키마 (OpenAI json_schema.schema 와 유사한 드래프트). Gemini 는 Schema 오브젝트를 기대한다.
-  schema: unknown
+  // JSON 스키마 (선택). 지정 시 Gemini responseSchema 로 구조 강제 — 다만 복잡한 스키마는
+  // CFG 제약이 커서 생성 속도가 급격히 느려지거나 "too many states" 400 을 유발.
+  // undefined 로 두면 responseMimeType=application/json 만 사용해 훨씬 빠르게 JSON 반환.
+  schema?: unknown
   timeoutMs?: number
   temperature?: number
   // 지정 시 system·user·raw response 를 Logger.log 로 전체 출력 (운영 디버깅용)
@@ -27,13 +29,16 @@ export async function callGeminiJson<T = unknown>(call: GeminiJsonCall): Promise
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), call.timeoutMs ?? 25_000)
   try {
+    const genConfig: Record<string, unknown> = {
+      temperature: call.temperature ?? 0.7,
+      responseMimeType: 'application/json',
+    }
+    if (call.schema !== undefined && call.schema !== null) {
+      genConfig.responseSchema = call.schema
+    }
     const body: Record<string, unknown> = {
       contents: [{ role: 'user', parts: [{ text: call.userText }] }],
-      generationConfig: {
-        temperature: call.temperature ?? 0.7,
-        responseMimeType: 'application/json',
-        responseSchema: call.schema,
-      },
+      generationConfig: genConfig,
     }
     if (call.systemInstruction) {
       body.systemInstruction = { parts: [{ text: call.systemInstruction }] }
