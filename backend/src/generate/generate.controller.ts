@@ -1,11 +1,12 @@
-import { Body, Controller, Ip, Post } from '@nestjs/common'
+import { Body, Controller, Get, Ip, Post } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import { GenerateService } from './generate.service'
 import { GenerateCardsDto } from './dto/generate-cards.dto'
-import { CurrentUser } from '../auth/auth.guard'
+import { CurrentUser, Public } from '../auth/auth.guard'
 import type { AuthUser } from '../auth/auth.service'
 import { QuotaService } from '../quota/quota.service'
+import { getLayoutDslHealth } from './layout-dsl-prompt'
 
 @ApiTags('generate')
 @Controller('api/generate')
@@ -44,5 +45,21 @@ export class GenerateController {
       template: body.template,
       clientIp,
     })
+  }
+
+  // LayoutDSL 파이프라인 진단 — GEMINI_API_KEY 설정 여부 + 최근 호출 통계
+  @Public()
+  @Get('layout-dsl/health')
+  @ApiOperation({ summary: 'LayoutDSL 생성 파이프라인 헬스 체크 (관리자 디버깅용)' })
+  layoutDslHealth() {
+    const key = (process.env.GEMINI_API_KEY ?? '').trim()
+    return {
+      geminiKey: {
+        present: key.length > 0,
+        length: key.length,
+        preview: key.length > 0 ? `${key.slice(0, 4)}…${key.slice(-4)}` : null,
+      },
+      ...getLayoutDslHealth(),
+    }
   }
 }

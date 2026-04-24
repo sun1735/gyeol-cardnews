@@ -61,6 +61,58 @@ export function recentFamilyHistory(): string[] {
   return [...familyHistory]
 }
 
+// ─── 호출 통계 (헬스체크용) ───
+interface CallStat {
+  ts: number
+  path: 'auto' | 'note-rag'
+  template: 'product-ad' | 'promo'
+  seed: string
+  family: string
+  outcome: 'success' | 'no-key' | 'http-fail' | 'invalid-shape' | 'all-null'
+  validCount: number
+  nullCount: number
+  retried: boolean
+  durationMs: number
+}
+const callStats: CallStat[] = []
+const STATS_MAX = 50
+
+export function getLayoutDslHealth() {
+  const recent = callStats.slice(-20).reverse()
+  const totals = callStats.reduce(
+    (acc, s) => {
+      acc[s.outcome] = (acc[s.outcome] ?? 0) + 1
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+  const familyCounts = familyHistory.reduce(
+    (acc, f) => {
+      acc[f] = (acc[f] ?? 0) + 1
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+  return {
+    totalCalls: callStats.length,
+    outcomes: totals,
+    familyDistribution: familyCounts,
+    dominance: detectFamilyDominance(),
+    recentCalls: recent.map((s) => ({
+      path: s.path,
+      template: s.template,
+      seed: s.seed,
+      family: s.family,
+      outcome: s.outcome,
+      validCount: s.validCount,
+      nullCount: s.nullCount,
+      retried: s.retried,
+      ageSec: Math.round((Date.now() - s.ts) / 1000),
+      durationMs: s.durationMs,
+    })),
+  }
+}
+
 export function detectFamilyDominance(): { family: string; count: number } | null {
   if (familyHistory.length < 10) return null
   const recent = familyHistory.slice(-10)
@@ -212,9 +264,28 @@ export async function runLayoutDsls(
   const { path, template, prompt, n, brand, contextBlock, timeoutMs } = input
   const logger = new Logger(`LayoutDSL:${path}`)
   const tag = `layout-dsl:${path}:${template}`
+  const t0 = Date.now()
 
-  if (!process.env.GEMINI_API_KEY) {
-    logger.warn(`GEMINI_API_KEY 없음 — LayoutDSL 스킵`)
+  const key = (process.env.GEMINI_API_KEY ?? '').trim()
+  logger.log(
+    `[${tag}] ▶ 진입 — key.present=${key.length > 0} key.length=${key.length} brand=${brand?.name ?? '(none)'} n=${n}`,
+  )
+
+  if (!key) {
+    logger.error(`[${tag}] ✗ GEMINI_API_KEY 없음 — LayoutDSL 전부 null 반환 (basic 폴백)`)
+    callStats.push({
+      ts: Date.now(),
+      path,
+      template,
+      seed: '-',
+      family: '-',
+      outcome: 'no-key',
+      validCount: 0,
+      nullCount: n,
+      retried: false,
+      durationMs: Date.now() - t0,
+    })
+    if (callStats.length > STATS_MAX) callStats.shift()
     return Array(n).fill(null)
   }
 
@@ -288,13 +359,17 @@ export async function runLayoutDsls(
   // 검증 + 블록 구조 집계 로그
   const out: (ValidatedLayoutDsl | null)[] = []
   const signatures: string[] = []
+  let validCount = 0
+  let nullCount = 0
+  const retried = parsed !== null && parsed.cards !== undefined && familyHistory.length >= 2
+    && familyHistory[familyHistory.length - 1] !== p1.family
   for (let i = 0; i < n; i++) {
     const raw = parsed.cards[i]
     const v = validateLayoutDsl(raw)
     if (v) {
+      validCount++
       const types = v.blocks.map((b: any) => b.type).join(',')
       logger.log(`[${tag}] 카드 ${i} 검증 통과 — blocks=${v.blocks.length} types=${types}`)
-      // 구조 시그니처 — type+rect 조합으로 동일 배치 감지
       const sig = v.blocks
         .map((b: any) => `${b.type}@${Array.isArray(b.rect) ? b.rect.join(',') : b.pos ?? '-'}`)
         .sort()
@@ -304,11 +379,31 @@ export async function runLayoutDsls(
       }
       signatures.push(sig)
     } else {
+      nullCount++
       logger.warn(
-        `[${tag}] 카드 ${i} 검증 실패 — 원본(일부): ${JSON.stringify(raw).slice(0, 300)}`,
+        `[${tag}] ✗ 카드 ${i} 검증 실패 — 원본(앞 500자): ${JSON.stringify(raw).slice(0, 500)}`,
       )
     }
     out.push(v)
   }
+
+  const outcome: CallStat['outcome'] =
+    validCount === n ? 'success' : validCount > 0 ? 'success' : 'all-null'
+  logger.log(
+    `[${tag}] ◀ 종료 — valid=${validCount}/${n} null=${nullCount} outcome=${outcome} ${Date.now() - t0}ms`,
+  )
+  callStats.push({
+    ts: Date.now(),
+    path,
+    template,
+    seed: p1.seed,
+    family: p1.family,
+    outcome,
+    validCount,
+    nullCount,
+    retried,
+    durationMs: Date.now() - t0,
+  })
+  if (callStats.length > STATS_MAX) callStats.shift()
   return out
 }

@@ -563,6 +563,16 @@ export default function Page() {
       }).then((r) => r.json())
       const rawCards: CardData[] = r.cards ?? []
       const newCards = rawCards.map((c) => ({ ...c, template: c.template ?? template }))
+      // 개발자 진단 로그 — 카드별 layoutDsl 존재 여부 + block 타입
+      console.table(
+        newCards.map((c) => ({
+          id: c.id.slice(0, 6),
+          template: c.template,
+          hasLayoutDsl: !!c.layoutDsl,
+          blocks: c.layoutDsl?.blocks?.length ?? 0,
+          types: c.layoutDsl?.blocks?.map((b: any) => b.type).join(',') ?? '-',
+        })),
+      )
       setCards(newCards)
       setSelectedCardId(newCards[0]?.id ?? null)
     } finally {
@@ -3247,6 +3257,13 @@ function CardItem({
 
       {/* 카드 프리뷰 (렌더 대상) */}
       <div className="flex justify-center">
+        {/* LayoutDSL 누락 경고 — product-ad/promo 인데 DSL 이 안 생성된 경우 */}
+        {(card.template === 'product-ad' || card.template === 'promo') &&
+          !card.layoutDsl && (
+            <div className="absolute top-2 left-2 z-20 px-2 py-1 rounded bg-amber-500 text-white text-[10px] font-bold shadow">
+              ⚠ AI 구도 생성 실패 · 기본 렌더로 폴백
+            </div>
+          )}
         {(card.template === 'product-ad' || card.template === 'promo') && card.layoutDsl ? (
           <div id={`card-${card.id}`}>
             {/* LayoutDSL 기반 자유 배치.
