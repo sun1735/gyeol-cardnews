@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { signIn, signOut, useSession } from 'next-auth/react'
 import type { BackgroundTemplate, Brand, CardData, Layout, SizePreset, Template } from '@/lib/types'
+import { COLOR_PRESETS } from '@/lib/colorPresets'
 // LayoutRenderer 가 product-ad/promo 렌더링을 전담. DynamicCard 는 layoutDsl 없는 레거시 카드용 fallback.
 // ProductAdCard/PromoCard (구 고정 템플릿) 는 더 이상 렌더 경로에 사용되지 않음.
 import { DynamicCard } from '@/components/templates/DynamicCard'
@@ -1977,15 +1978,16 @@ export default function Page() {
                   </div>
                 </div>
 
-                {/* 5) BGM (준비 중) */}
-                <div className="flex items-center justify-between p-2 rounded-md bg-amber-50 border border-amber-100">
-                  <span className="text-[11px] text-amber-800 font-bold flex items-center gap-1.5">
+                {/* 5) BGM 가이드 — 자체 삽입 대신 플랫폼 BGM 사용 권장 (저작권 안전) */}
+                <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200">
+                  <div className="flex items-start gap-1.5 text-[11px] text-slate-700 font-bold mb-1">
                     <span>🎵</span>
-                    BGM · 트랜지션 효과음
-                  </span>
-                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold tracking-wider uppercase">
-                    준비 중
-                  </span>
+                    <span>BGM 은 인스타·틱톡 앱에서 추가하세요</span>
+                  </div>
+                  <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
+                    저작권 탐지·차단 방지를 위해 MP4 에 음원을 넣지 않습니다. 업로드 후 각 플랫폼의 라이센스된
+                    BGM 을 인앱 편집기에서 선택하세요 — <b>삭제 위험 0%</b>.
+                  </p>
                 </div>
               </div>
 
@@ -2033,11 +2035,16 @@ export default function Page() {
                       </a>
                     </div>
                     {/* 업로드 가이드 */}
-                    <div className="text-[10px] text-slate-600 bg-white border border-slate-200 rounded-md p-2 leading-relaxed">
-                      <b className="text-slate-800">📱 업로드하는 법:</b>
-                      <br />
-                      다운로드한 MP4 를 스마트폰으로 옮긴 뒤 인스타 앱 → 릴스 만들기 → 갤러리에서 선택.
-                      자막이나 음악은 인스타 자체 기능으로 추가하세요.
+                    <div className="text-[10px] text-slate-600 bg-white border border-slate-200 rounded-md p-2 leading-relaxed space-y-1.5">
+                      <div>
+                        <b className="text-slate-800">📱 업로드 방법:</b> MP4 다운로드 → 스마트폰 이동
+                        → 인스타 앱 → 릴스 만들기 → 갤러리에서 선택.
+                      </div>
+                      <div className="pt-1.5 border-t border-slate-100">
+                        <b className="text-slate-800">🎵 BGM 추가:</b> 릴스 편집 화면에서 상단 "음악"
+                        아이콘 → 인스타가 제공하는 라이센스된 곡 선택. 이 방법이 <b>유일하게
+                        안전한 방법</b> 입니다 (플랫폼 자체 BGM 은 저작권 분쟁 없음).
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2581,6 +2588,59 @@ export default function Page() {
                     <div>
                       <div className="text-sm font-semibold text-slate-700 mb-2">
                         색상 팔레트
+                      </div>
+                      {/* 업종별 프리셋 — 클릭 시 primary/secondary/text 한 번에 세팅 */}
+                      <div className="mb-3">
+                        <div className="text-[11px] text-slate-500 mb-1.5 font-medium">
+                          업종 프리셋 — 클릭해서 바로 적용
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {COLOR_PRESETS.map((p) => {
+                            const active =
+                              newBrand.primaryColor.toLowerCase() === p.primaryColor.toLowerCase()
+                            return (
+                              <button
+                                key={p.key}
+                                type="button"
+                                onClick={() =>
+                                  setNewBrand({
+                                    ...newBrand,
+                                    primaryColor: p.primaryColor,
+                                    secondaryColor: p.secondaryColor,
+                                    textColor: p.textColor,
+                                  })
+                                }
+                                className={`flex items-center gap-2 p-2 rounded-lg text-left transition ${
+                                  active
+                                    ? 'bg-indigo-50 ring-2 ring-indigo-400'
+                                    : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-200'
+                                }`}
+                                title={p.description}
+                              >
+                                {/* 3색 스와치 */}
+                                <div className="flex flex-col gap-0.5 flex-shrink-0">
+                                  <span
+                                    className="w-3 h-3 rounded-full border border-white shadow-sm"
+                                    style={{ background: p.primaryColor }}
+                                  />
+                                  <span
+                                    className="w-3 h-3 rounded-full border border-white shadow-sm"
+                                    style={{ background: p.secondaryColor }}
+                                  />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[11px] font-bold leading-tight flex items-center gap-1">
+                                    <span>{p.emoji}</span>
+                                    <span className="truncate">{p.label}</span>
+                                  </div>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mb-1.5 font-medium">
+                        직접 세부 조정
                       </div>
                       <div className="grid grid-cols-3 gap-3">
                         {(

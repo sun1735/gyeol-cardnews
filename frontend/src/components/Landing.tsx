@@ -4,8 +4,92 @@
 // 구성: 히어로 → 기능 3줄 → 템플릿 갤러리 → 3단계 안내 → 요금 미리보기 → 최종 CTA → 푸터.
 // 기존 TemplatePreview 를 재사용해 "실제로 이렇게 나옵니다" 를 보여주는 게 핵심.
 
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { TemplatePreview } from './templates/TemplatePreview'
+
+// 실제 생성된 릴스 MP4 샘플. /public/samples/yoosun-reel.mp4 가 있으면 재생,
+// 없으면 플레이스홀더(폰 목업) 표시.
+function ReelSamplePreview() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [available, setAvailable] = useState<'loading' | 'ready' | 'missing'>('loading')
+
+  useEffect(() => {
+    // HEAD 로 파일 존재만 체크 (본문 다운로드 방지)
+    let cancelled = false
+    fetch('/samples/yoosun-reel.mp4', { method: 'HEAD' })
+      .then((r) => {
+        if (cancelled) return
+        setAvailable(r.ok ? 'ready' : 'missing')
+      })
+      .catch(() => !cancelled && setAvailable('missing'))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <div className="relative">
+      {/* 폰 목업 프레임 — 9:16 비율, 실제로 비디오가 돌아가는 느낌 */}
+      <div
+        className="mx-auto relative rounded-[32px] overflow-hidden shadow-2xl border-[6px] border-slate-900"
+        style={{ width: 240, height: 427, background: '#0f172a' }}
+      >
+        {available === 'ready' ? (
+          <video
+            ref={videoRef}
+            src="/samples/yoosun-reel.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          // 플레이스홀더: 실제 샘플 이미지를 9:16 로 확대해 세로로 스크롤 느낌
+          <div className="relative w-full h-full">
+            <img
+              src="/samples/yoosun-basic.png"
+              alt=""
+              className="w-full h-full object-cover"
+              style={{ animation: 'reelSlow 8s ease-in-out infinite alternate' }}
+            />
+            <style>{`@keyframes reelSlow { 0%{object-position:center 0%} 100%{object-position:center 100%} }`}</style>
+            {/* 상단 릴스 UI 흉내 (카메라·검색·설명 아이콘) */}
+            <div className="absolute top-3 left-0 right-0 flex items-center justify-between px-4">
+              <span className="text-white text-[11px] font-bold">릴스</span>
+              <div className="flex gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                <span className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
+              </div>
+            </div>
+            {/* 하단 정보 */}
+            <div className="absolute bottom-3 left-0 right-0 px-3 text-white">
+              <div className="text-[11px] font-bold tracking-wide drop-shadow">@brand_account</div>
+              <div className="text-[10px] opacity-80 mt-0.5 drop-shadow">카드 시리즈 자동 변환 · 9:16 MP4</div>
+            </div>
+            {/* 재생 버튼 오버레이 */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-2xl">
+                <span style={{ fontSize: 22, marginLeft: 3 }}>▶</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* 샘플 라벨 */}
+      <div className="mt-4 text-center">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-600 text-white text-[11px] font-bold tracking-wider uppercase">
+          {available === 'ready' ? '실제 생성 릴스' : '릴스 샘플 미리보기'}
+        </div>
+        <div className="mt-2 text-[13px] text-slate-600 font-medium">
+          카드뉴스 5장 → 9:16 MP4 자동 합성
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Landing() {
   const scrollToId = (id: string) => () => {
@@ -242,35 +326,27 @@ export function Landing() {
               </div>
             </div>
 
-            {/* 우: 릴스 MP4 변환 설명 */}
-            <div className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-[20px] border border-indigo-100 relative">
-              <div className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase">
-                NEW
+            {/* 우: 실제 생성된 릴스 MP4 embed */}
+            <ReelSamplePreview />
+          </div>
+
+          {/* 릴스 변환 기능 상세 */}
+          <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { emoji: '📐', label: '9:16 세로', sub: '자동 레이아웃' },
+              { emoji: '✨', label: '3종 전환', sub: '페이드·슬라이드·줌' },
+              { emoji: '🚀', label: '10~30초', sub: 'FFmpeg 고속 합성' },
+              { emoji: '📲', label: '바로 업로드', sub: '릴스·틱톡·쇼츠' },
+            ].map((f, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-[14px] bg-white border border-slate-200 text-center"
+              >
+                <div className="text-[28px]">{f.emoji}</div>
+                <div className="mt-1 text-[14px] font-bold">{f.label}</div>
+                <div className="text-[11px] text-slate-500 font-medium mt-0.5">{f.sub}</div>
               </div>
-              <div className="text-[56px] text-center mt-4">🎬</div>
-              <h3 className="mt-2 text-[22px] font-black text-center tracking-[-0.02em]">
-                한 번 더 클릭 → <br />
-                <span style={{ color: '#4338ca' }}>릴스 MP4 완성</span>
-              </h3>
-              <ul className="mt-5 space-y-2 text-[14px] text-slate-700 font-medium">
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-600 mt-0.5">✓</span>
-                  <span>9:16 세로 자동 레이아웃</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-600 mt-0.5">✓</span>
-                  <span>페이드 · 슬라이드 · 줌 전환 선택</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-600 mt-0.5">✓</span>
-                  <span>인스타 릴스 · 틱톡 · 유튜브 쇼츠 바로 업로드</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-indigo-600 mt-0.5">✓</span>
-                  <span>FFmpeg 자체 처리 · 서버 비용 0원</span>
-                </li>
-              </ul>
-            </div>
+            ))}
           </div>
         </div>
       </section>
