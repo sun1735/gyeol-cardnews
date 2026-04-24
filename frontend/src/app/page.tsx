@@ -528,6 +528,17 @@ export default function Page() {
         const cards = await pollRagJob(jobId)
         // 응답에 template 필드가 없을 수도 있으므로 현재 선택값으로 보정
         const withTemplate = cards.map((c) => ({ ...c, template: c.template ?? template }))
+        // 개발자 진단 로그 (note-rag 경로)
+        console.log('[generate/cards-from-note] received', withTemplate.length, 'cards')
+        console.table(
+          withTemplate.map((c) => ({
+            id: c.id?.slice(0, 6),
+            template: c.template,
+            hasLayoutDsl: !!c.layoutDsl,
+            blocks: c.layoutDsl?.blocks?.length ?? 0,
+            types: c.layoutDsl?.blocks?.map((b: any) => b.type).join(',') ?? '-',
+          })),
+        )
         setCards(withTemplate)
         setSelectedCardId(withTemplate[0]?.id ?? null)
         setRagProgress(100)
