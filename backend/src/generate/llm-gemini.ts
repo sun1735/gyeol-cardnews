@@ -49,9 +49,13 @@ export async function callGeminiJson<T = unknown>(call: GeminiJsonCall): Promise
         `━━━━━━ [${call.debugLabel}] SYSTEM PROMPT ━━━━━━\n${call.systemInstruction ?? '(none)'}`,
       )
       logger.log(`━━━━━━ [${call.debugLabel}] USER PROMPT ━━━━━━\n${call.userText}`)
-      logger.log(
-        `━━━━━━ [${call.debugLabel}] SCHEMA (truncated) ━━━━━━\n${JSON.stringify(call.schema).slice(0, 800)}`,
-      )
+      // schema 미지정 시 JSON.stringify(undefined) → undefined → .slice() 터짐 방어
+      if (call.schema !== undefined && call.schema !== null) {
+        const s = JSON.stringify(call.schema) ?? ''
+        logger.log(`━━━━━━ [${call.debugLabel}] SCHEMA (truncated) ━━━━━━\n${s.slice(0, 800)}`)
+      } else {
+        logger.log(`━━━━━━ [${call.debugLabel}] SCHEMA ━━━━━━ (none — responseMimeType=JSON only)`)
+      }
     }
 
     const res = await fetch(`${GEMINI_ENDPOINT}?key=${encodeURIComponent(key)}`, {
