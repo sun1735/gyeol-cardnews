@@ -38,7 +38,7 @@ const SIZE_PX: Record<Exclude<SizePreset, 'custom'>, { w: number; h: number; dis
 const SIZE_LABELS: Record<SizePreset, string> = {
   '1:1': '정사각',
   '4:5': '인스타 피드',
-  '9:16': '릴스 · 스토리',
+  '9:16': '숏폼 (릴스·틱톡)',
   custom: '배너 · 자유',
 }
 
@@ -258,7 +258,7 @@ export default function Page() {
   const [backgrounds, setBackgrounds] = useState<BackgroundTemplate[]>([])
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
-  // 단계 10: 릴스 내보내기
+  // 단계 10: 숏폼(9:16) MP4 내보내기 — 내부 변수명은 reel* 유지
   const [reelTransition, setReelTransition] = useState<ReelTransition>('fade')
   const [reelDuration, setReelDuration] = useState(3)
   const [reelImageQuality, setReelImageQuality] = useState<number>(0.88)
@@ -551,6 +551,7 @@ export default function Page() {
         return
       }
 
+      const effectiveSize = size === 'custom' ? '1:1' : size
       const body =
         mode === 'auto'
           ? {
@@ -561,6 +562,7 @@ export default function Page() {
               baseImageUrls: baseImages.length ? baseImages : undefined,
               template,
               autoGenerateImage,
+              sizePreset: effectiveSize,
             }
           : {
               mode: 'manual',
@@ -574,6 +576,7 @@ export default function Page() {
               baseImageUrls: baseImages.length ? baseImages : undefined,
               template,
               autoGenerateImage,
+              sizePreset: effectiveSize,
             }
       const r = await authedFetch('/api/generate/cards', {
         method: 'POST',
@@ -895,18 +898,18 @@ export default function Page() {
     a.click()
   }
 
-  // 단계 10: 9:16 MP4 릴스 내보내기
+  // 단계 10: 9:16 MP4 숏폼 내보내기 (인스타 릴스·스토리 / 틱톡 / 유튜브 쇼츠 공용)
   async function exportReel() {
     if (cards.length < 2) {
       await openAlert({
         title: '카드가 부족해요',
-        message: '릴스는 최소 2장의 카드가 필요합니다. 카드를 추가한 뒤 다시 시도해 주세요.',
+        message: '숏폼은 최소 2장의 카드가 필요합니다. 카드를 추가한 뒤 다시 시도해 주세요.',
         variant: 'warning',
       })
       return
     }
     setIsExportingReel(true)
-    setReelStatus('릴스 준비 중…')
+    setReelStatus('숏폼 준비 중…')
     setLastReelUrl(null)
     const previousSize = size
     const needsSwitch = size !== '9:16'
@@ -982,7 +985,7 @@ export default function Page() {
         break
       }
 
-      if (!j) throw lastErr ?? new Error('릴스 생성 실패')
+      if (!j) throw lastErr ?? new Error('숏폼 생성 실패')
 
       setReelStatus('다운로드 준비 중…')
       setLastReelUrl(j.url)
@@ -991,12 +994,12 @@ export default function Page() {
       a.href = j.url
       a.download = j.filename
       a.click()
-      setReelStatus('릴스 생성 완료')
+      setReelStatus('숏폼 생성 완료')
       setTimeout(() => setReelStatus(null), 2000)
     } catch (e: any) {
       setReelStatus(null)
       await openAlert({
-        title: '릴스 생성 실패',
+        title: '숏폼 생성 실패',
         message: String(e?.message ?? e),
         variant: 'danger',
       })
@@ -1574,7 +1577,7 @@ export default function Page() {
               ) : (
                 <p className="text-[13px] text-slate-600 mt-3 font-medium">
                   {size === '4:5' && '인스타그램 피드 표준 사이즈'}
-                  {size === '9:16' && '인스타 릴스 · 스토리 · 틱톡'}
+                  {size === '9:16' && '숏폼 — 릴스·스토리·틱톡·쇼츠'}
                   {size === '1:1' && '인스타 정사각 · 모든 SNS 공통'}
                 </p>
               )}
@@ -1846,11 +1849,11 @@ export default function Page() {
                   차별점
                 </span>
                 <div className="text-[15px] font-black tracking-[-0.015em]">
-                  🎬 카드뉴스 → 릴스 MP4 자동 변환
+                  🎬 카드뉴스 → 숏폼 MP4 자동 변환
                 </div>
               </div>
               <p className="px-4 pb-3 text-[11px] text-slate-600 font-medium leading-relaxed">
-                {cards.length}장의 카드를 한 번에 9:16 릴스로 합성합니다.
+                {cards.length}장의 카드를 한 번에 9:16 숏폼 MP4 로 합성합니다 — 릴스·틱톡·쇼츠 전부 커버.
                 GPT·Canva 에서 안 되는 핵심 기능.
               </p>
 
@@ -2003,7 +2006,7 @@ export default function Page() {
                       : 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
                   }}
                 >
-                  {isExportingReel ? '🎬 렌더링 중… (10~30초)' : '🎬 릴스 MP4 내보내기'}
+                  {isExportingReel ? '🎬 렌더링 중… (10~30초)' : '🎬 숏폼 MP4 내보내기'}
                 </button>
 
                 {reelStatus && (

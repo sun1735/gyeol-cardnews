@@ -96,4 +96,13 @@ export class GenerateCardsDto {
   })
   @IsOptional()
   autoGenerateImage?: boolean
+
+  @ApiPropertyOptional({
+    enum: ['1:1', '4:5', '9:16'],
+    example: '9:16',
+    description:
+      '출력 비율 힌트. 9:16 이면 자동 생성 이미지도 9:16 세로(숏폼) 로 생성 — 릴스·스토리·틱톡·쇼츠 공통.',
+  })
+  @IsOptional() @IsIn(['1:1', '4:5', '9:16'])
+  sizePreset?: '1:1' | '4:5' | '9:16'
 }

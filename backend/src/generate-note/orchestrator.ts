@@ -161,7 +161,7 @@ export class Orchestrator {
       !rankedHasAny &&
       autoImageOn
     ) {
-      await this.autoGenerateAndInject(ranked, dto.prompt, brand, template)
+      await this.autoGenerateAndInject(ranked, dto.prompt, brand, template, dto.sizePreset)
     }
     const editResults = await this.parallelEdit(copies, ranked, refs, recipe, template)
     const editedCount = editResults.filter((r) => r.status === 'edited').length
@@ -505,6 +505,7 @@ export class Orchestrator {
     prompt: string,
     brand: any,
     template: 'product-ad' | 'promo',
+    sizePreset?: '1:1' | '4:5' | '9:16',
   ): Promise<void> {
     if (!process.env.GEMINI_API_KEY) {
       this.logger.warn('[auto-image:note-rag] GEMINI_API_KEY 없음 — 스킵')
@@ -512,7 +513,17 @@ export class Orchestrator {
     }
     const t0 = Date.now()
     const recipe = brand ? buildStyleRecipe(brand) : undefined
-    const aspectRatio: '1:1' | '4:5' = template === 'promo' ? '1:1' : '4:5'
+    // sizePreset 우선 (숏폼 9:16 포함), 아니면 template 기준
+    const aspectRatio: '1:1' | '4:5' | '9:16' =
+      sizePreset === '9:16'
+        ? '9:16'
+        : sizePreset === '4:5'
+          ? '4:5'
+          : sizePreset === '1:1'
+            ? '1:1'
+            : template === 'promo'
+              ? '1:1'
+              : '4:5'
     try {
       const result = await generateImageWithGemini({
         prompt,

@@ -8,8 +8,8 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { TemplatePreview } from './templates/TemplatePreview'
 
-// 실제 생성된 릴스 MP4 샘플. /public/samples/yoosun-reel.mp4 가 있으면 재생,
-// 없으면 플레이스홀더(폰 목업) 표시.
+// 실제 생성된 숏폼 MP4 샘플. /public/samples/yoosun-reel.mp4 가 있으면 재생,
+// 없으면 플레이스홀더(폰 목업) 표시. (파일명은 레거시 호환 유지)
 function ReelSamplePreview() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [available, setAvailable] = useState<'loading' | 'ready' | 'missing'>('loading')
@@ -55,9 +55,9 @@ function ReelSamplePreview() {
               style={{ animation: 'reelSlow 8s ease-in-out infinite alternate' }}
             />
             <style>{`@keyframes reelSlow { 0%{object-position:center 0%} 100%{object-position:center 100%} }`}</style>
-            {/* 상단 릴스 UI 흉내 (카메라·검색·설명 아이콘) */}
+            {/* 상단 숏폼 UI 흉내 (플랫폼 공용) */}
             <div className="absolute top-3 left-0 right-0 flex items-center justify-between px-4">
-              <span className="text-white text-[11px] font-bold">릴스</span>
+              <span className="text-white text-[11px] font-bold">SHORTS</span>
               <div className="flex gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
                 <span className="w-1.5 h-1.5 rounded-full bg-white/60" />
@@ -81,7 +81,7 @@ function ReelSamplePreview() {
       {/* 샘플 라벨 */}
       <div className="mt-4 text-center">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-600 text-white text-[11px] font-bold tracking-wider uppercase">
-          {available === 'ready' ? '실제 생성 릴스' : '릴스 샘플 미리보기'}
+          {available === 'ready' ? '실제 생성 숏폼' : '숏폼 샘플 미리보기'}
         </div>
         <div className="mt-2 text-[13px] text-slate-600 font-medium">
           카드뉴스 5장 → 9:16 MP4 자동 합성
@@ -197,7 +197,7 @@ export function Landing() {
             </p>
           </div>
 
-          {/* 우측 미리보기 — 실제 시리즈 5장 샘플 오버랩 + "→ 릴스" 힌트 */}
+          {/* 우측 미리보기 — 실제 시리즈 5장 샘플 오버랩 + "→ 숏폼" 힌트 */}
           <div className="relative h-[440px] hidden lg:block">
             {/* 카드 5장이 살짝 겹쳐 시리즈 감각 */}
             {[
@@ -226,7 +226,7 @@ export function Landing() {
                 </div>
               </div>
             ))}
-            {/* "→ 릴스 MP4" 플로팅 뱃지 */}
+            {/* "→ 숏폼 MP4" 플로팅 뱃지 */}
             <div
               className="absolute"
               style={{ bottom: 20, left: 0, zIndex: 10 }}
@@ -238,7 +238,7 @@ export function Landing() {
                     한 번 더 클릭
                   </div>
                   <div className="text-[15px] font-black text-slate-900">
-                    릴스 MP4 한 개
+                    숏폼 MP4 한 개
                   </div>
                 </div>
               </div>
@@ -269,8 +269,8 @@ export function Landing() {
             },
             {
               emoji: '🎬',
-              title: '릴스 MP4 자동 변환',
-              desc: '생성한 카드뉴스 시리즈를 9:16 세로 릴스 MP4 한 번에 합성. 페이드·슬라이드 전환 자동 · 인스타 릴스·틱톡 바로 업로드.',
+              title: '숏폼 MP4 자동 변환',
+              desc: '생성한 카드뉴스 시리즈를 9:16 세로 숏폼 MP4 로 한 번에 합성. 페이드·슬라이드 전환 자동 · 인스타 릴스·틱톡·유튜브 쇼츠 바로 업로드.',
             },
           ].map((f, i) => (
             <div
@@ -290,18 +290,18 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ─────────── 결과물 · 릴스 변환 ─────────── */}
+      {/* ─────────── 결과물 · 숏폼 변환 ─────────── */}
       <section id="templates" className="bg-slate-50 border-y border-slate-100">
         <div className="max-w-6xl mx-auto px-5 py-20 sm:py-24">
           <div className="text-center">
             <h2 className="text-[28px] sm:text-[36px] font-black tracking-[-0.025em]">
-              카드뉴스 5~10장 <span style={{ color: '#4338ca' }}>→</span> 릴스 MP4 한 번에
+              카드뉴스 5~10장 <span style={{ color: '#4338ca' }}>→</span> 숏폼 MP4 한 번에
             </h2>
             <p className="mt-3 text-slate-600 text-[16px] font-medium">
-              브랜드 톤 유지하며 시리즈로 생성 · 바로 릴스로 합성해 인스타 업로드
+              브랜드 톤 유지하며 시리즈로 생성 · 9:16 숏폼 MP4 한 번에 합성 (릴스·틱톡·쇼츠 공용)
             </p>
           </div>
-          {/* 시리즈 카드 5장 샘플 + 릴스 MP4 프리뷰 */}
+          {/* 시리즈 카드 5장 샘플 + 숏폼 MP4 프리뷰 */}
           <div className="mt-12 grid grid-cols-1 md:grid-cols-[1.3fr_1fr] gap-6 items-center">
             {/* 좌: 실제 생성된 YOOSUN 시리즈 */}
             <div className="p-6 bg-white rounded-[20px] border border-slate-200 relative">
@@ -326,17 +326,17 @@ export function Landing() {
               </div>
             </div>
 
-            {/* 우: 실제 생성된 릴스 MP4 embed */}
+            {/* 우: 실제 생성된 숏폼 MP4 embed */}
             <ReelSamplePreview />
           </div>
 
-          {/* 릴스 변환 기능 상세 */}
+          {/* 숏폼 변환 기능 상세 */}
           <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { emoji: '📐', label: '9:16 세로', sub: '자동 레이아웃' },
               { emoji: '✨', label: '3종 전환', sub: '페이드·슬라이드·줌' },
               { emoji: '🚀', label: '10~30초', sub: 'FFmpeg 고속 합성' },
-              { emoji: '📲', label: '바로 업로드', sub: '릴스·틱톡·쇼츠' },
+              { emoji: '📲', label: '바로 업로드', sub: '릴스·틱톡·쇼츠' }, // 플랫폼명 유지
             ].map((f, i) => (
               <div
                 key={i}
@@ -374,7 +374,7 @@ export function Landing() {
             {
               n: '03',
               title: '내보내기',
-              desc: '생성된 카드를 바로 편집하거나, PNG·ZIP·릴스(MP4) 로 다운로드해서 업로드.',
+              desc: '생성된 카드를 바로 편집하거나, PNG·ZIP·숏폼 MP4 로 다운로드해서 업로드.',
             },
           ].map((s, i) => (
             <div
@@ -434,7 +434,7 @@ export function Landing() {
                   '카드 100장',
                   '브랜드 5개',
                   '워터마크 없음',
-                  '릴스 MP4 내보내기',
+                  '숏폼 MP4 내보내기',
                 ],
               },
               {

@@ -44,6 +44,7 @@ export class GenerateController {
       baseImageUrls: body.baseImageUrls,
       template: body.template,
       autoGenerateImage: body.autoGenerateImage,
+      sizePreset: body.sizePreset,
       clientIp,
     })
   }

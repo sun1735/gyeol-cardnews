@@ -66,6 +66,7 @@ interface GenInput {
   clientIp?: string // 운영 로그 식별용 — DTO 가 아니라 컨트롤러에서 주입
   template?: 'basic' | 'product-ad' | 'promo'
   autoGenerateImage?: boolean
+  sizePreset?: '1:1' | '4:5' | '9:16'
 }
 
 interface DesignOut {
@@ -774,7 +775,18 @@ export class GenerateService {
     const t0 = Date.now()
     const imgPrompt = input.prompt ?? cards[0]?.title ?? '제품 광고'
     const recipe = brand ? buildStyleRecipe(brand) : undefined
-    const aspectRatio: '1:1' | '4:5' = template === 'promo' ? '1:1' : '4:5'
+    // 사용자가 9:16 숏폼으로 선택했으면 이미지도 9:16 세로로 생성해 자연스러운 릴스·틱톡·쇼츠 커버.
+    // 아니면 template 기준 (promo=1:1, product-ad=4:5).
+    const aspectRatio: '1:1' | '4:5' | '9:16' =
+      input.sizePreset === '9:16'
+        ? '9:16'
+        : input.sizePreset === '4:5'
+          ? '4:5'
+          : input.sizePreset === '1:1'
+            ? '1:1'
+            : template === 'promo'
+              ? '1:1'
+              : '4:5'
     try {
       const result = await generateImageWithGemini({
         prompt: imgPrompt,
