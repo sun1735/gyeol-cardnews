@@ -170,48 +170,37 @@ export function buildLayoutDslPrompt(input: BuildDslPromptInput): BuildDslPrompt
 
   const brandPrimary = typeof brand?.primaryColor === 'string' ? brand.primaryColor : '#4338ca'
 
+  // 시스템 프롬프트 — 간결하게. 긴 프롬프트는 Gemini 응답 지연의 주원인.
   const sys = [
-    '당신은 한국 SNS 카드뉴스 AI 레이아웃 디자이너입니다. 절대 동일한 구도를 반복하지 않습니다.',
-    '반드시 canvas + blocks 로 구성된 Layout DSL JSON 하나만 반환합니다.',
-    '블록은 6~10개. 블록 종류: image, title, subtitle, body, badge, price, features, cta, swatch, decor.',
-    '좌표는 rect=[x,y,w,h] 퍼센트(0~100). 모든 블록은 서로 명확히 구분된 영역을 가져야 하며, 겹칠 경우 decor(mask-gradient/mask-solid)로 텍스트 가독성을 보장합니다.',
-    'image.url 은 반드시 정확히 "{{image}}" 문자열. 외부 URL 금지. image 크기는 30%~100% 사이(HERO_FULL 패밀리일 때만 100%).',
-    '반드시 title, body, cta 블록을 포함합니다. body 는 48자 이상의 문장형.',
-    'body 텍스트는 제목과 명확히 다른 내용(설명/혜택/근거/배경)을 담아야 합니다. 제목을 반복하면 안 됩니다.',
-    '색상은 HEX(#RRGGBB). 대비 4.5:1 이상 유지(어두운 배경 + 밝은 글자, 또는 반대).',
-    '페이지 번호(예: 1/5), 과장/단정 표현, 의료 효능 표현 금지.',
+    '한국 SNS 카드뉴스 AI 디자이너. canvas + blocks 로 구성된 Layout DSL JSON 하나만 반환.',
+    '블록 6~10개. 타입: image, title, subtitle, body, badge, price, features, cta, swatch, decor.',
+    'rect=[x,y,w,h] 퍼센트(0~100). 겹침 시 decor(mask-gradient/mask-solid)로 가독성 확보.',
+    'image.url 은 반드시 "{{image}}". image 크기 30~100%.',
+    'title/body/cta 필수. body 는 48자 이상, 제목과 다른 내용(설명/혜택).',
+    '색상 HEX #RRGGBB, 대비 4.5:1 이상. 페이지 번호·과장 금지.',
+    `강제 패밀리: ${familyFull}`,
+    '전형적 split(좌 텍스트+우 이미지) 만 뽑지 말 것. 매 호출마다 다른 구도.',
     '',
-    '── 매번 반드시 지켜야 할 다양성 규칙 ──',
-    '1) 이 호출에 적용할 패밀리(강제): ' + familyFull,
-    '2) 피해야 할 안전한 기본값: "이미지를 좌측 55%에 두고 우측 텍스트 + 하단 CTA bar" 같은 전형적 split 만 매번 뽑지 말 것.',
-    '3) title 의 align/pos, image 의 rect 위치, decor 사용 여부를 매 호출마다 다르게.',
-    '4) cardLayout 은 cover/content/cta 중 문맥에 맞는 것 하나.',
-    '5) 배경(canvas.bg 또는 decor 패널) 색은 주제 감성과 브랜드 primary 에서 파생된 HEX 를 새로 선택.',
-    '',
-    '── 예시 1 (TOP_IMAGE) ──',
+    '예시:',
     JSON.stringify(EXAMPLE_1),
-    '── 예시 2 (LEFT_PANEL) ──',
-    JSON.stringify(EXAMPLE_2),
-    '',
-    '위 예시는 참고용일 뿐 그대로 복사하지 마세요. 구도·색·블록 배치·문장을 전부 새로 만드세요.',
   ].join('\n')
 
-  const userTextLines = [recipe ? recipeAsPromptBlock(recipe) : '', '']
-  if (contextBlock) {
-    userTextLines.push('[브랜드 지식노트 — 근거로 활용, 인용은 자연스럽게]')
-    userTextLines.push(contextBlock)
-    userTextLines.push('')
+  // 사용자 텍스트 — RAG 청크는 총 800자로 제한해 속도 확보.
+  const trimmedContext = contextBlock ? contextBlock.slice(0, 800) : ''
+  const userTextLines: string[] = []
+  if (recipe) userTextLines.push(recipeAsPromptBlock(recipe))
+  if (trimmedContext) {
+    userTextLines.push('', '[지식노트 발췌]', trimmedContext)
   }
   userTextLines.push(
+    '',
     `주제: ${prompt}`,
     `브랜드: ${brand?.name ?? '미지정'} (primary ${brandPrimary})`,
-    `카드 수: ${n}`,
-    `템플릿 방향: ${template === 'promo' ? '이벤트·세일 (대담·긴장감)' : '상품 광고 (정보 밀집·신뢰)'}`,
-    `이번 호출 seed: ${seed} (이 seed 가 달라지면 반드시 새로운 구도·색·문구).`,
-    `강제 패밀리: ${familyFull}`,
-    'canvas.w=1080, h 는 1080/1350/1920 중 주제에 어울리는 값.',
+    `카드 수: ${n} · seed: ${seed}`,
+    `방향: ${template === 'promo' ? '이벤트·세일(대담)' : '상품 광고(정보·신뢰)'}`,
+    'canvas.w=1080, h=1080/1350/1920 중 택1.',
   )
-  const userText = userTextLines.filter((l) => l !== undefined).join('\n')
+  const userText = userTextLines.join('\n')
 
   return { sys, userText, seed, family, familyFull }
 }
@@ -264,8 +253,8 @@ export interface RunLayoutDslsInput {
 }
 
 // DSL 은 구조화 JSON 을 많이 만들어야 해 일반 카피 LLM(15s)보다 오래 걸림.
-// Gemini 2.5 Flash 기준 통상 10~30s, worst case 40s. 여유있게 45s 로 세팅.
-const DSL_CALL_TIMEOUT_MS = 45_000
+// 45s 로 실 배포 확인 시 aborted 가 또 났음 → 60s 로 상향 + 프롬프트 절반 단축.
+const DSL_CALL_TIMEOUT_MS = 60_000
 
 export async function runLayoutDsls(
   input: RunLayoutDslsInput,
