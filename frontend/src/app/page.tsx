@@ -3357,108 +3357,203 @@ function CardItem({
             fontFamily: font,
           }}
         >
-          {card.imageUrl ? (
-            <img
-              src={card.imageUrl}
-              alt=""
-              crossOrigin="anonymous"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                opacity: isCover ? 0.9 : 0.35,
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: `linear-gradient(135deg, ${primary}1A, ${primary}80)`,
-              }}
-            />
+          {/* ─────────── Cover: 풀블리드 이미지 + 하단 그라디언트 + 대형 타이틀 ─────────── */}
+          {card.layout === 'cover' && (
+            <>
+              {card.imageUrl ? (
+                <img
+                  src={card.imageUrl}
+                  alt=""
+                  crossOrigin="anonymous"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${primary} 0%, ${primary}cc 100%)` }} />
+              )}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%)',
+                }}
+              />
+              {/* 시리즈 힌트 — 우상단 "1 / N" */}
+              {total > 1 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: Math.round(d.display * 0.04),
+                    right: Math.round(d.display * 0.04),
+                    padding: `${Math.round(d.display * 0.012)}px ${Math.round(d.display * 0.028)}px`,
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.9)',
+                    color: primary,
+                    fontSize: Math.round(d.display * 0.028),
+                    fontWeight: 800,
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  {index + 1} / {total}
+                </div>
+              )}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0, right: 0, bottom: 0,
+                  padding: pad,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: Math.round(d.display * 0.02),
+                }}
+              >
+                {renderedSubtext && (
+                  <div style={{ fontSize: subtextSize, fontWeight: subtextWeight, letterSpacing: '0.08em', color: subtextColor ?? '#fde68a', textTransform: 'uppercase', textAlign: subtextAlign }}>
+                    {renderedSubtext}
+                  </div>
+                )}
+                <div style={{ fontSize: titleSize, fontWeight: titleWeight, color: titleColor ?? '#ffffff', lineHeight: 1.15, letterSpacing: '-0.025em', textAlign: titleAlign, textShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>
+                  {card.title || ' '}
+                </div>
+                {card.body && (
+                  <div style={{ fontSize: bodySize, fontWeight: bodyWeight, lineHeight: 1.55, color: bodyColor ?? 'rgba(255,255,255,0.92)', whiteSpace: 'pre-wrap', textAlign: bodyAlign, textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>
+                    {card.body}
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
-          {onImage && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background:
-                  'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.6) 100%)',
-              }}
-            />
+          {/* ─────────── Content: 상단 이미지 50% + 하단 카드 50% (솔리드 배경) ─────────── */}
+          {card.layout === 'content' && (
+            <>
+              {/* 상단 이미지 영역 */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '48%', overflow: 'hidden', background: `${primary}33` }}>
+                {card.imageUrl ? (
+                  <img
+                    src={card.imageUrl}
+                    alt=""
+                    crossOrigin="anonymous"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${primary}55, ${primary}bb)` }} />
+                )}
+              </div>
+              {/* 하단 카드 영역 */}
+              <div
+                style={{
+                  position: 'absolute', top: '48%', left: 0, right: 0, bottom: 0,
+                  background: bg,
+                  padding: pad,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: Math.round(d.display * 0.018),
+                }}
+              >
+                <div>
+                  {renderedSubtext && (
+                    <div style={{ fontSize: subtextSize, fontWeight: subtextWeight, letterSpacing: '0.06em', color: subtextColor ?? primary, textTransform: 'uppercase', textAlign: subtextAlign, marginBottom: Math.round(d.display * 0.012) }}>
+                      {renderedSubtext}
+                    </div>
+                  )}
+                  <div style={{ fontSize: titleSize, fontWeight: titleWeight, color: titleColor ?? text, lineHeight: 1.2, letterSpacing: '-0.02em', textAlign: titleAlign }}>
+                    {card.title || ' '}
+                  </div>
+                  {card.body && (
+                    <div style={{ fontSize: bodySize, fontWeight: bodyWeight, lineHeight: 1.65, color: bodyColor ?? text, whiteSpace: 'pre-wrap', textAlign: bodyAlign, marginTop: Math.round(d.display * 0.02), opacity: 0.85 }}>
+                      {card.body}
+                    </div>
+                  )}
+                </div>
+                {/* 하단 인덱서 선 */}
+                {total > 1 && (
+                  <div style={{ display: 'flex', gap: Math.round(d.display * 0.008), marginTop: Math.round(d.display * 0.02) }}>
+                    {Array.from({ length: total }).map((_, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          flex: 1,
+                          height: 2,
+                          background: i === index ? primary : `${primary}33`,
+                          borderRadius: 1,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              padding: pad,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent,
-              gap: Math.round(d.display * 0.018),
-            }}
-          >
-            {renderedSubtext && (
+          {/* ─────────── CTA: 솔리드 브랜드 컬러 + 중앙 정렬 + 대형 버튼 ─────────── */}
+          {card.layout === 'cta' && (
+            <>
+              <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${primary} 0%, ${primary}dd 100%)` }} />
+              {card.imageUrl && (
+                <img
+                  src={card.imageUrl}
+                  alt=""
+                  crossOrigin="anonymous"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.18, mixBlendMode: 'overlay' }}
+                />
+              )}
+              {/* 원형 액센트 장식 */}
               <div
                 style={{
-                  fontSize: subtextSize,
-                  fontWeight: subtextWeight,
-                  letterSpacing: '0.04em',
-                  color: subtextColor ?? (onImage ? '#e2e8f0' : primary),
-                  textAlign: subtextAlign,
+                  position: 'absolute',
+                  top: -Math.round(d.display * 0.1),
+                  right: -Math.round(d.display * 0.1),
+                  width: Math.round(d.display * 0.4),
+                  height: Math.round(d.display * 0.4),
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.08)',
                 }}
-              >
-                {renderedSubtext}
-              </div>
-            )}
-            <div
-              style={{
-                fontSize: titleSize,
-                fontWeight: titleWeight,
-                color: titleColor ?? (onImage ? '#ffffff' : text),
-                lineHeight: 1.25,
-                letterSpacing: '-0.02em',
-                textAlign: titleAlign,
-              }}
-            >
-              {card.title || ' '}
-            </div>
-            {card.body && (
+              />
               <div
                 style={{
-                  fontSize: bodySize,
-                  fontWeight: bodyWeight,
-                  lineHeight: 1.65,
-                  color: bodyColor ?? (onImage ? '#f8fafc' : text),
-                  whiteSpace: 'pre-wrap',
-                  textAlign: bodyAlign,
+                  position: 'absolute', inset: 0,
+                  padding: pad,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: Math.round(d.display * 0.02),
                 }}
               >
-                {card.body}
+                {renderedSubtext && (
+                  <div style={{ fontSize: subtextSize, fontWeight: subtextWeight, letterSpacing: '0.15em', color: subtextColor ?? 'rgba(255,255,255,0.85)', textTransform: 'uppercase' }}>
+                    {renderedSubtext}
+                  </div>
+                )}
+                <div style={{ fontSize: titleSize, fontWeight: titleWeight, color: titleColor ?? '#ffffff', lineHeight: 1.15, letterSpacing: '-0.02em', textShadow: '0 2px 12px rgba(0,0,0,0.25)' }}>
+                  {card.title || ' '}
+                </div>
+                {card.body && (
+                  <div style={{ fontSize: bodySize, fontWeight: bodyWeight, lineHeight: 1.6, color: bodyColor ?? 'rgba(255,255,255,0.9)', whiteSpace: 'pre-wrap', maxWidth: '88%' }}>
+                    {card.body}
+                  </div>
+                )}
+                {renderedCta && (
+                  <div
+                    style={{
+                      marginTop: Math.round(d.display * 0.03),
+                      fontSize: Math.round(ctaSize * 1.1),
+                      fontWeight: 800,
+                      color: ctaColor ?? primary,
+                      background: '#ffffff',
+                      padding: `${Math.round(d.display * 0.025)}px ${Math.round(d.display * 0.055)}px`,
+                      borderRadius: Math.round(d.display * 0.015),
+                      boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    {renderedCta}
+                  </div>
+                )}
               </div>
-            )}
-            {renderedCta && (
-              <div
-                style={{
-                  alignSelf: toAlignSelf(ctaAlign),
-                  marginTop: Math.round(d.display * 0.015),
-                  fontSize: ctaSize,
-                  fontWeight: ctaWeight,
-                  color: ctaColor ?? (onImage ? primary : '#ffffff'),
-                  background: onImage ? '#ffffff' : primary,
-                  padding: `${Math.round(d.display * 0.018)}px ${Math.round(d.display * 0.038)}px`,
-                  borderRadius: Math.round(d.display * 0.015),
-                }}
-              >
-                {renderedCta}
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
         )}
       </div>
