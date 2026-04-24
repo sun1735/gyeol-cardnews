@@ -117,44 +117,26 @@ export function cardArraySchema(maxCount: number) {
 }
 
 // LayoutDSL — LLM 이 "어떤 블록을 어디에 어떤 스타일로" 자유롭게 배치하게 하는 스키마.
-// rect 는 [x, y, w, h] 0~100 퍼센트. 매번 새로운 레이아웃이 나오도록 설계.
-export function layoutDslSchema(maxCount: number) {
+// Gemini responseSchema 는 state-space 제한이 엄격해 enum·maxItems·중첩이 많으면
+// HTTP 400 "too many states" 를 낸다. → 스키마는 최소한으로만 강제하고
+// 실제 값 검증(enum, 길이, HEX 등)은 backend/src/generate/schema.ts 의 validateLayoutDsl 에서 수행.
+export function layoutDslSchema(_maxCount: number) {
   const blockItem = {
     type: 'object',
     properties: {
       id: { type: 'string' },
-      type: {
-        type: 'string',
-        enum: ['image', 'title', 'subtitle', 'body', 'badge', 'price', 'features', 'cta', 'swatch', 'decor'],
-      },
-      rect: {
-        type: 'array',
-        items: { type: 'number' },
-        maxItems: 4,
-      },
-      pos: {
-        type: 'string',
-        enum: [
-          'top-left', 'top-center', 'top-right',
-          'middle-left', 'center', 'middle-right',
-          'bottom-left', 'bottom-center', 'bottom-right',
-        ],
-      },
-      align: { type: 'string', enum: ['left', 'center', 'right'] },
+      type: { type: 'string' }, // enum 제거 — validator 가 체크
+      rect: { type: 'array', items: { type: 'number' } },
+      pos: { type: 'string' },
+      align: { type: 'string' },
       text: { type: 'string' },
       url: { type: 'string' },
       color: { type: 'string' },
       background: { type: 'string' },
       size: { type: 'number' },
       weight: { type: 'number' },
-      fit: { type: 'string', enum: ['cover', 'contain'] },
-      style: {
-        type: 'string',
-        enum: [
-          'pill', 'circle', 'underline', 'ribbon', 'blur', 'solid', 'glass',
-          'mask-gradient', 'mask-solid', 'corner-accent',
-        ],
-      },
+      fit: { type: 'string' },
+      style: { type: 'string' },
       rotate: { type: 'number' },
       zIndex: { type: 'number' },
       priceOriginal: { type: 'number' },
@@ -162,7 +144,6 @@ export function layoutDslSchema(maxCount: number) {
       discountPercent: { type: 'number' },
       features: {
         type: 'array',
-        maxItems: 4,
         items: {
           type: 'object',
           properties: {
@@ -172,11 +153,7 @@ export function layoutDslSchema(maxCount: number) {
           required: ['icon', 'label'],
         },
       },
-      swatches: {
-        type: 'array',
-        items: { type: 'string' },
-        maxItems: 6,
-      },
+      swatches: { type: 'array', items: { type: 'string' } },
       big: { type: 'string' },
     },
     required: ['id', 'type'],
@@ -187,7 +164,6 @@ export function layoutDslSchema(maxCount: number) {
     properties: {
       cards: {
         type: 'array',
-        maxItems: maxCount,
         items: {
           type: 'object',
           properties: {
@@ -202,14 +178,10 @@ export function layoutDslSchema(maxCount: number) {
               },
               required: ['w', 'h', 'bg'],
             },
-            blocks: {
-              type: 'array',
-              maxItems: 12,
-              items: blockItem,
-            },
-            cardLayout: { type: 'string', enum: ['cover', 'content', 'cta'] },
+            blocks: { type: 'array', items: blockItem },
+            cardLayout: { type: 'string' },
           },
-          required: ['canvas', 'blocks', 'cardLayout'],
+          required: ['canvas', 'blocks'],
         },
       },
     },
