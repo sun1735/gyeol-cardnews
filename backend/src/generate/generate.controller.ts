@@ -43,6 +43,7 @@ export class GenerateController {
       brandId: body.brandId,
       baseImageUrls: body.baseImageUrls,
       template: body.template,
+      autoGenerateImage: body.autoGenerateImage,
       clientIp,
     })
   }

@@ -128,6 +128,8 @@ export default function Page() {
   const [mode, setMode] = useState<GenMode>('auto')
   // 카드 템플릿 — basic(기본) / product-ad(상품 광고) / promo(프로모션, 추후).
   const [template, setTemplate] = useState<Template>('basic')
+  // product-ad/promo 에서 이미지 없을 때 Gemini Image 로 자동 생성 (기본 ON, 유료 플랜 의도)
+  const [autoGenerateImage, setAutoGenerateImage] = useState(true)
   // requiresNoteRag 인 템플릿은 모드가 note-rag 가 아니면 자동 basic 복귀.
   useEffect(() => {
     const meta = TEMPLATES.find((t) => t.key === template)
@@ -513,6 +515,7 @@ export default function Page() {
             baseImageUrls: baseImages.length ? baseImages : undefined,
             sizePreset: size,
             template,
+            autoGenerateImage,
           }),
         })
         if (enqRes.status === 429) {
@@ -554,6 +557,7 @@ export default function Page() {
               brandId: selectedBrandId || undefined,
               baseImageUrls: baseImages.length ? baseImages : undefined,
               template,
+              autoGenerateImage,
             }
           : {
               mode: 'manual',
@@ -566,6 +570,7 @@ export default function Page() {
               brandId: selectedBrandId || undefined,
               baseImageUrls: baseImages.length ? baseImages : undefined,
               template,
+              autoGenerateImage,
             }
       const r = await authedFetch('/api/generate/cards', {
         method: 'POST',
@@ -1431,6 +1436,24 @@ export default function Page() {
                   이벤트·세일 감성으로 AI 가 레이아웃을 새로 짭니다. 매번 다른 구도 ·
                   1장씩 생성, 대형 할인율·기간 문구 중심.
                 </p>
+              )}
+              {(template === 'product-ad' || template === 'promo') && (
+                <label className="mt-3 flex items-start gap-2.5 p-2.5 rounded-[10px] bg-indigo-50/60 border border-indigo-100 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoGenerateImage}
+                    onChange={(e) => setAutoGenerateImage(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                  <span className="flex-1">
+                    <span className="block text-[13px] font-bold text-indigo-900">
+                      AI 이미지 자동 생성
+                    </span>
+                    <span className="block text-[11px] text-indigo-700/80 font-medium mt-0.5">
+                      이미지 업로드 안 해도 Gemini 가 브랜드·주제에 맞춰 배경을 생성합니다. 약 10~20초 추가.
+                    </span>
+                  </span>
+                </label>
               )}
             </div>
 

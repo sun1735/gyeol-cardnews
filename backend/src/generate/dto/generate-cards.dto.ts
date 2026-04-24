@@ -88,4 +88,12 @@ export class GenerateCardsDto {
   })
   @IsOptional() @IsIn(['basic', 'product-ad', 'promo'])
   template?: 'basic' | 'product-ad' | 'promo'
+
+  @ApiPropertyOptional({
+    description:
+      'product-ad / promo 템플릿에서 baseImageUrls 가 없을 때 Gemini Image 로 배경 이미지를 자동 생성할지. 기본 true.',
+    example: true,
+  })
+  @IsOptional()
+  autoGenerateImage?: boolean
 }

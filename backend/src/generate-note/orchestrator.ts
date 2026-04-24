@@ -34,7 +34,7 @@ import {
   layoutDslSchema,
 } from '../generate/llm-gemini'
 import { runLayoutDsls } from '../generate/layout-dsl-prompt'
-import { editImageWithGemini, saveEditedImage } from '../images/editor'
+import { editImageWithGemini, generateImageWithGemini, saveEditedImage } from '../images/editor'
 import { GenerateFromNoteDto } from './dto/generate-from-note.dto'
 import { KnowledgeSearchService, RetrievedChunk } from './knowledge-search.service'
 import { ImageRankerService, RankedImage } from './image-ranker.service'
@@ -150,7 +150,19 @@ export class Orchestrator {
     await setProgress(65)
 
     // 7) 병렬 이미지 편집 — template 전달(프롬프트 힌트 차별화)
+    //    product-ad/promo + 참조 이미지·랭커 결과 모두 없고 autoGenerateImage 이면
+    //    Gemini Image 로 배경 1장 자동 생성해 모든 카드에 주입.
     const refs = (dto.baseImageUrls ?? []).filter((u) => u?.startsWith('/uploads/'))
+    const autoImageOn = dto.autoGenerateImage !== false
+    const rankedHasAny = ranked.some((r) => !!r)
+    if (
+      (template === 'product-ad' || template === 'promo') &&
+      refs.length === 0 &&
+      !rankedHasAny &&
+      autoImageOn
+    ) {
+      await this.autoGenerateAndInject(ranked, dto.prompt, brand, template)
+    }
     const editResults = await this.parallelEdit(copies, ranked, refs, recipe, template)
     const editedCount = editResults.filter((r) => r.status === 'edited').length
     const editFailed = editResults.filter((r) => r.status === 'failed').length
@@ -482,6 +494,38 @@ export class Orchestrator {
     } catch (e: any) {
       this.logger.warn(`Gemini 호출 예외 — 템플릿 폴백: ${e?.message ?? e}`)
       return templateCopies
+    }
+  }
+
+  // baseImages·브랜드 이미지 라이브러리가 모두 없을 때 호출.
+  // Gemini Image 로 배경 이미지 1장 생성 → ranked 배열 전부에 같은 URL 을 주입해
+  // 이후 parallelEdit 이 이 URL 을 기반으로 카드별 편집을 수행하게 한다.
+  private async autoGenerateAndInject(
+    ranked: (RankedImage | null)[],
+    prompt: string,
+    brand: any,
+    template: 'product-ad' | 'promo',
+  ): Promise<void> {
+    if (!process.env.GEMINI_API_KEY) {
+      this.logger.warn('[auto-image:note-rag] GEMINI_API_KEY 없음 — 스킵')
+      return
+    }
+    const t0 = Date.now()
+    const recipe = brand ? buildStyleRecipe(brand) : undefined
+    const aspectRatio: '1:1' | '4:5' = template === 'promo' ? '1:1' : '4:5'
+    try {
+      const result = await generateImageWithGemini({
+        prompt,
+        recipe,
+        aspectRatio,
+      })
+      const url = await saveEditedImage(result.bytes, result.mimeType)
+      for (let i = 0; i < ranked.length; i++) {
+        if (!ranked[i]) ranked[i] = { url, score: 1, source: 'auto' } as any
+      }
+      this.logger.log(`[auto-image:note-rag] ✓ ${Date.now() - t0}ms · url=${url}`)
+    } catch (e: any) {
+      this.logger.warn(`[auto-image:note-rag] ✗ 실패 — 텍스트 폴백: ${e?.message ?? e}`)
     }
   }
 

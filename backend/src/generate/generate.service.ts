@@ -22,6 +22,7 @@ import {
   layoutDslSchema,
 } from './llm-gemini'
 import { runLayoutDsls } from './layout-dsl-prompt'
+import { generateImageWithGemini, saveEditedImage } from '../images/editor'
 
 type CardSource = 'llm' | 'template'
 
@@ -64,6 +65,7 @@ interface GenInput {
   baseImageUrls?: string[] // Mode A — 프롬프트에 공통 첨부된 참조 이미지 1~3장
   clientIp?: string // 운영 로그 식별용 — DTO 가 아니라 컨트롤러에서 주입
   template?: 'basic' | 'product-ad' | 'promo'
+  autoGenerateImage?: boolean
 }
 
 interface DesignOut {
@@ -304,6 +306,17 @@ export class GenerateService {
         input.mode === 'manual'
           ? this.wrapManual(input.cards ?? [], brand, baseImages)
           : await this.fromPrompt(input.prompt ?? '', effectiveCount, brand, baseImages)
+
+      // AI 이미지 자동 생성 — product-ad/promo + baseImages 없음 + autoGenerateImage !== false.
+      // DSL 생성 전에 이미지를 먼저 만들어 두고 built.cards[*].imageUrl 에 주입.
+      const autoImageOn = input.autoGenerateImage !== false
+      if (
+        (template === 'product-ad' || template === 'promo') &&
+        baseImages.length === 0 &&
+        autoImageOn
+      ) {
+        await this.autoGenerateBackgroundImage(built.cards, input, brand, template)
+      }
 
       // LayoutDSL 자유 배치 — product-ad/promo 일 때 LLM 이 블록 배치를 매번 새로 설계.
       // DSL 생성 실패(timeout/error)가 전체 요청을 500 으로 만들지 않도록 try/catch 로 격리.
@@ -741,6 +754,42 @@ export class GenerateService {
       return { cards: null, timedOut: false }
     } finally {
       clearTimeout(timeoutId)
+    }
+  }
+
+  // 사용자가 이미지를 업로드하지 않았고 템플릿이 product-ad/promo 일 때,
+  // Gemini Image API 로 브랜드·프롬프트 기반 배경 이미지 1장을 자동 생성.
+  // 실패해도 예외를 흘리지 않고 그냥 진행 (LLM 이 텍스트 중심 레이아웃으로 알아서 채움).
+  private async autoGenerateBackgroundImage(
+    cards: CardOut[],
+    input: GenInput,
+    brand: any,
+    template: 'product-ad' | 'promo',
+  ): Promise<void> {
+    const logger = new Logger('AutoImage')
+    if (!process.env.GEMINI_API_KEY) {
+      logger.warn('GEMINI_API_KEY 없음 — 자동 이미지 생성 스킵')
+      return
+    }
+    const t0 = Date.now()
+    const imgPrompt = input.prompt ?? cards[0]?.title ?? '제품 광고'
+    const recipe = brand ? buildStyleRecipe(brand) : undefined
+    const aspectRatio: '1:1' | '4:5' = template === 'promo' ? '1:1' : '4:5'
+    try {
+      const result = await generateImageWithGemini({
+        prompt: imgPrompt,
+        recipe,
+        aspectRatio,
+      })
+      const url = await saveEditedImage(result.bytes, result.mimeType)
+      for (const c of cards) if (!c.imageUrl) c.imageUrl = url
+      logger.log(
+        `[auto-image] ✓ 생성 완료 ${Date.now() - t0}ms · url=${url} · applied=${cards.length}`,
+      )
+    } catch (e: any) {
+      logger.warn(
+        `[auto-image] ✗ 실패 — 텍스트 중심 레이아웃으로 폴백: ${e?.message ?? e}`,
+      )
     }
   }
 
