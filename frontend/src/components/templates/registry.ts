@@ -11,8 +11,11 @@ export interface TemplateMeta {
   requiresNoteRag: boolean
   // 권장 비율 (UI 에 힌트로 표시)
   recommendedAspect: '1:1' | '4:5' | '9:16'
-  // 준비 중 여부
+  // 준비 중 여부 (선택 불가)
   disabled: boolean
+  // 베타 기능 — 선택은 가능하지만 뱃지 + 안내 표시
+  beta?: boolean
+  betaNote?: string
 }
 
 export const TEMPLATES: TemplateMeta[] = [
@@ -27,19 +30,22 @@ export const TEMPLATES: TemplateMeta[] = [
   {
     key: 'product-ad',
     title: '상품 광고',
-    description: 'AI 구도·가격·스펙',
-    // 모든 모드(auto/manual/note-rag)에서 사용 가능. note-rag 면 지식노트 근거까지 활용.
+    description: 'AI 구도 (베타)',
     requiresNoteRag: false,
     recommendedAspect: '4:5',
     disabled: false,
+    beta: true,
+    betaNote: 'AI 이미지 생성 품질이 안정화 중입니다. 실패 시 기본 템플릿으로 시도해 주세요.',
   },
   {
     key: 'promo',
     title: '프로모션',
-    description: 'AI 구도·이벤트 감성',
+    description: 'AI 이벤트 감성 (베타)',
     requiresNoteRag: false,
     recommendedAspect: '1:1',
     disabled: false,
+    beta: true,
+    betaNote: 'AI 이미지 생성 품질이 안정화 중입니다. 실패 시 기본 템플릿으로 시도해 주세요.',
   },
 ]
 

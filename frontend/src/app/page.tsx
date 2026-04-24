@@ -1405,18 +1405,33 @@ export default function Page() {
                       key={t.key}
                       onClick={() => !blocked && setTemplate(t.key)}
                       disabled={blocked}
-                      className={`px-2.5 py-2.5 rounded-[10px] text-left transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                      title={t.beta ? t.betaNote : undefined}
+                      className={`relative px-2.5 py-2.5 rounded-[10px] text-left transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         active
                           ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200'
-                          : 'text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200'
+                          : t.beta
+                            ? 'text-slate-500 hover:bg-slate-50 ring-1 ring-slate-200 bg-slate-50/50'
+                            : 'text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200'
                       }`}
                     >
-                      <span className="block text-[15px] font-bold tracking-[-0.01em]">
+                      {t.beta && (
+                        <span
+                          className="absolute top-1 right-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wider"
+                          aria-label="베타 기능"
+                        >
+                          BETA
+                        </span>
+                      )}
+                      <span
+                        className={`block text-[15px] font-bold tracking-[-0.01em] ${
+                          t.beta && !active ? 'text-slate-500' : ''
+                        }`}
+                      >
                         {t.title}
                       </span>
                       <span
                         className={`block text-[12px] mt-0.5 font-medium ${
-                          active ? 'text-indigo-700' : 'text-slate-600'
+                          active ? 'text-indigo-700' : t.beta ? 'text-slate-400' : 'text-slate-600'
                         }`}
                       >
                         {desc}
@@ -1425,17 +1440,17 @@ export default function Page() {
                   )
                 })}
               </div>
-              {template === 'product-ad' && (
-                <p className="mt-2.5 text-[13px] text-slate-600 leading-relaxed">
-                  AI 가 <b>구도·컬러·장식까지</b> 결정합니다. 매 생성마다 다른 결과 —
-                  마음에 들 때까지 "다시 만들기". 1장씩 생성, 수정도 가능합니다.
-                </p>
-              )}
-              {template === 'promo' && (
-                <p className="mt-2.5 text-[13px] text-slate-600 leading-relaxed">
-                  이벤트·세일 감성으로 AI 가 레이아웃을 새로 짭니다. 매번 다른 구도 ·
-                  1장씩 생성, 대형 할인율·기간 문구 중심.
-                </p>
+              {(template === 'product-ad' || template === 'promo') && (
+                <div className="mt-2.5 p-2.5 rounded-md bg-amber-50 border border-amber-200">
+                  <p className="text-[12px] text-amber-800 font-semibold mb-1">
+                    ⚠ 베타 기능 — 이미지 품질 안정화 중
+                  </p>
+                  <p className="text-[12px] text-amber-700/90 leading-relaxed">
+                    AI 가 구도·컬러를 매번 새로 설계하지만 이미지 생성이 실패하면 텍스트 중심
+                    카드만 나올 수 있습니다. 일관된 시리즈 카드가 필요하면 <b>기본 템플릿 + 지식노트
+                    기반</b> 모드를 권장합니다.
+                  </p>
+                </div>
               )}
               {(template === 'product-ad' || template === 'promo') && (
                 <label className="mt-3 flex items-start gap-2.5 p-2.5 rounded-[10px] bg-indigo-50/60 border border-indigo-100 cursor-pointer">
@@ -3291,11 +3306,11 @@ function CardItem({
 
       {/* 카드 프리뷰 (렌더 대상) */}
       <div className="flex justify-center">
-        {/* LayoutDSL 누락 경고 — product-ad/promo 인데 DSL 이 안 생성된 경우 */}
+        {/* LayoutDSL 누락 경고 — product-ad/promo (베타) 인데 DSL 이 안 생성된 경우 */}
         {(card.template === 'product-ad' || card.template === 'promo') &&
           !card.layoutDsl && (
-            <div className="absolute top-2 left-2 z-20 px-2 py-1 rounded bg-amber-500 text-white text-[10px] font-bold shadow">
-              ⚠ AI 구도 생성 실패 · 기본 렌더로 폴백
+            <div className="absolute top-2 left-2 z-20 px-2.5 py-1.5 rounded bg-amber-500 text-white text-[11px] font-bold shadow max-w-[90%]">
+              ⚠ 베타 기능 — 이미지 생성 실패. 기본 템플릿으로 시도해 주세요
             </div>
           )}
         {(card.template === 'product-ad' || card.template === 'promo') && card.layoutDsl ? (

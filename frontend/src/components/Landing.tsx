@@ -74,7 +74,7 @@ export function Landing() {
               AI 카드뉴스 생성 · Powered by Gemini
             </div>
             <h1 className="text-[44px] sm:text-[56px] font-black tracking-[-0.035em] leading-[1.05]">
-              1분이면{' '}
+              브랜드 톤 유지{' '}
               <span
                 style={{
                   background: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
@@ -83,14 +83,14 @@ export function Landing() {
                   color: 'transparent',
                 }}
               >
-                인스타 카드뉴스 5장
+                5~10장 카드뉴스
               </span>
-              <br />이 완성됩니다
+              <br />시리즈 자동 생성
             </h1>
             <p className="mt-6 text-[18px] sm:text-[19px] text-slate-600 leading-relaxed font-medium">
-              브랜드 지식노트를 업로드하면 AI 가 톤과 스타일을 학습해
+              브랜드 지식노트를 업로드하면 AI 가 톤·색상·핵심 메시지를 기억해
               <br className="hidden sm:inline" />
-              상품 광고·프로모션 카드를 자동으로 만들어줍니다.
+              일관된 스토리의 인스타 카드뉴스 5~10장을 한 번에 완성합니다.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -160,13 +160,13 @@ export function Landing() {
           {[
             {
               emoji: '📚',
-              title: '지식노트 기반 카피',
-              desc: '브랜드 문서·FAQ·보도자료를 업로드하면 AI 가 실제 근거로 카피를 씁니다. 숫자·고유명사·톤이 자동으로 맞춰집니다.',
+              title: '브랜드 메모리 (지식노트)',
+              desc: '브랜드 문서·FAQ·보도자료를 업로드하면 AI 가 톤·핵심 메시지·숫자·고유명사를 기억합니다. 매 생성마다 같은 브랜드 감성이 유지됩니다.',
             },
             {
-              emoji: '🎨',
-              title: '3종 템플릿',
-              desc: '기본·상품 광고·프로모션 템플릿 선택. 가격·할인율·기능 아이콘까지 자동으로 채워지고, 디자인은 고정된 최신 트렌드 그리드.',
+              emoji: '🧵',
+              title: '5~10장 시리즈 일관성',
+              desc: 'Cover → Content → CTA 흐름으로 5~10장이 연결된 스토리로 나옵니다. GPT 한 번에 한 장씩 뽑는 것과 차원이 다른 결과물.',
             },
             {
               emoji: '⚡',
@@ -206,37 +206,49 @@ export function Landing() {
             {[
               {
                 key: 'basic' as const,
-                title: '기본',
-                desc: '콘텐츠·공지·스토리텔링 카드뉴스. 실제 생성 예시 ↓',
+                title: '기본 (추천)',
+                desc: '5~10장 카드뉴스 시리즈. 브랜드 톤·스토리 일관성 유지. 실제 생성 예시 ↓',
                 primary: '#4338ca',
                 sample: '/samples/yoosun-basic.png',
                 badge: '실제 생성 예시',
+                beta: false,
               },
               {
                 key: 'product-ad' as const,
                 title: '상품 광고',
-                desc: '가격·할인율·기능 아이콘까지. 쇼핑몰 상세페이지 감성.',
+                desc: '가격·할인율 AI 구도 (베타 · 이미지 품질 안정화 중)',
                 primary: '#4338ca',
                 sample: undefined,
+                beta: true,
               },
               {
                 key: 'promo' as const,
                 title: '프로모션',
-                desc: '이벤트·세일·한정. 중앙 대형 할인율이 주인공.',
+                desc: '이벤트·세일 AI 구도 (베타 · 이미지 품질 안정화 중)',
                 primary: '#dc2626',
                 sample: undefined,
+                beta: true,
               },
             ].map((t) => (
               <div
                 key={t.key}
-                className="flex flex-col items-center gap-5 p-6 bg-white rounded-[20px] border border-slate-200 hover:shadow-lg transition relative"
+                className={`flex flex-col items-center gap-5 p-6 bg-white rounded-[20px] border transition relative ${
+                  t.beta
+                    ? 'border-slate-200 opacity-75 hover:opacity-100'
+                    : 'border-slate-200 hover:shadow-lg'
+                }`}
               >
-                {t.badge && (
+                {t.badge && !t.beta && (
                   <div
                     className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full text-white text-[10px] font-bold tracking-wider uppercase"
                     style={{ background: '#4338ca' }}
                   >
                     {t.badge}
+                  </div>
+                )}
+                {t.beta && (
+                  <div className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold tracking-wider uppercase border border-amber-200">
+                    BETA
                   </div>
                 )}
                 <TemplatePreview
@@ -248,7 +260,9 @@ export function Landing() {
                 />
                 <div className="text-center">
                   <h3 className="text-[20px] font-bold tracking-[-0.015em]">{t.title}</h3>
-                  <p className="mt-1.5 text-[14px] text-slate-600 font-medium leading-relaxed">
+                  <p className={`mt-1.5 text-[14px] font-medium leading-relaxed ${
+                    t.beta ? 'text-slate-500' : 'text-slate-600'
+                  }`}>
                     {t.desc}
                   </p>
                 </div>
